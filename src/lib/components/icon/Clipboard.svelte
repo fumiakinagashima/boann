@@ -1,0 +1,9 @@
+<script lang="ts">
+	let { size = 24, class: cls = '' }: { size?: number; class?: string } = $props();
+</script>
+
+<svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class={cls} aria-hidden="true">
+	<path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2" />
+	<rect x="9" y="3" width="6" height="4" rx="1" />
+	<path d="M9 12h6M9 16h4" />
+</svg>

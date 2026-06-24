@@ -1,0 +1,51 @@
+{
+  "name": "midleton",
+  "private": true,
+  "version": "0.0.1",
+  "type": "module",
+  "scripts": {
+    "dev": "vite dev",
+    "build": "vite build",
+    "preview": "vite preview",
+    "prepare": "svelte-kit sync || echo ''",
+    "check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
+    "check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch",
+    "db:studio": "drizzle-kit studio --config=drizzle.local.config.ts",
+    "db:seed:demo": "bun run scripts/seed-demo-data.ts",
+    "db:seed:remote-sql": "bun run scripts/generate-seed-sql.ts",
+    "test:unit": "vitest run",
+    "test:e2e": "playwright test"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20260607.1",
+    "@libsql/client": "^0.17.3",
+    "@playwright/test": "^1.60.0",
+    "@sveltejs/adapter-auto": "^7.0.1",
+    "@sveltejs/adapter-cloudflare": "^7.2.8",
+    "@sveltejs/kit": "^2.57.0",
+    "@sveltejs/vite-plugin-svelte": "^7.0.0",
+    "@types/node": "^25.9.2",
+    "drizzle-kit": "^0.31.10",
+    "jszip": "^3.10.1",
+    "sass": "^1.100.0",
+    "svelte": "^5.55.2",
+    "svelte-check": "^4.4.6",
+    "typescript": "^6.0.2",
+    "vite": "^8.0.7",
+    "vitest": "^4.1.8"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.102.0",
+    "@inlang/paraglide-sveltekit": "^0.16.1",
+    "docx": "^9.7.1",
+    "drizzle-orm": "^0.45.2",
+    "exceljs": "^4.4.0",
+    "marked": "^18.0.5",
+    "pptxgenjs": "^4.0.1",
+    "xss": "^1.0.15",
+    "zod": "^4.4.3"
+  },
+  "trustedDependencies": [
+    "@parcel/watcher"
+  ]
+}

@@ -1,0 +1,17 @@
+ANTHROPIC_API_KEY=""
+MOCK_AI="false"
+# AI_MODEL="claude-haiku-4-5-20251001"  # haiku (default) | claude-sonnet-4-6 | claude-opus-4-8
+
+# Email (set EMAIL_PROVIDER to use: resend | ses | smtp)
+EMAIL_PROVIDER="resend"
+EMAIL_FROM=""
+EMAIL_FROM_NAME="Midleton"
+RESEND_API_KEY=""
+# SES_REGION="ap-northeast-1"
+# SES_ACCESS_KEY_ID=""
+# SES_SECRET_ACCESS_KEY=""
+# SMTP_HOST=""
+# SMTP_PORT="587"
+# SMTP_SECURE="false"
+# SMTP_USERNAME=""
+# SMTP_PASSWORD=""

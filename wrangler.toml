@@ -1,0 +1,32 @@
+name = "midleton"
+compatibility_date = "2025-01-01"
+compatibility_flags = ["nodejs_compat"]
+
+main = "worker.ts"
+assets = { directory = ".svelte-kit/cloudflare/", binding = "ASSETS" }
+
+# リマインダー配信: pending な reminders を1分ごとにチェックし、remind_at に達したものを送信する
+[triggers]
+crons = ["* * * * *"]
+
+[[d1_databases]]
+binding = "DB"
+database_name = "midleton"
+database_id = "06f71c5e-2de6-4db4-b951-64705293e69a"
+migrations_dir = "drizzle"
+
+# KV: 本番デプロイ前に `wrangler kv namespace create midleton` を実行し id を本番用の値に置き換えること
+# （ローカル開発では id はダミー値で良く、.wrangler/state にローカルKVが作成される）
+[[kv_namespaces]]
+binding = "KV"
+id = "7c211f829aba4616b1ff26beb3ed5835"
+
+# R2: 本番デプロイ前に `wrangler r2 bucket create midleton` を実行すること
+[[r2_buckets]]
+binding = "R2"
+bucket_name = "midleton"
+
+[vars]
+# ANTHROPIC_API_KEY は `wrangler secret put ANTHROPIC_API_KEY` で管理する（[vars] に書くと deploy 時にシークレットを空文字で上書きしてしまうため定義しない）
+# ローカル開発時のモックモード（.dev.vars で上書き可能）
+MOCK_AI = "false"

@@ -1,0 +1,256 @@
+import type { Db } from '../db';
+import type { ToolEnv } from '../mcp/shared';
+import { dispatchTool, type ToolName } from '../mcp';
+import { getEnabledWorkflows, getWorkflow, type WorkflowRow } from '../db/workflow-service';
+import { recordWorkflowRun } from '../db/workflow-run-service';
+import { getAccount } from '../db/account-service';
+import { getJstHourMinute } from '$lib/datetime';
+import { getWorkflowActionTool, parseStepRef, parseItemRef } from '$lib/workflow-tools';
+import { WORKFLOW_FOREACH_MAX_ITEMS, WORKFLOW_MAX_ACTIONS_PER_RUN } from '$lib/constants';
+import type {
+	WorkflowStep,
+	WorkflowActionStep,
+	WorkflowForeachStep,
+	WorkflowResultType
+} from '$lib/types/chat';
+
+type StepResult = { type: WorkflowResultType; value: boolean | number | string };
+type ListResults = Map<string, Record<string, unknown>[]>;
+/** ネストしたforeachの「現在の項目」をforeachのidごとに積んだスタック。配列の末尾が最も内側のforeach。 */
+type ItemStack = { foreachStepId: string; item: Record<string, unknown> }[];
+
+/** ワークフロー実行を即時中断させるためのエラー（未定義の変数参照・未対応ツール等）。 */
+class WorkflowAbortError extends Error {}
+
+/**
+ * ネストしたforeachの組み合わせ爆発（例: 50件×50件×50件の3段ネスト）を防ぐための、
+ * 1回の実行全体で許容するアクション実行回数の残量。runSteps/runForeachの再帰全体で1つを共有する。
+ */
+type Budget = { remaining: number };
+
+function consumeBudget(budget: Budget): void {
+	if (budget.remaining <= 0) {
+		throw new WorkflowAbortError(
+			`1回の実行で許容するアクション数の上限（${WORKFLOW_MAX_ACTIONS_PER_RUN}）を超えました。foreachのネストを減らしてください`
+		);
+	}
+	budget.remaining--;
+}
+
+function resolveOperand(operand: string, results: Map<string, StepResult>, itemStack: ItemStack): StepResult {
+	const itemRef = parseItemRef(operand);
+	if (itemRef !== null) {
+		const scope = itemRef.foreachStepId
+			? itemStack.find((s) => s.foreachStepId === itemRef.foreachStepId)
+			: itemStack[itemStack.length - 1];
+		if (!scope) throw new WorkflowAbortError(`@item参照はforeachの中でのみ使用できます: ${operand}`);
+		const v = scope.item[itemRef.field];
+		if (v === undefined) throw new WorkflowAbortError(`現在の項目に存在しないフィールドです: ${itemRef.field}`);
+		const type: WorkflowResultType = typeof v === 'number' ? 'number' : typeof v === 'boolean' ? 'boolean' : 'string';
+		return { type, value: (v as boolean | number | string) ?? '' };
+	}
+	const refId = parseStepRef(operand);
+	if (refId === null) return { type: 'string', value: operand };
+	const found = results.get(refId);
+	if (!found) throw new WorkflowAbortError(`参照先のステップ結果が見つかりません: ${refId}`);
+	return found;
+}
+
+function compare(left: StepResult, operator: string, right: StepResult): boolean {
+	let rv: boolean | number | string = right.value;
+	if (left.type === 'number') rv = typeof rv === 'number' ? rv : Number(rv);
+	else if (left.type === 'boolean') rv = typeof rv === 'boolean' ? rv : rv === 'true';
+	const lv = left.value;
+	switch (operator) {
+		case '==':
+			return lv === rv;
+		case '!=':
+			return lv !== rv;
+		case '>':
+			return (lv as number) > (rv as number);
+		case '<':
+			return (lv as number) < (rv as number);
+		case '>=':
+			return (lv as number) >= (rv as number);
+		case '<=':
+			return (lv as number) <= (rv as number);
+		default:
+			throw new WorkflowAbortError(`未対応の演算子です: ${operator}`);
+	}
+}
+
+async function runAction(
+	db: Db,
+	step: WorkflowActionStep,
+	results: Map<string, StepResult>,
+	listResults: ListResults,
+	env: ToolEnv | undefined,
+	selfEmail: string | null,
+	itemStack: ItemStack,
+	budget: Budget
+): Promise<void> {
+	consumeBudget(budget);
+	const toolDef = getWorkflowActionTool(step.tool);
+	if (!toolDef) throw new WorkflowAbortError(`未対応のツールです: ${step.tool}`);
+
+	const resolvedParams: Record<string, string | number> = {};
+	for (const field of toolDef.params) {
+		const raw = step.params?.[field.key];
+		if (!raw) continue;
+		const value = resolveOperand(raw, results, itemStack).value;
+		if (field.type === 'number') {
+			resolvedParams[field.key] = Number(value);
+		} else if (field.type === 'date' && typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value)) {
+			// <input type="date"> の "YYYY-MM-DD" は new Date() でUTC深夜と解釈されJSTと9時間ズレるため、
+			// JSTのウォールクロックとして明示的にオフセットを付与する（until は当日いっぱいを含めるため終端時刻にする）
+			resolvedParams[field.key] = `${value}T${field.key === 'until' ? '23:59:59' : '00:00:00'}+09:00`;
+		} else {
+			resolvedParams[field.key] = String(value);
+		}
+	}
+
+	let input: Record<string, unknown> = resolvedParams;
+	if (step.tool === 'send_email') {
+		if (!selfEmail) throw new WorkflowAbortError('送信先（自分のメールアドレス）が特定できません');
+		input = { ...resolvedParams, to: selfEmail };
+	} else if (step.tool === 'get_entities') {
+		// entity_type_id はカタログのparamsに含めず、エディタの「対象」選択で直接 step.params に設定される
+		const entityTypeId = step.params?.entity_type_id;
+		if (!entityTypeId) throw new WorkflowAbortError(`「${step.label}」の対象テーブルが選択されていません`);
+		input = { ...resolvedParams, entity_type_id: entityTypeId };
+	} else if (step.tool === 'send_slack_notification') {
+		// integration_id はカタログのparamsに含めず、エディタの「対象」選択で直接 step.params に設定される
+		const integrationId = step.params?.integration_id;
+		if (!integrationId) throw new WorkflowAbortError(`「${step.label}」のSlack連携先が選択されていません`);
+		input = { ...resolvedParams, integration_id: integrationId };
+	}
+
+	const raw = await dispatchTool(db, step.tool as ToolName, input, env);
+
+	if (toolDef.resultType && toolDef.extractResult) {
+		results.set(step.id, { type: toolDef.resultType, value: toolDef.extractResult(raw) });
+	}
+	if (toolDef.listResult) {
+		listResults.set(step.id, toolDef.listResult.extractList(raw));
+	}
+}
+
+async function runForeach(
+	db: Db,
+	step: WorkflowForeachStep,
+	results: Map<string, StepResult>,
+	listResults: ListResults,
+	env: ToolEnv | undefined,
+	selfEmail: string | null,
+	itemStack: ItemStack,
+	budget: Budget
+): Promise<void> {
+	const refId = parseStepRef(step.source);
+	if (!refId) throw new WorkflowAbortError(`「${step.label}」の対象が選択されていません`);
+	const items = listResults.get(refId);
+	if (!items) throw new WorkflowAbortError(`「${step.label}」の参照先のリスト結果が見つかりません: ${refId}`);
+	for (const item of items.slice(0, WORKFLOW_FOREACH_MAX_ITEMS)) {
+		await runSteps(db, step.body, results, listResults, env, selfEmail, [...itemStack, { foreachStepId: step.id, item }], budget);
+	}
+}
+
+async function runSteps(
+	db: Db,
+	steps: WorkflowStep[],
+	results: Map<string, StepResult>,
+	listResults: ListResults,
+	env: ToolEnv | undefined,
+	selfEmail: string | null,
+	itemStack: ItemStack = [],
+	budget: Budget = { remaining: WORKFLOW_MAX_ACTIONS_PER_RUN }
+): Promise<void> {
+	for (const step of steps) {
+		if (step.kind === 'action') {
+			await runAction(db, step, results, listResults, env, selfEmail, itemStack, budget);
+		} else if (step.kind === 'condition') {
+			const left = resolveOperand(step.left, results, itemStack);
+			const right = resolveOperand(step.right, results, itemStack);
+			if (compare(left, step.operator, right)) {
+				await runSteps(db, step.then, results, listResults, env, selfEmail, itemStack, budget);
+			}
+		} else {
+			await runForeach(db, step, results, listResults, env, selfEmail, itemStack, budget);
+		}
+	}
+}
+
+export type WorkflowRunResult = { id: string; name: string; ok: boolean; error?: string };
+
+const WORKFLOW_RUN_LOCK_PREFIX = 'workflow-run-lock:';
+/** ロックの取り忘れ（異常終了等）に備えたフェイルセーフのTTL。通常は実行完了時にreleaseRunLockで即時解放する。 */
+const WORKFLOW_RUN_LOCK_TTL_SECONDS = 90;
+
+/**
+ * 「今すぐ実行」とCron tickが同じワークフローを同時に実行してしまう（通知の重複送信等）のを防ぐ、
+ * KVを使ったベストエフォートのロック。KVはアトミックなcompare-and-swapを提供しないため完全な排他制御ではないが、
+ * 実用上の同時実行（同じ分の重複発火・連打）はこれで十分防げる。KV未設定（ローカル開発等）の場合は実行を許可する。
+ */
+async function acquireRunLock(kv: KVNamespace | undefined, workflowId: string): Promise<boolean> {
+	if (!kv) return true;
+	const key = `${WORKFLOW_RUN_LOCK_PREFIX}${workflowId}`;
+	if (await kv.get(key)) return false;
+	await kv.put(key, '1', { expirationTtl: WORKFLOW_RUN_LOCK_TTL_SECONDS });
+	return true;
+}
+
+async function releaseRunLock(kv: KVNamespace | undefined, workflowId: string): Promise<void> {
+	if (!kv) return;
+	await kv.delete(`${WORKFLOW_RUN_LOCK_PREFIX}${workflowId}`);
+}
+
+async function executeWorkflow(db: Db, workflow: WorkflowRow, env?: ToolEnv): Promise<WorkflowRunResult> {
+	if (!(await acquireRunLock(env?.KV, workflow.id))) {
+		return {
+			id: workflow.id,
+			name: workflow.name,
+			ok: false,
+			error: '他の処理がこのワークフローを実行中のため今回はスキップしました。しばらく待ってから再度お試しください'
+		};
+	}
+	const startedAt = new Date();
+	try {
+		const account = workflow.accountId ? await getAccount(db, workflow.accountId) : null;
+		// send_notification 等、env.accountId を「通知・登録の宛先」として参照するツールのために、
+		// ワークフローの登録者をこの実行スコープのアカウントとして引き渡す
+		const toolEnv: ToolEnv | undefined = workflow.accountId
+			? { ...(env ?? {}), accountId: workflow.accountId }
+			: env;
+		await runSteps(db, workflow.steps, new Map(), new Map(), toolEnv, account?.email ?? null);
+		await recordWorkflowRun(db, { workflowId: workflow.id, ok: true, startedAt, finishedAt: new Date() });
+		return { id: workflow.id, name: workflow.name, ok: true };
+	} catch (e) {
+		const error = e instanceof Error ? e.message : String(e);
+		await recordWorkflowRun(db, { workflowId: workflow.id, ok: false, error, startedAt, finishedAt: new Date() });
+		return { id: workflow.id, name: workflow.name, ok: false, error };
+	} finally {
+		await releaseRunLock(env?.KV, workflow.id);
+	}
+}
+
+/** 毎分のCronから呼ばれる。現在のJST時刻に一致する有効なワークフローを実行する。 */
+export async function processDueWorkflows(
+	db: Db,
+	env?: ToolEnv,
+	now: Date = new Date()
+): Promise<WorkflowRunResult[]> {
+	const { hour, minute } = getJstHourMinute(now);
+	const due = (await getEnabledWorkflows(db)).filter(
+		(w) => w.triggerHour === hour && w.triggerMinute === minute
+	);
+	return Promise.all(due.map((workflow) => executeWorkflow(db, workflow, env)));
+}
+
+/**
+ * 「今すぐ実行」用。トリガー時刻・有効化フラグを無視し、DBに保存されている内容をそのまま即時実行する
+ * （編集中の画面上の未保存の内容ではない）。テスト目的の手動実行。
+ */
+export async function runWorkflowNow(db: Db, workflowId: string, env?: ToolEnv): Promise<WorkflowRunResult> {
+	const workflow = await getWorkflow(db, workflowId);
+	if (!workflow) throw new Error('ワークフローが見つかりません');
+	return executeWorkflow(db, workflow, env);
+}

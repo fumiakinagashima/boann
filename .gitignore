@@ -1,0 +1,34 @@
+node_modules
+package-lock.json
+
+# Output
+.output
+.vercel
+.netlify
+.wrangler
+/.svelte-kit
+/build
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Env
+.env
+.env.*
+!.env.example
+!.env.test
+.dev.vars
+
+# Vite
+vite.config.js.timestamp-*
+vite.config.ts.timestamp-*
+
+# Test artifacts
+/test-results
+/playwright-report
+/blob-report
+
+# Internal docs
+/docs
+CLAUDE.md
