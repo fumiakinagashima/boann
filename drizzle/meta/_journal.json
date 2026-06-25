@@ -5,22 +5,8 @@
     {
       "idx": 0,
       "version": "6",
-      "when": 1780881386550,
-      "tag": "0000_previous_paibok",
-      "breakpoints": true
-    },
-    {
-      "idx": 1,
-      "version": "6",
-      "when": 1780896000000,
-      "tag": "0001_phase3_schema",
-      "breakpoints": true
-    },
-    {
-      "idx": 2,
-      "version": "6",
-      "when": 1749350000000,
-      "tag": "0002_integrations",
+      "when": 1750000000000,
+      "tag": "0000_initial",
       "breakpoints": true
     }
   ]

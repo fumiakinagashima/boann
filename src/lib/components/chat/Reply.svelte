@@ -128,6 +128,14 @@
 					placeholder={field.placeholder ?? ''}
 					disabled={submitted}
 				/>
+			{:else if field.type === 'textarea'}
+				<textarea
+					class="text-input textarea-input"
+					bind:value={answers[field.key] as string}
+					placeholder={field.placeholder ?? ''}
+					disabled={submitted}
+					rows={4}
+				></textarea>
 			{:else}
 				<input
 					type="text"
@@ -252,6 +260,12 @@
 	}
 
 	/* ---- text / number input ---- */
+	.textarea-input {
+		max-width: 400px;
+		resize: vertical;
+		min-height: 80px;
+	}
+
 	.text-input {
 		width: 100%;
 		max-width: 280px;

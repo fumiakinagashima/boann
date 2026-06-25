@@ -11,7 +11,7 @@ export const tools: Tool[] = [
 			properties: {
 				topic: {
 					type: 'string',
-					enum: ['overview', 'customers', 'deals', 'activities', 'documents', 'approvals', 'apps', 'reminders', 'email'],
+					enum: ['overview', 'apps', 'tables', 'records', 'workflows', 'documents', 'reminders', 'email'],
 					description: '知りたいトピック（省略時は全体概要）'
 				}
 			}
@@ -20,136 +20,119 @@ export const tools: Tool[] = [
 ];
 
 const getHelpInputSchema = z.object({
-	topic: z.enum(['overview', 'customers', 'deals', 'activities', 'documents', 'approvals', 'apps', 'reminders', 'email']).optional()
+	topic: z.enum(['overview', 'apps', 'tables', 'records', 'workflows', 'documents', 'reminders', 'email']).optional()
 });
 
 const HELP: Record<string, object> = {
 	overview: {
-		title: 'Midleton 使い方ガイド',
-		description: 'チャットで業務指示を出すだけで、顧客管理・案件管理・資料作成・申請管理などが完結するAIファーストなCRM/SFAシステムです',
+		title: 'Boann 使い方ガイド',
+		description: 'チャットで業務指示を出すだけで、カスタムアプリの作成・データ管理・ワークフロー自動化などが完結するAIファーストなノーコードプラットフォームです',
 		features: [
-			{ name: '顧客・担当者管理', topic: 'customers', examples: ['〇〇株式会社を登録して', '田中さんの会社を探して', '名刺を読み取って登録したい'] },
-			{ name: '案件管理', topic: 'deals', examples: ['〇〇社に新しい案件を作って', '今月の商談状況を教えて', '案件をガントチャートで見せて'] },
-			{ name: '活動履歴', topic: 'activities', examples: ['〇〇社に電話した記録を残して', '先週の活動一覧を見せて'] },
-			{ name: '資料生成（Word/Excel/PowerPoint）', topic: 'documents', examples: ['今月の営業報告書をWordで作って', '案件一覧をExcelにまとめて', '会議用スライドを作って'] },
-			{ name: '申請管理', topic: 'approvals', examples: ['出張費用の申請を作って', '承認待ちの申請は？'] },
-			{ name: 'ノーコードアプリ生成', topic: 'apps', examples: ['在庫管理アプリを作って', 'プロジェクト管理テーブルが欲しい'] },
+			{ name: 'ノーコードアプリ生成', topic: 'apps', examples: ['在庫管理アプリを作って', '採用候補者を管理するテーブルが欲しい', '問い合わせ管理アプリを作って'] },
+			{ name: 'テーブル管理', topic: 'tables', examples: ['どんなテーブルがある？', '商品管理テーブルにカテゴリフィールドを追加して'] },
+			{ name: 'レコード操作', topic: 'records', examples: ['在庫管理に新しい商品を登録して', '商品一覧を見せて', '〇〇の在庫数を更新して'] },
+			{ name: 'ワークフロー自動化', topic: 'workflows', examples: ['毎日9時に在庫数が少ない商品を通知して', 'ワークフローを作りたい'] },
+			{ name: '資料生成（CSV/Markdownデータ）', topic: 'documents', examples: ['商品一覧をExcel用にまとめて', 'データをCSVで出力して'] },
 			{ name: 'リマインダー', topic: 'reminders', examples: ['明日の10時にフォローアップをリマインドして'] },
-			{ name: 'メール送信', topic: 'email', examples: ['〇〇社にお礼メールを送って'] }
+			{ name: 'メール送信', topic: 'email', examples: ['〇〇にお知らせメールを送って'] }
 		],
 		tips: [
 			'自然な日本語で指示するだけでOKです',
-			'各機能の詳しい使い方を聞く場合は「顧客管理の使い方を教えて」のように指定してください',
+			'各機能の詳しい使い方を聞く場合は「アプリ作成の使い方を教えて」のように指定してください',
 			'データ管理・設定変更はサイドメニューの「データ管理」「設定」からも直接操作できます',
-			'顧客・案件・担当者・活動の削除は、一覧の行をクリックして詳細ダイアログを開き、右上の「削除」ボタンから行えます'
+			'レコードの削除は、一覧の行をクリックして詳細ダイアログを開き、右上の「削除」ボタンから行えます'
 		],
 		relatedPages: [
-			{ label: 'データ管理', href: '/database', description: '顧客・案件・活動などのデータを直接管理できます' },
+			{ label: 'データ管理', href: '/database', description: '作成したアプリのテーブル・データを直接管理できます' },
 			{ label: '設定', href: '/settings', description: 'アプリの各種設定を変更できます' }
-		]
-	},
-	customers: {
-		title: '顧客・担当者管理',
-		operations: [
-			{ action: '顧客を登録する', examples: ['〇〇株式会社を顧客として登録して', '新規顧客を追加したい'] },
-			{ action: '顧客と担当者を同時に登録する', examples: ['〇〇社の田中さんをまとめて登録して'] },
-			{ action: '名刺をスキャンして登録する', examples: ['名刺を読み取って登録したい', '名刺をスキャンしたい'] },
-			{ action: '顧客を検索・一覧表示する', examples: ['田中さんの会社を探して', '東京の顧客一覧を見せて'] },
-			{ action: '顧客情報を更新する', examples: ['〇〇社のメールアドレスを変更して', '〇〇社のステータスを無効にして'] },
-			{ action: '顧客情報を削除する', description: 'チャットまたはデータ管理の顧客一覧で行をクリックして詳細ダイアログを開き、右上の「削除」ボタンから削除します', examples: ['〇〇社を削除したい', '〇〇社の情報を消したい'] },
-			{ action: '担当者を追加する', examples: ['〇〇社に鈴木さんを担当者として登録して'] },
-			{ action: '顧客の詳細を確認する', examples: ['〇〇社の案件・活動・担当者をまとめて教えて'] },
-			{ action: 'ヘルススコアを確認する', examples: ['〇〇社との関係は良好？', 'スコアが低い顧客は？'] },
-			{ action: '引き継ぎサマリーを作成する', examples: ['〇〇社の引き継ぎ資料を作って', '〇〇社とのやり取りをまとめて'] }
-		],
-		relatedPages: [
-			{ label: '顧客一覧', href: '/database/customers', description: '顧客の一覧表示・登録・編集・削除ができます' }
-		]
-	},
-	deals: {
-		title: '案件管理',
-		operations: [
-			{ action: '案件を登録する', examples: ['〇〇社にシステム導入の案件を作って'] },
-			{ action: '案件一覧・集計を見る', examples: ['今月の商談状況を教えて', '受注案件の合計金額は？', '案件をガントチャートで見せて', '営業パイプラインをカンバンで見せて'] },
-			{ action: '案件のステータスを更新する', examples: ['〇〇案件を受注にして', '〇〇案件が失注になった'] },
-			{ action: '案件を削除する', description: 'チャットまたはデータ管理の案件一覧で行をクリックして詳細ダイアログを開き、右上の「削除」ボタンから削除します', examples: ['〇〇案件を削除したい', '〇〇社の案件を消して'] }
-		],
-		statusValues: [
-			{ value: 'open', label: '商談中' },
-			{ value: 'won', label: '受注' },
-			{ value: 'lost', label: '失注' }
-		],
-		relatedPages: [
-			{ label: '案件一覧', href: '/database/deals', description: '案件の一覧表示・登録・編集・削除ができます' }
-		]
-	},
-	activities: {
-		title: '活動履歴',
-		operations: [
-			{ action: '活動を記録する', examples: ['〇〇社に電話した記録を残して', '〇〇社との面談メモを追加して', '〇〇社にメールを送った'] },
-			{ action: '活動履歴を確認する', examples: ['〇〇社との最近のやり取りは？', '今週の活動一覧を見せて'] },
-			{ action: '活動履歴を削除する', description: 'チャットまたはデータ管理の活動一覧で行をクリックして詳細ダイアログを開き、右上の「削除」ボタンから削除します', examples: ['〇〇の活動記録を削除して', '誤って登録した活動を消したい'] }
-		],
-		activityTypes: [
-			{ value: 'note', label: 'メモ' },
-			{ value: 'call', label: '電話' },
-			{ value: 'email', label: 'メール' },
-			{ value: 'meeting', label: '面談' }
-		],
-		relatedPages: [
-			{ label: '活動履歴一覧', href: '/database/activities', description: '活動履歴の一覧表示・登録・削除ができます' }
-		]
-	},
-	documents: {
-		title: '資料生成（Word / Excel / PowerPoint）',
-		operations: [
-			{ action: 'Word文書を作成する', description: '報告書・議事録など文章中心の資料', examples: ['今月の営業報告書をWordで作って', '〇〇社への提案書を作成して'] },
-			{ action: 'Excelブックを作成する', description: '一覧・集計表など表形式データ', examples: ['案件一覧をExcelにまとめて', '今月の売上をExcelで集計して'] },
-			{ action: 'PowerPointスライドを作成する', description: '会議・プレゼン用スライド', examples: ['営業会議用のスライドを作って', '〇〇社向けの提案スライドを作成して'] }
-		],
-		tips: [
-			'AIがデータを収集してから生成するため、少し時間がかかる場合があります',
-			'生成完了後、自動的にダウンロードリンクが表示されます',
-			'どんな内容を含めてほしいか具体的に伝えると、より良い資料が作れます'
-		]
-	},
-	approvals: {
-		title: '申請管理',
-		operations: [
-			{ action: '申請を作成する', examples: ['出張費用10万円の申請を作って', '〇〇の承認申請を出したい'] },
-			{ action: '申請一覧を確認する', examples: ['自分の申請状況を教えて', '承認待ちの申請は？'] },
-			{ action: '申請を承認・否決する', examples: ['〇〇の申請を承認して', '〇〇申請のステップ1を却下して'] },
-			{ action: '申請を取り消す', examples: ['〇〇の申請を取り消して'] }
-		],
-		tips: [
-			'承認ルートは複数ステップ・並列承認に対応しています'
-		],
-		relatedPages: [
-			{ label: '申請管理', href: '/database/approvals', description: '申請の詳細確認・承認・否決操作ができます' }
 		]
 	},
 	apps: {
 		title: 'ノーコードアプリ生成',
-		description: 'CRMのコア機能（顧客/案件/活動）以外の業務データを管理するカスタムテーブル・アプリを対話で設計・作成できます',
+		description: 'チャットで業務内容を伝えるだけで、カスタムテーブル・アプリをAIが自動設計して作成します',
 		operations: [
-			{ action: 'アプリを新規作成する', examples: ['在庫管理アプリを作って', 'プロジェクト管理テーブルが欲しい', '問い合わせ管理を作りたい'] },
-			{ action: 'フィールドを追加する', examples: ['在庫管理テーブルに「担当者」フィールドを追加して'] },
-			{ action: 'データを登録・確認する', examples: ['在庫管理に新しい商品を登録して', '在庫管理の一覧を見せて'] }
+			{ action: '新しいアプリを作成する', examples: ['在庫管理アプリを作って', '採用候補者のトラッキングテーブルが欲しい', '問い合わせ管理を作りたい', '社内の備品管理アプリを作って'] },
+			{ action: 'フィールドを追加する', examples: ['在庫管理テーブルに「担当者」フィールドを追加して', '商品管理に「カテゴリ」列を追加して'] },
+			{ action: '他テーブルと関連付ける', examples: ['案件管理テーブルを顧客テーブルと紐付けたい', '注文テーブルに商品を選択するフィールドを追加して'] }
 		],
 		tips: [
-			'AIが設計したフィールド構成を確認してから作成されます',
-			'顧客・案件などのコアデータと関連付けることもできます',
-			'作成後はデータ管理画面から直接データ管理ができます'
+			'AIがフィールド構成を提案して確認を求めてから作成します',
+			'テーブル同士を recordSelect フィールドで関連付けることができます',
+			'作成後はデータ管理画面から直接データ操作ができます',
+			'フィールド構成の変更はデータ管理のスキーマ編集画面からも行えます'
 		],
 		relatedPages: [
-			{ label: 'データ管理', href: '/database', description: '作成したカスタムアプリのデータ管理ができます' }
+			{ label: 'データ管理', href: '/database', description: '作成したアプリのテーブル一覧・スキーマ編集ができます' }
+		]
+	},
+	tables: {
+		title: 'テーブル管理',
+		description: '作成したカスタムテーブルの確認・フィールド追加・削除ができます',
+		operations: [
+			{ action: 'テーブル一覧を確認する', examples: ['どんなテーブルがある？', 'テーブル一覧を見せて', '作成済みのアプリを教えて'] },
+			{ action: 'フィールドを追加する', examples: ['〇〇テーブルに「△△」フィールドを追加して'] },
+			{ action: 'テーブルを削除する', description: 'データ管理のスキーマ編集画面から削除できます', examples: ['〇〇テーブルを削除したい'] }
+		],
+		tips: [
+			'テーブル名（識別名）は英小文字・数字・アンダースコアのみ使用できます',
+			'システム予約語（accounts, reminders, workflows 等）はテーブル名として使用できません'
+		],
+		relatedPages: [
+			{ label: 'データ管理', href: '/database', description: 'テーブル一覧・スキーマ編集ができます' }
+		]
+	},
+	records: {
+		title: 'レコード操作',
+		description: 'カスタムテーブルのデータ（レコード）の登録・一覧表示・更新・削除ができます',
+		operations: [
+			{ action: 'レコードを登録する', examples: ['在庫管理に新しい商品を追加して', '〇〇テーブルにデータを登録したい'] },
+			{ action: 'レコード一覧を見る', examples: ['商品一覧を見せて', '〇〇テーブルのデータを表示して'] },
+			{ action: 'レコードを更新する', examples: ['〇〇の在庫数を10に変更して', '〇〇テーブルの〇〇レコードを編集して'] },
+			{ action: 'レコードを削除する', description: 'チャットまたはデータ管理の一覧で行をクリックして詳細ダイアログを開き、右上の「削除」ボタンから削除します', examples: ['〇〇レコードを削除したい'] }
+		],
+		tips: [
+			'データ管理画面からも直接レコードの登録・編集・削除ができます',
+			'行クリックで詳細ダイアログを開けます（チャットの一覧テーブルでも使えます）'
+		],
+		relatedPages: [
+			{ label: 'データ管理', href: '/database', description: '各テーブルのレコード一覧・登録・編集・削除ができます' }
+		]
+	},
+	workflows: {
+		title: 'ワークフロー自動化',
+		description: '毎日決まった時刻に実行する自動化フローを作成できます（通知・集計・メール送信など）',
+		operations: [
+			{ action: 'ワークフローを作成する', examples: ['毎日9時に未処理の〇〇を通知して', 'ワークフローを作りたい', '定期実行の自動化フローを作って'] },
+			{ action: 'ワークフロー一覧を確認する', examples: ['設定済みのワークフローは？', 'どんなワークフローがある？'] },
+			{ action: 'ワークフローを編集する', examples: ['〇〇ワークフローのトリガー時刻を変えて', '〇〇ワークフローにステップを追加して'] }
+		],
+		tips: [
+			'トリガーは毎日の決まった時刻のみ対応しています',
+			'action（ツール実行）/ condition（条件分岐）/ foreach（繰り返し）の3種類のステップを組み合わせます',
+			'ワークフロー管理画面から有効化・無効化・実行ログの確認ができます'
+		],
+		relatedPages: [
+			{ label: 'ワークフロー管理', href: '/database/workflows', description: 'ワークフローの一覧・有効化・実行ログ確認ができます' }
+		]
+	},
+	documents: {
+		title: '資料生成（CSV / Markdownデータ出力）',
+		description: 'テーブルのデータをCSV・Markdown形式で出力し、ExcelやAIツールで加工できる素材ファイルを生成します',
+		operations: [
+			{ action: 'データをCSVで出力する', description: 'Excelで開ける表形式データ', examples: ['商品一覧をCSVで出力して', '〇〇テーブルのデータをExcel用にまとめて'] },
+			{ action: 'Markdownレポートを生成する', description: '文章・複数テーブル混在の報告書', examples: ['〇〇のサマリーレポートを作って', '月次まとめをMarkdownで生成して'] }
+		],
+		tips: [
+			'生成したファイルはダウンロードリンクから取得できます',
+			'Excel・ChatGPT・Copilotなどの外部ツールで加工するための素材ファイルです',
+			'具体的な加工内容を伝えると、外部AIツール向けのプロンプトも一緒に生成します'
 		]
 	},
 	reminders: {
 		title: 'リマインダー',
 		description: '指定した日時に通知センター・メール・Slack（連携設定済みの場合）へ通知を送ります',
 		operations: [
-			{ action: 'リマインダーを設定する', examples: ['明日の10時にフォローアップをリマインドして', '来週月曜に〇〇社への提案書提出をリマインドして', '今日の15:00に会議を通知して'] }
+			{ action: 'リマインダーを設定する', examples: ['明日の10時にフォローアップをリマインドして', '来週月曜に〇〇を通知して', '今日の15:00に会議の連絡をして'] }
 		],
 		tips: [
 			'通知先はフォーム送信時に選択できます（通知センター・メール・Slack）',
@@ -163,7 +146,7 @@ const HELP: Record<string, object> = {
 	email: {
 		title: 'メール送信',
 		operations: [
-			{ action: 'メールを作成・送信する', examples: ['〇〇社にお礼メールを送って', '田中さんにフォローアップメールを書いて', '〇〇社への提案メールを作成して'] }
+			{ action: 'メールを作成・送信する', examples: ['〇〇にお知らせメールを送って', '△△担当者にフォローアップメールを書いて', '確認メールを作成して'] }
 		],
 		tips: [
 			'AIが下書きを作成し、フォームで内容を確認・編集してから送信します',

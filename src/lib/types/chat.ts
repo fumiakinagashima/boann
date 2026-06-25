@@ -163,8 +163,9 @@ export type ReplyOption = {
 
 export type ReplyField = {
 	key: string;
-	type: 'single' | 'multiple' | 'text' | 'number' | 'datetime';
+	type: 'single' | 'multiple' | 'text' | 'textarea' | 'number' | 'datetime';
 	label?: string;
+	required?: boolean;
 	options?: ReplyOption[];
 	placeholder?: string;
 };

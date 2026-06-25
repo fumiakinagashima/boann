@@ -1,6 +1,5 @@
 <script lang="ts">
 	import Form from '$lib/components/chat/Form.svelte';
-	import CustomerDetail from './CustomerDetail.svelte';
 	import RecordDetail from './RecordDetail.svelte';
 	import DialogChatSide from './DialogChatSide.svelte';
 	import X from '$lib/components/icon/X.svelte';
@@ -10,12 +9,6 @@
 	import type { FieldDef } from '$lib/server/db/table-service';
 	import { toJstDatetimeLocal } from '$lib/datetime';
 	import type { FormField } from '$lib/types/chat';
-	import type {
-		CustomerDetailCustomer,
-		CustomerDetailContact,
-		CustomerDetailDeal,
-		CustomerDetailActivity
-	} from '$lib/types/chat';
 
 	type Props = {
 		// テーブル種別。コア4種に限らずカスタム(entity)テーブル名も受け付ける
@@ -38,13 +31,6 @@
 	let currentView = $derived(viewStack[viewStack.length - 1] ?? { kind: 'detail' });
 
 	// 詳細 state
-	type CustomerDetailData = {
-		customer: CustomerDetailCustomer;
-		contacts: CustomerDetailContact[];
-		deals: CustomerDetailDeal[];
-		activities: CustomerDetailActivity[];
-	};
-	let customerDetail = $state<CustomerDetailData | null>(null);
 	let genericFields = $state<FieldDef[]>([]);
 	let genericRecord = $state<Record<string, unknown> | null>(null);
 	let detailLoading = $state(true);
@@ -58,23 +44,15 @@
 	let formRef = $state<HTMLFormElement | null>(null);
 	let formKey = $state(0);
 
-	// コアテーブル表示名（カスタムは info.label で解決）
-	const CORE_LABELS: Record<string, string> = {
-		customers: '顧客', contacts: '担当者', deals: '案件', activities: '活動履歴'
-	};
 	function labelFor(t: string): string {
-		return CORE_LABELS[t] ?? ((t === type ? tableLabel : '') || t);
+		return (t === type ? tableLabel : '') || t;
 	}
 
 	async function loadDetail() {
 		detailLoading = true;
-		customerDetail = null;
 		genericRecord = null;
 		try {
-			if (type === 'customers' && recordId) {
-				const res = await fetch(`/api/customers/${recordId}/detail`);
-				customerDetail = res.ok ? ((await res.json()) as CustomerDetailData) : null;
-			} else if (recordId) {
+			if (recordId) {
 				const [infoRes, recRes] = await Promise.all([
 					fetch(`/api/database/${type}/info`),
 					fetch(`/api/database/${type}/records/${recordId}`)
@@ -87,7 +65,6 @@
 				}
 			}
 		} catch {
-			customerDetail = null;
 			genericRecord = null;
 		} finally {
 			detailLoading = false;
@@ -203,7 +180,6 @@
 			const label = currentView.type === type ? formLabel || labelFor(currentView.type) : labelFor(currentView.type);
 			return currentView.mode === 'edit' ? `${label}を編集` : `${label}を登録`;
 		}
-		if (type === 'customers') return customerDetail?.customer.name ?? '顧客詳細';
 		const r = genericRecord;
 		return (r?.name as string) ?? (r?.title as string) ?? `${labelFor(type)}詳細`;
 	});
@@ -212,41 +188,21 @@
 		currentView.kind === 'form' ? formFields.map((f) => ({ key: f.key, label: f.label })) : []
 	);
 
-	// 詳細表示中のレコードを AI アシスタントに渡し、「この顧客」等の指示語を解決できるようにする
+	// 詳細表示中のレコードを AI アシスタントに渡す
 	const chatRecordContext = $derived.by(() => {
-		if (currentView.kind !== 'detail') return null;
-		if (type === 'customers' && customerDetail) {
-			const c = customerDetail.customer;
-			return {
-				type: 'customers',
-				typeLabel: '顧客',
-				id: c.id,
-				label: c.name,
-				data: {
-					会社名: c.name,
-					メール: c.email,
-					電話: c.phone,
-					住所: c.address,
-					ステータス: c.status,
-					メモ: c.notes
-				} as Record<string, unknown>
-			};
+		if (currentView.kind !== 'detail' || !genericRecord) return null;
+		const data: Record<string, unknown> = {};
+		for (const f of genericFields) {
+			const v = genericRecord[f.key];
+			if (v != null && v !== '') data[f.label] = v;
 		}
-		if (genericRecord) {
-			const data: Record<string, unknown> = {};
-			for (const f of genericFields) {
-				const v = genericRecord[f.key];
-				if (v != null && v !== '') data[f.label] = v;
-			}
-			return {
-				type,
-				typeLabel: labelFor(type),
-				id: String(genericRecord.id),
-				label: dialogTitle,
-				data
-			};
-		}
-		return null;
+		return {
+			type,
+			typeLabel: labelFor(type),
+			id: String(genericRecord.id),
+			label: dialogTitle,
+			data
+		};
 	});
 </script>
 
@@ -271,19 +227,6 @@
 			{#if currentView.kind === 'detail'}
 				{#if detailLoading}
 					<div class="loading-wrap"><span class="spinner"></span></div>
-				{:else if type === 'customers'}
-					{#if !customerDetail}
-						<p class="error-text">顧客情報を取得できませんでした。</p>
-					{:else}
-						<CustomerDetail
-							customer={customerDetail.customer}
-							contacts={customerDetail.contacts}
-							deals={customerDetail.deals}
-							activities={customerDetail.activities}
-							onOpenForm={pushFormSpec}
-							onDelete={() => handleDelete('customers', customerDetail!.customer.id)}
-						/>
-					{/if}
 				{:else if !genericRecord}
 					<p class="error-text">レコードを取得できませんでした。</p>
 				{:else}

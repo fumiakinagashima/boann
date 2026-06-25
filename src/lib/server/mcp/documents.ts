@@ -18,7 +18,7 @@ export const tools: Tool[] = [
 	{
 		name: 'build_handoff_data',
 		description:
-			'DBから取得したデータをCSV/Markdownファイルに整形してR2に保存し、ダウンロードリンクと外部AIツール向けのプロンプトをセットで返す。「Excelにまとめて」「資料を作って」などの資料作成依頼に使う。事前に search_deals / get_customers / get_activities 等のツールでデータを取得し、その内容を tables に構成して渡す。',
+			'DBから取得したデータをCSV/Markdownファイルに整形してR2に保存し、ダウンロードリンクと外部AIツール向けのプロンプトをセットで返す。「Excelにまとめて」「資料を作って」などの資料作成依頼に使う。事前に get_entities 等のツールでデータを取得し、その内容を tables に構成して渡す。',
 		input_schema: {
 			type: 'object',
 			properties: {

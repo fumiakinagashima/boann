@@ -10,11 +10,9 @@
 	import MoreVertical from '$lib/components/icon/MoreVertical.svelte';
 	import Bell from '$lib/components/icon/Bell.svelte';
 	import Database from '$lib/components/icon/Database.svelte';
-	import ClipboardCheck from '$lib/components/icon/ClipboardCheck.svelte';
 	import Users from '$lib/components/icon/Users.svelte';
 	import Clock from '$lib/components/icon/Clock.svelte';
 	import Workflow from '$lib/components/icon/Workflow.svelte';
-	import CreditCard from '$lib/components/icon/CreditCard.svelte';
 	import Settings from '$lib/components/icon/Settings.svelte';
 	import LogOut from '$lib/components/icon/LogOut.svelte';
 	import type { AccountRow } from '$lib/server/db/account-service';
@@ -136,7 +134,7 @@
 
 <aside class="sidebar">
 	<div class="sidebar-header">
-		<span class="logo">MIDLETON</span>
+		<span class="logo">BOANN</span>
 	</div>
 
 	<a href="/" class="new-chat-row" onclick={() => chatSession.startNew()}>
@@ -205,11 +203,6 @@
 			データ管理
 		</a>
 
-		<a href="/database/approvals" class="settings-row">
-			<ClipboardCheck size={15} />
-			申請管理
-		</a>
-
 		{#if account.permission === 'admin'}
 			<a href="/database/accounts" class="settings-row">
 				<Users size={15} />
@@ -225,11 +218,6 @@
 		<a href="/database/workflows" class="settings-row">
 			<Workflow size={15} />
 			ワークフロー
-		</a>
-
-		<a href="/bizcard" class="settings-row">
-			<CreditCard size={15} />
-			名刺取り込み
 		</a>
 
 		<a href="/settings" class="settings-row">

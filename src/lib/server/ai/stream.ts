@@ -106,18 +106,9 @@ function sanitizeWorkflowSteps(steps: unknown): WorkflowStep[] {
 	});
 }
 
-// レコード一覧を返す検索系ツール → 詳細ダイアログを開くためのテーブル種別（entity）。
-// AIが <ui type="table"> の body に entity を付け忘れても、直前に使った検索ツールから補完する。
-const RECORD_LIST_TOOL_ENTITY: Record<string, string> = {
-	get_customers: 'customers',
-	search_customers: 'customers',
-	get_contacts: 'contacts',
-	get_deals: 'deals',
-	search_deals: 'deals',
-	get_activities: 'activities',
-	search_activities: 'activities',
-	list_approvals: 'approvals'
-};
+// get_entities はカスタムテーブル名（entity_type_id → name）を DB から解決して entity を補完する。
+// entity 未指定のレコード一覧テーブルへのフォールバック（rows に id がある場合のみ）。
+const RECORD_LIST_TOOL_ENTITY: Record<string, string> = {};
 
 // entity 未指定のレコード一覧テーブルに、ヒント entity を補完する。
 // 行クリックで詳細ダイアログを開けるようにするためのフォールバック（rows に id がある場合のみ）。
@@ -162,12 +153,6 @@ export function parseUITag(tag: string): MessageContent | null {
 			return { type: 'actions', title, actions: JSON.parse(body) };
 		} else if (type === 'values') {
 			return { type: 'values', title, items: JSON.parse(body) };
-		} else if (type === 'gantt') {
-			const opts = body ? JSON.parse(body) : {};
-			return { type: 'gantt', title, filter: opts.filter };
-		} else if (type === 'timeline') {
-			const opts = body ? JSON.parse(body) : {};
-			return { type: 'timeline', title, filter: opts.filter };
 		} else if (type === 'chart') {
 			// chart display is temporarily disabled
 			return null;
@@ -176,17 +161,12 @@ export function parseUITag(tag: string): MessageContent | null {
 			return { type: 'kanban', title, columns, cards };
 		} else if (type === 'link' && href && label) {
 			return { type: 'link', label, href, description, newTab: newTab || undefined };
-		} else if (type === 'bizcard') {
-			return { type: 'bizcard', title };
 		} else if (type === 'document_job' && jobId && label) {
 			return { type: 'document_job', jobId, label };
 		} else if (type === 'doc_handoff' && downloadUrl && filename && label) {
 			return { type: 'doc_handoff', label, downloadUrl, filename, prompt: body };
 		} else if (type === 'reply') {
 			return { type: 'reply', title, fields: JSON.parse(body), submitLabel };
-		} else if (type === 'customer_detail') {
-			const { customer, contacts, deals, activities } = JSON.parse(body);
-			return { type: 'customer_detail', customer, contacts, deals, activities };
 		} else if (type === 'workflow') {
 			const { triggerHour, triggerMinute, steps } = JSON.parse(body);
 			return {
@@ -220,7 +200,6 @@ export async function streamChat(
 	// 「最後に単一エンティティ種別だけを使ったターン」の entity を記憶し、
 	// 最終ターンで entity 未指定テーブルへのフォールバックに使う。
 	// 複数エンティティを同一ターンで使った場合は undefined（どれかわからないため補完しない）。
-	// 例: search_customers → search_deals という2ターン構成では、後半ターンの 'deals' が残る。
 	let hintEntity: string | undefined;
 
 	for (let turn = 0; turn < 10; turn++) {

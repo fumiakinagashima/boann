@@ -54,7 +54,7 @@ export const tools: Tool[] = [
 							ref_table: {
 								type: 'string',
 								description:
-									'type が recordSelect のときの関係先テーブル名。コアテーブルは customers/contacts/deals/activities、カスタムテーブルは list_entity_types で取得した name を指定する'
+									'type が recordSelect のときの関係先テーブル名。list_entity_types で取得したテーブルの name を指定する'
 							}
 						},
 						required: ['key', 'label']
@@ -121,7 +121,7 @@ export const tools: Tool[] = [
 				ref_table: {
 					type: 'string',
 					description:
-						'type が recordSelect のときの関係先テーブル名。コアテーブルは customers/contacts/deals/activities、カスタムテーブルは list_entity_types で取得した name を指定する'
+						'type が recordSelect のときの関係先テーブル名。list_entity_types で取得したテーブルの name を指定する'
 				}
 			},
 			required: ['entity_type_id', 'key', 'label']

@@ -2,7 +2,6 @@ import { z } from 'zod';
 import type { Tool } from '@anthropic-ai/sdk/resources/messages';
 import type { Db } from '../db';
 import { sendEmail, getEmailSetup } from '../email';
-import { recordActivity } from '../db/table-service';
 import { createReminder, listReminders, resolveChannelLabels, deleteSentReminders } from '../db/reminder-service';
 import { deleteReadNotifications, createNotification } from '../db/notification-service';
 import { getSlackIntegration, sendSlackMessage } from '../slack';
@@ -40,18 +39,13 @@ export const tools: Tool[] = [
 	},
 	{
 		name: 'send_email',
-		description:
-			'指定した宛先にメールを送信する。送信成功時、customer_id を指定すると活動履歴に「メール」記録が自動追加される。',
+		description: '指定した宛先にメールを送信する。',
 		input_schema: {
 			type: 'object',
 			properties: {
 				to: { type: 'string', description: '送信先メールアドレス' },
 				subject: { type: 'string', description: '件名' },
-				body: { type: 'string', description: '本文（プレーンテキスト）' },
-				customer_id: {
-					type: 'string',
-					description: '関連する顧客ID（指定すると活動履歴に記録される）'
-				}
+				body: { type: 'string', description: '本文（プレーンテキスト）' }
 			},
 			required: ['to', 'subject', 'body']
 		}
@@ -135,8 +129,7 @@ export async function handleListReminders(db: Db, input: unknown, env?: ToolEnv)
 const sendEmailSchema = z.object({
 	to: z.string().email(),
 	subject: z.string().min(1),
-	body: z.string().min(1),
-	customer_id: z.string().optional()
+	body: z.string().min(1)
 });
 
 export async function handleSendEmail(db: Db, input: unknown, env?: ToolEnv) {
@@ -155,15 +148,7 @@ export async function handleSendEmail(db: Db, input: unknown, env?: ToolEnv) {
 		subject: data.subject,
 		text: body
 	});
-	if (data.customer_id) {
-		await recordActivity(
-			db,
-			data.customer_id,
-			'email',
-			`メール「${data.subject}」を送信しました`,
-			env?.accountId
-		);
-	}
+
 	return { to: data.to, subject: data.subject };
 }
 

@@ -3,28 +3,22 @@
 	import WorkflowEditorDialog from '$lib/components/dialog/WorkflowEditorDialog.svelte';
 	import ActionSelector from '$lib/components/chat/ActionSelector.svelte';
 	import Values from '$lib/components/chat/Values.svelte';
-	import Gantt from '$lib/components/chat/Gantt.svelte';
-	import Timeline from '$lib/components/chat/Timeline.svelte';
 	import Kanban from '$lib/components/chat/Kanban.svelte';
 	import Link from '$lib/components/chat/Link.svelte';
-	import Bizcard from '$lib/components/chat/Bizcard.svelte';
 	import DocumentJob from '$lib/components/chat/DocumentJob.svelte';
 	import DocHandoff from '$lib/components/chat/DocHandoff.svelte';
 	import FormButton from '$lib/components/chat/FormButton.svelte';
 	import Reply from '$lib/components/chat/Reply.svelte';
 	import FormDialog from '$lib/components/dialog/FormDialog.svelte';
 	import RecordDialog from '$lib/components/dialog/RecordDialog.svelte';
-	import ApprovalDialog from '$lib/components/dialog/ApprovalDialog.svelte';
-	import { type CoreType } from '$lib/components/dialog/field-adapter';
 	import TurnHistoryDrawer from '$lib/components/chat/TurnHistoryDrawer.svelte';
 	import TypingIndicator from '$lib/components/ui/TypingIndicator.svelte';
-	import type { Message, MessageContent, FormContent, ActionItem, ValuesContent, GanttContent, TimelineContent, ChartContent, KanbanContent, LinkContent, BizcardContent, DocumentJobContent, DocHandoffContent, ReplyContent, CustomerDetailContent, WorkflowContent } from '$lib/types/chat';
+	import type { Message, MessageContent, FormContent, ActionItem, ValuesContent, ChartContent, KanbanContent, LinkContent, DocumentJobContent, DocHandoffContent, ReplyContent, WorkflowContent } from '$lib/types/chat';
 	import type { StreamEvent } from '$lib/server/ai/stream';
 	import * as m from '$lib/paraglide/messages.js';
 	import { tick, untrack } from 'svelte';
 	import { marked } from 'marked';
 	import { filterXSS } from 'xss';
-	import { toast } from '$lib/stores/toast.svelte';
 	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
 	import { chatSession } from '$lib/stores/chat-session.svelte';
@@ -40,7 +34,7 @@
 	import Plus from '$lib/components/icon/Plus.svelte';
 	import ArrowUp from '$lib/components/icon/ArrowUp.svelte';
 	import Clock from '$lib/components/icon/Clock.svelte';
-	import { CHAT_TITLE_MAX_LENGTH, CHAT_TEXTAREA_MAX_HEIGHT_PX, DEAL_STATUS_IDS } from '$lib/constants';
+	import { CHAT_TITLE_MAX_LENGTH, CHAT_TEXTAREA_MAX_HEIGHT_PX } from '$lib/constants';
 
 	function renderMarkdown(text: string): string {
 		return filterXSS(marked.parse(text, { async: false }) as string);
@@ -99,45 +93,17 @@
 	let panelForm = $state<FormContent | null>(null);
 	let panelWorkflow = $state<WorkflowContent | null>(null);
 	let panelRecord = $state<{ type: string; recordId: string | null; view: 'detail' | 'form'; prefill?: Record<string, string> } | null>(null);
-	let panelApprovalId = $state<string | null>(null);
 	let historyDrawerOpen = $state(false);
 
-	// コアエンティティのCRUDツールフォームは FormDialog ではなく RecordDialog（REST + getTableInfo）で開く
-	const CORE_TOOL_TYPE: Record<string, CoreType> = {
-		create_customer: 'customers', update_customer: 'customers',
-		create_contact: 'contacts', update_contact: 'contacts',
-		create_deal: 'deals', update_deal: 'deals',
-		create_activity: 'activities', update_activity: 'activities'
-	};
-	const SNAKE_TO_CAMEL: Record<string, string> = {
-		customer_id: 'customerId', postal_code: 'postalCode', name_kana: 'nameKana',
-		planned_start: 'plannedStart', planned_end: 'plannedEnd'
-	};
-
-	// コアCRUDフォームを RecordDialog のパネル指定に変換。対象外（リマインダー等）は null。
+	// entity 属性付きフォームは RecordDialog で開く。entity なし（リマインダー等）は FormDialog。
 	function coreToolToPanel(form: FormContent): typeof panelRecord {
-		// entity 属性が指定されている場合は RecordDialog で直接開く（カスタムテーブル含む）
-		if (form.entity) {
-			const prefill: Record<string, string> = {};
-			for (const f of form.fields) {
-				if (f.key === 'id') continue;
-				if (f.value != null && f.value !== '') prefill[f.key] = String(f.value);
-			}
-			return { type: form.entity, recordId: null, view: 'form', prefill };
-		}
-		const type = CORE_TOOL_TYPE[form.tool];
-		if (!type) return null;
-		if (form.tool.startsWith('update_')) {
-			const recordId = form.fields.find((f) => f.key === 'id')?.value ?? null;
-			if (!recordId) return null; // id 不明なら FormDialog にフォールバック
-			return { type, recordId: String(recordId), view: 'form' };
-		}
+		if (!form.entity) return null;
 		const prefill: Record<string, string> = {};
 		for (const f of form.fields) {
 			if (f.key === 'id') continue;
-			if (f.value != null && f.value !== '') prefill[SNAKE_TO_CAMEL[f.key] ?? f.key] = String(f.value);
+			if (f.value != null && f.value !== '') prefill[f.key] = String(f.value);
 		}
-		return { type, recordId: null, view: 'form', prefill };
+		return { type: form.entity, recordId: null, view: 'form', prefill };
 	}
 
 	// メッセージを「ユーザー発言1件＋それに続くAI応答群」のターン単位にまとめる。
@@ -386,8 +352,6 @@
 				contents.push(c);
 			} else if (c.type === 'workflow') {
 				nextPanelWorkflow = c as WorkflowContent;
-			} else if (c.type === 'customer_detail') {
-				nextPanelRecord = { type: 'customers', recordId: (c as CustomerDetailContent).customer.id, view: 'detail' };
 			} else {
 				contents.push(c);
 			}
@@ -395,7 +359,6 @@
 		if (contents.length === 0 && !nextPanelWorkflow && !nextPanelRecord) {
 			contents.push({ type: 'text', text: m.chat_error() });
 		}
-		hidePreviousDealKanban(contents);
 		if (contents.length > 0) {
 			const message: Message = { id: crypto.randomUUID(), role: 'assistant', contents, createdAt: new Date() };
 			messages = [...messages, message];
@@ -433,29 +396,6 @@
 		}
 	}
 
-	// 案件のステータス（進行中/受注/失注）をそのまま列にしたカンバン。ドラッグ&ドロップで status を更新できる。
-	const DEAL_KANBAN_STATUS_IDS = DEAL_STATUS_IDS;
-
-	function isDealStatusKanban(content: KanbanContent): boolean {
-		const ids = content.columns.map((c) => c.id);
-		return DEAL_KANBAN_STATUS_IDS.length === ids.length && DEAL_KANBAN_STATUS_IDS.every((id) => ids.includes(id));
-	}
-
-	function hidePreviousDealKanban(newContents: MessageContent[]) {
-		const hasNewDealKanban = newContents.some((c) => c.type === 'kanban' && isDealStatusKanban(c));
-		if (!hasNewDealKanban) return;
-		for (const msg of messages) {
-			let changed = false;
-			for (const content of msg.contents) {
-				if (content.type === 'kanban' && isDealStatusKanban(content) && !content.completed) {
-					content.completed = true;
-					changed = true;
-				}
-			}
-			if (changed) persistMessage(msg);
-		}
-	}
-
 	// 削除されたレコードを、同じテーブル種別の一覧テーブルから取り除く
 	function removeRecordRow(entity: string, recordId: string) {
 		for (const msg of messages) {
@@ -468,24 +408,6 @@
 				}
 			}
 			if (changed) persistMessage(msg);
-		}
-	}
-
-	async function handleDealKanbanChange(cardId: string, status: string): Promise<boolean> {
-		try {
-			const res = await fetch(`/api/deals/${cardId}/status`, {
-				method: 'PATCH',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ status })
-			});
-			if (!res.ok) {
-				toast.error('ステータスの更新に失敗しました');
-				return false;
-			}
-			return true;
-		} catch {
-			toast.error('ステータスの更新に失敗しました');
-			return false;
 		}
 	}
 
@@ -610,11 +532,6 @@
 		panelForm = null;
 	}
 
-	function handleBizcardComplete(msg: Message, bizcardContent: BizcardContent) {
-		bizcardContent.completed = true;
-		persistMessage(msg);
-	}
-
 	async function runQuickAction(action: QuickActionDef) {
 		quickActionMenuOpen = false;
 		if (loading) return;
@@ -636,7 +553,6 @@
 			const formContent = result.contents.find((c) => c.type === 'form') as FormContent | undefined;
 			const otherContents = result.contents.filter((c) => c.type !== 'form');
 			if (otherContents.length > 0) {
-				hidePreviousDealKanban(otherContents);
 				const message: Message = { id: crypto.randomUUID(), role: 'assistant', contents: otherContents, createdAt: new Date() };
 				messages = [...messages, message];
 				persistMessage(message);
@@ -671,8 +587,8 @@
 <div class="chat" bind:this={chatEl}>
 	<!-- Greeting: visible only before first message -->
 	<div class="greeting" class:hidden={hasStarted} aria-hidden={hasStarted}>
-		<h1>MIDLETON</h1>
-		<p>業務を指示してください</p>
+		<h1>BOANN</h1>
+		<p>アプリを作成・管理できます</p>
 	</div>
 
 	{#if hasStarted && pastTurns.length > 0}
@@ -708,8 +624,7 @@
 										columns={content.columns}
 										rows={content.rows}
 										onRowClick={content.entity ? (row) => {
-										if (content.entity === 'approvals') panelApprovalId = String(row.id);
-										else panelRecord = { type: content.entity!, recordId: String(row.id), view: 'detail' };
+										panelRecord = { type: content.entity!, recordId: String(row.id), view: 'detail' };
 									} : undefined}
 									/>
 								{:else if content.type === 'actions'}
@@ -719,13 +634,9 @@
 										onselect={handleActionSelect}
 									/>
 								{:else}
-									{@const extra = content as ValuesContent | GanttContent | TimelineContent | ChartContent | KanbanContent | LinkContent | BizcardContent | DocumentJobContent | DocHandoffContent | ReplyContent}
+									{@const extra = content as ValuesContent | ChartContent | KanbanContent | LinkContent | DocumentJobContent | DocHandoffContent | ReplyContent}
 									{#if extra.type === 'values'}
 										<Values title={extra.title} items={extra.items} />
-									{:else if extra.type === 'gantt'}
-										<Gantt title={extra.title} filter={extra.filter} />
-									{:else if extra.type === 'timeline'}
-										<Timeline title={extra.title} filter={extra.filter} />
 									<!-- chart display temporarily disabled -->
 									<!-- {:else if extra.type === 'chart'}
 										<Chart chartType={extra.chartType} title={extra.title} data={extra.data} /> -->
@@ -735,15 +646,10 @@
 												title={extra.title}
 												columns={extra.columns}
 												cards={extra.cards}
-												onchange={isDealStatusKanban(extra) ? handleDealKanbanChange : undefined}
 											/>
 										{/if}
 									{:else if extra.type === 'link'}
 										<Link label={extra.label} href={extra.href} description={extra.description} newTab={extra.newTab} />
-									{:else if extra.type === 'bizcard'}
-										{#if !extra.completed}
-											<Bizcard title={extra.title} onComplete={() => handleBizcardComplete(msg, extra)} />
-										{/if}
 									{:else if extra.type === 'document_job'}
 										<DocumentJob jobId={extra.jobId} label={extra.label} onResolved={(result) => resolveDocumentJob(msg, extra.jobId, result)} />
 									{:else if extra.type === 'doc_handoff'}
@@ -867,14 +773,6 @@
 				panelRecord = null;
 				if (entity) removeRecordRow(entity, id);
 			}}
-		/>
-	{/if}
-	{#if panelApprovalId}
-		<ApprovalDialog
-			mode="detail"
-			id={panelApprovalId}
-			accountId={page.data.account?.id}
-			onclose={() => (panelApprovalId = null)}
 		/>
 	{/if}
 	<TurnHistoryDrawer turns={pastTurns} open={historyDrawerOpen} onclose={() => (historyDrawerOpen = false)} />

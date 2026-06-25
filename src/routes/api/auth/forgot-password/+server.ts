@@ -33,7 +33,7 @@ export const POST: RequestHandler = async ({ request, platform, url }) => {
 			from: setup.from,
 			fromName: setup.fromName,
 			to: data.email,
-			subject: '【Midleton】パスワード再設定のご案内',
+			subject: '【Boann】パスワード再設定のご案内',
 			text: `パスワード再設定のご案内\n\n以下のリンクから新しいパスワードを設定してください。\n${resetUrl}\n\nこのリンクの有効期限は1時間です。\n\nこのメールに心当たりがない場合は、このメールを無視してください。`
 		});
 	}

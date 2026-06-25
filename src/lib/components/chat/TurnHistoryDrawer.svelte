@@ -34,12 +34,10 @@
 		chart: 'グラフ',
 		kanban: 'カンバン',
 		link: 'リンク',
-		bizcard: '名刺読み取り',
 		document_job: '資料生成',
 		reply: '質問',
 		form: 'フォーム',
-		workflow: 'ワークフロー',
-		customer_detail: '顧客詳細'
+		workflow: 'ワークフロー'
 	};
 
 	function summarize(content: MessageContent): string {
