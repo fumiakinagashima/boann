@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { untrack } from 'svelte';
-	import { invalidateAll } from '$app/navigation';
+	import { goto, invalidateAll } from '$app/navigation';
 	import { toast } from '$lib/stores/toast.svelte';
 	import Workflow, { type WorkflowState } from '$lib/components/chat/Workflow.svelte';
 	import WorkflowChatPanel from './WorkflowChatPanel.svelte';
@@ -24,8 +24,8 @@
 		runs?: WorkflowRunRow[];
 		entityTypes?: EntityTypeForWorkflow[];
 		slackIntegrations?: SlackIntegrationOption[];
-		// ダイアログ内で使う場合に指定。指定時は「一覧に戻る」リンクを出さない（ダイアログのヘッダーで閉じる）
 		inDialog?: boolean;
+		noChatPanel?: boolean;
 	};
 
 	let {
@@ -38,7 +38,8 @@
 		runs = [],
 		entityTypes = [],
 		slackIntegrations = [],
-		inDialog = false
+		inDialog = false,
+		noChatPanel = false
 	}: Props = $props();
 
 	// 保存後も画面遷移しないため、新規作成時に発行されたidを保持して以降の保存をPATCH（更新）に切り替える
@@ -48,6 +49,13 @@
 
 	type WorkflowInstance = { getState: () => WorkflowState; setState: (def: WorkflowState) => void };
 	let wfRef = $state<WorkflowInstance | null>(null);
+
+	export function getState(): WorkflowState {
+		return wfRef?.getState() ?? { name: initialName, triggerHour: initialTriggerHour, triggerMinute: initialTriggerMinute, steps: initialSteps };
+	}
+	export function setState(s: WorkflowState) {
+		wfRef?.setState(s);
+	}
 
 	let aiReview = $state<WorkflowReviewResult | null>(null);
 	let aiReviewLoading = $state(false);
@@ -146,6 +154,7 @@
 				const row = (await res.json()) as { id: string };
 				currentId = row.id;
 				toast.success(`「${name}」を保存しました`);
+				goto(`/workflows/${row.id}`, { replaceState: true });
 			}
 			await invalidateAll();
 		} catch (e) {
@@ -159,7 +168,7 @@
 <div class="editor-wrap">
 	<div class="editor-row1">
 		{#if !inDialog}
-			<a href="/database/workflows" class="btn-back">← 一覧に戻る</a>
+			<a href="/workflows" class="btn-back">← 一覧に戻る</a>
 		{/if}
 		<Toggle bind:checked={enabled} label="有効化（毎日指定時刻に実行）" />
 		<div class="editor-row1-actions">
@@ -213,10 +222,14 @@
 	{/if}
 
 	<div class="editor-body">
-		<WorkflowChatPanel
-			getCurrent={() => wfRef?.getState() ?? { name: initialName, triggerHour: initialTriggerHour, triggerMinute: initialTriggerMinute, steps: initialSteps }}
-			onApply={(state) => wfRef?.setState(state)}
-		/>
+		{#if !noChatPanel}
+			<div class="chat-embedded">
+				<WorkflowChatPanel
+					getCurrent={() => wfRef?.getState() ?? { name: initialName, triggerHour: initialTriggerHour, triggerMinute: initialTriggerMinute, steps: initialSteps }}
+					onApply={(state) => wfRef?.setState(state)}
+				/>
+			</div>
+		{/if}
 		<div class="editor-canvas">
 			<Workflow
 				bind:this={wfRef}
@@ -370,6 +383,16 @@
 		display: flex;
 		gap: 16px;
 		align-items: flex-start;
+	}
+
+	.chat-embedded {
+		width: 300px;
+		flex-shrink: 0;
+		border: 1px solid var(--color-border);
+		border-radius: 10px;
+		overflow: hidden;
+		align-self: stretch;
+		min-height: 400px;
 	}
 
 	.btn-save {

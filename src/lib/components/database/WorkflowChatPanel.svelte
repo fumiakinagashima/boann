@@ -147,35 +147,25 @@
 
 <style lang="scss">
 	.chat-panel {
-		width: 300px;
-		flex-shrink: 0;
 		display: flex;
 		flex-direction: column;
-		border: 1px solid var(--color-border);
-		border-radius: 10px;
+		height: 100%;
 		overflow: hidden;
-		background: var(--color-background);
-
-		@media (max-width: 720px) {
-			display: none;
-		}
+		background: var(--color-surface);
 	}
 
 	.chat-header {
-		padding: 10px 14px;
-		font-size: 0.75rem;
+		padding: 12px 16px;
+		font-size: 0.8125rem;
 		font-weight: 600;
 		color: var(--color-text-muted);
-		text-transform: uppercase;
-		letter-spacing: 0.04em;
 		border-bottom: 1px solid var(--color-border);
 		flex-shrink: 0;
 	}
 
 	.chat-messages {
 		flex: 1;
-		min-height: 240px;
-		max-height: 560px;
+		min-height: 0;
 		overflow-y: auto;
 		padding: 12px 14px;
 		display: flex;

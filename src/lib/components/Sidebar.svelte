@@ -91,6 +91,10 @@
 				{/if}
 			</div>
 		{/if}
+		<a href="/workflows" class="nav-item" class:active={isUnderPath('/workflows')}>
+			<span class="nav-icon"><Workflow size={15} /></span>
+			<span>ワークフロー</span>
+		</a>
 	</nav>
 
 	<div class="sidebar-footer">
@@ -108,11 +112,6 @@
 				アカウント
 			</a>
 		{/if}
-
-		<a href="/workflows" class="footer-item" class:active={isUnderPath('/workflows')}>
-			<Workflow size={15} />
-			ワークフロー
-		</a>
 
 		<a href="/settings" class="footer-item" class:active={isUnderPath('/settings')}>
 			<Settings size={15} />

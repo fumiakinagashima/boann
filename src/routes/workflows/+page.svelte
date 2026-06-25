@@ -1,9 +1,8 @@
 <script lang="ts">
 	import { untrack } from 'svelte';
-	import { invalidateAll } from '$app/navigation';
+	import { goto, invalidateAll } from '$app/navigation';
 	import { toast } from '$lib/stores/toast.svelte';
 	import { formatJstDateTime } from '$lib/datetime';
-	import WorkflowEditorDialog from '$lib/components/dialog/WorkflowEditorDialog.svelte';
 	import ChatPanel from '$lib/components/chat/ChatPanel.svelte';
 	import type { WorkflowRow } from '$lib/server/db/workflow-service';
 	import type { PageData } from './$types';
@@ -14,13 +13,13 @@
 	$effect(() => { rows = data.rows; });
 
 	let deletingId = $state<string | null>(null);
-	let dialog = $state<{ row: WorkflowRow | null } | null>(null);
 
 	function triggerLabel(row: WorkflowRow): string {
 		return `毎日 ${String(row.triggerHour).padStart(2, '0')}:${String(row.triggerMinute).padStart(2, '0')}`;
 	}
 
-	async function deleteWorkflow(id: string, name: string) {
+	async function deleteWorkflow(e: MouseEvent, id: string, name: string) {
+		e.stopPropagation();
 		if (!confirm(`ワークフロー「${name}」を削除しますか？`)) return;
 		deletingId = id;
 		try {
@@ -35,27 +34,55 @@
 			deletingId = null;
 		}
 	}
+
+	// ── Resizable split ────────────────────────────────────────
+	const CHAT_MIN = 220, CHAT_MAX = 640;
+	let chatWidth = $state(340);
+	let resizing = $state(false);
+
+	function onResizerMouseDown(e: MouseEvent) {
+		e.preventDefault();
+		resizing = true;
+		const startX = e.clientX;
+		const startWidth = chatWidth;
+		function onMove(e: MouseEvent) {
+			chatWidth = Math.min(CHAT_MAX, Math.max(CHAT_MIN, startWidth + (startX - e.clientX)));
+		}
+		function onUp() {
+			resizing = false;
+			window.removeEventListener('mousemove', onMove);
+			window.removeEventListener('mouseup', onUp);
+		}
+		window.addEventListener('mousemove', onMove);
+		window.addEventListener('mouseup', onUp);
+	}
 </script>
 
 <svelte:head><title>ワークフロー</title></svelte:head>
 
-<div class="workflow-layout">
+<div class="wf-layout" style="grid-template-columns: 1fr 5px {chatWidth}px" class:resizing>
 	<div class="list-panel">
 		<div class="page-header">
 			<h1>ワークフロー</h1>
-			<button class="btn-primary" onclick={() => (dialog = { row: null })}>+ 新規作成</button>
+			<button class="btn-primary" onclick={() => goto('/workflows/new')}>+ 新規作成</button>
 		</div>
 
 		{#if rows.length === 0}
 			<div class="empty">
 				<p>ワークフローはまだありません。</p>
 				<p class="empty-hint">右のAIに「毎日〇時に〇〇を通知して」と話しかけてみてください。</p>
-				<button class="btn-primary" onclick={() => (dialog = { row: null })}>新規作成する</button>
+				<button class="btn-primary" onclick={() => goto('/workflows/new')}>新規作成する</button>
 			</div>
 		{:else}
 			<div class="wf-list">
 				{#each rows as row (row.id)}
-					<div class="wf-card">
+					<div
+						class="wf-card"
+						role="link"
+						tabindex="0"
+						onclick={() => goto(`/workflows/${row.id}`)}
+						onkeydown={(e) => { if (e.key === 'Enter') goto(`/workflows/${row.id}`); }}
+					>
 						<span class="status-badge status-{row.enabled ? 'enabled' : 'disabled'}">
 							{row.enabled ? '有効' : '無効'}
 						</span>
@@ -66,11 +93,11 @@
 							</span>
 						</div>
 						<div class="wf-card-actions">
-							<button class="btn-secondary" onclick={() => (dialog = { row })}>編集</button>
+							<button class="btn-secondary" onclick={() => goto(`/workflows/${row.id}`)}>開く</button>
 							<button
 								class="btn-danger"
 								disabled={deletingId === row.id}
-								onclick={() => deleteWorkflow(row.id, row.name)}
+								onclick={(e) => deleteWorkflow(e, row.id, row.name)}
 							>
 								{deletingId === row.id ? '削除中…' : '削除'}
 							</button>
@@ -81,11 +108,16 @@
 		{/if}
 	</div>
 
+	<div
+		class="resizer"
+		onmousedown={onResizerMouseDown}
+		role="separator"
+		aria-label="パネル幅を調整"
+		aria-orientation="vertical"
+	></div>
+
 	<div class="chat-col">
-		<div class="chat-col-header">
-			<span>✨</span>
-			AIアシスタント
-		</div>
+		<div class="chat-col-header">AIアシスタント</div>
 		<ChatPanel
 			placeholder="ワークフローを作成・編集する指示を入力…"
 			onAction={() => invalidateAll()}
@@ -93,31 +125,57 @@
 	</div>
 </div>
 
-{#if dialog}
-	<WorkflowEditorDialog
-		id={dialog.row?.id}
-		initialName={dialog.row?.name ?? '新規ワークフロー'}
-		initialTriggerHour={dialog.row?.triggerHour ?? 9}
-		initialTriggerMinute={dialog.row?.triggerMinute ?? 0}
-		initialSteps={dialog.row?.steps ?? []}
-		initialEnabled={dialog.row?.enabled ?? false}
-		entityTypes={data.entityTypes}
-		slackIntegrations={data.slackIntegrations}
-		onclose={() => (dialog = null)}
-	/>
-{/if}
-
 <style lang="scss">
-	.workflow-layout {
+	.wf-layout {
 		display: grid;
-		grid-template-columns: 1fr 340px;
 		height: 100%;
 		overflow: hidden;
+
+		&.resizing {
+			cursor: col-resize;
+			user-select: none;
+		}
 	}
 
 	.list-panel {
 		padding: 28px 32px;
 		overflow-y: auto;
+	}
+
+	.resizer {
+		width: 5px;
+		cursor: col-resize;
+		background: var(--color-border);
+		transition: background 0.15s;
+		position: relative;
+
+		&::after {
+			content: '';
+			position: absolute;
+			inset: 0 -4px;
+		}
+
+		&:hover, .resizing & {
+			background: var(--color-primary);
+		}
+	}
+
+	.chat-col {
+		display: flex;
+		flex-direction: column;
+		height: 100%;
+		overflow: hidden;
+		border-left: 1px solid var(--color-border);
+	}
+
+	.chat-col-header {
+		padding: 12px 16px;
+		font-size: 0.8125rem;
+		font-weight: 600;
+		color: var(--color-text-muted);
+		border-bottom: 1px solid var(--color-border);
+		flex-shrink: 0;
+		background: var(--color-surface);
 	}
 
 	.page-header {
@@ -144,6 +202,7 @@
 		cursor: pointer;
 		transition: opacity 0.15s;
 		&:hover { opacity: 0.88; }
+		&:disabled { opacity: 0.4; cursor: not-allowed; }
 	}
 
 	.empty {
@@ -176,8 +235,11 @@
 		gap: 16px;
 		padding: 14px 16px;
 		background: var(--color-surface);
+		cursor: pointer;
+		transition: background 0.12s;
 
 		&:not(:last-child) { border-bottom: 1px solid var(--color-border); }
+		&:hover { background: color-mix(in srgb, var(--color-primary) 4%, var(--color-surface)); }
 	}
 
 	.status-badge {
@@ -238,26 +300,5 @@
 		cursor: pointer;
 		&:hover:not(:disabled) { border-color: #ef4444; color: #ef4444; }
 		&:disabled { opacity: 0.5; cursor: not-allowed; }
-	}
-
-	/* Chat col */
-	.chat-col {
-		display: flex;
-		flex-direction: column;
-		height: 100%;
-		overflow: hidden;
-	}
-
-	.chat-col-header {
-		display: flex;
-		align-items: center;
-		gap: 6px;
-		padding: 12px 16px;
-		font-size: 0.8125rem;
-		font-weight: 600;
-		color: var(--color-text-muted);
-		border-bottom: 1px solid var(--color-border);
-		border-left: 1px solid var(--color-border);
-		background: var(--color-surface);
 	}
 </style>
