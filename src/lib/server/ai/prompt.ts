@@ -340,7 +340,13 @@ text / email / tel / number / textarea / select / date / datetime-local / hidden
 
 **multiselect フィールドの使い方**: 複数選択に使う。\`options\` で選択肢を指定し、value は選択済みの値をカンマ区切りにした文字列（例: \`"notification,slack:abc123"\`）。`;
 
-export function buildSystemPrompt(): string {
+export type AppContext = {
+	entityTypeId: string;
+	appLabel: string;
+	appName: string;
+};
+
+export function buildSystemPrompt(appContext?: AppContext): string {
 	const now = new Intl.DateTimeFormat('ja-JP', {
 		timeZone: 'Asia/Tokyo',
 		year: 'numeric',
@@ -350,7 +356,11 @@ export function buildSystemPrompt(): string {
 		hour: '2-digit',
 		minute: '2-digit'
 	}).format(new Date());
-	return `${SYSTEM_PROMPT}\n\n## 現在日時\n${now}`;
+	let prompt = `${SYSTEM_PROMPT}\n\n## 現在日時\n${now}`;
+	if (appContext) {
+		prompt += `\n\n## 現在編集中のアプリ\n- entity_type_id: ${appContext.entityTypeId}\n- 表示名: ${appContext.appLabel}\n- 識別名 (name): ${appContext.appName}\n\nフィールドの追加・変更は必ず entity_type_id = "${appContext.entityTypeId}" を使って add_entity_field を呼ぶこと。create_app は使わない。`;
+	}
+	return prompt;
 }
 
 export const WORKFLOW_REVIEW_SYSTEM_PROMPT = `あなたはBoannというノーコードアプリプラットフォームのワークフロー（毎日決まった時刻に実行する自動化フロー）レビューAIです。

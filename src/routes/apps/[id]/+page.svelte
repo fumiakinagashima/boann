@@ -2,6 +2,7 @@
 	import { invalidateAll } from '$app/navigation';
 	import { formatJstDateTime } from '$lib/datetime';
 	import ChevronLeft from '$lib/components/icon/ChevronLeft.svelte';
+	import AppIcon from '$lib/components/AppIcon.svelte';
 	import type { PageData } from './$types';
 	import type { FieldDef, RecordRow } from '$lib/server/db/table-service';
 
@@ -121,12 +122,14 @@
 			</a>
 			<div class="header-main">
 				<div class="header-title">
-					<span class="app-icon">{data.app.icon ?? '📋'}</span>
+					<span class="app-icon">
+					<AppIcon icon={data.app.icon} size={24} />
+				</span>
 					<h1>{data.app.label}</h1>
 				</div>
 				<div class="header-actions">
 					{#if data.account?.permission === 'admin'}
-						<a href="/apps/{data.app.id}/build" class="btn-secondary">⚙ アプリ設定</a>
+						<a href="/apps/{data.app.id}/build" class="btn-secondary">アプリ設定</a>
 					{/if}
 					<button class="btn-primary" onclick={openNew}>+ レコード追加</button>
 				</div>
@@ -138,7 +141,7 @@
 				<p class="empty-title">フィールドが設定されていません</p>
 				{#if data.account?.permission === 'admin'}
 					<p class="empty-desc">アプリ設定でフィールドを追加してください。</p>
-					<a href="/apps/{data.app.id}/build" class="btn-primary">⚙ アプリ設定を開く</a>
+					<a href="/apps/{data.app.id}/build" class="btn-primary">アプリ設定を開く</a>
 				{/if}
 			</div>
 		{:else if records.length === 0}
@@ -308,7 +311,15 @@
 	}
 
 	.app-icon {
-		font-size: 1.75rem;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		width: 40px;
+		height: 40px;
+		border-radius: 10px;
+		background: color-mix(in srgb, var(--color-primary) 8%, var(--color-background));
+		color: var(--color-primary);
+		flex-shrink: 0;
 	}
 
 	h1 {
@@ -433,7 +444,7 @@
 		top: 0;
 		right: 0;
 		bottom: 0;
-		width: 420px;
+		width: 520px;
 		max-width: 100vw;
 		display: flex;
 		flex-direction: column;
@@ -453,7 +464,7 @@
 		display: flex;
 		align-items: center;
 		justify-content: space-between;
-		padding: 16px 20px;
+		padding: 16px 24px;
 		border-bottom: 1px solid var(--color-border);
 		flex-shrink: 0;
 
@@ -485,7 +496,7 @@
 	.form-panel-body {
 		flex: 1;
 		overflow-y: auto;
-		padding: 20px;
+		padding: 24px;
 		display: flex;
 		flex-direction: column;
 		gap: 16px;

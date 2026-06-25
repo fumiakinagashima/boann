@@ -1,16 +1,18 @@
 <script lang="ts">
 	import { invalidateAll } from '$app/navigation';
 	import { goto } from '$app/navigation';
-	import { tick } from 'svelte';
+	import { tick, untrack } from 'svelte';
 	import ChevronLeft from '$lib/components/icon/ChevronLeft.svelte';
+	import GripVertical from '$lib/components/icon/GripVertical.svelte';
 	import ChatPanel from '$lib/components/chat/ChatPanel.svelte';
+	import AppIcon, { ICON_OPTIONS } from '$lib/components/AppIcon.svelte';
 	import type { PageData } from './$types';
 
 	let { data }: { data: PageData } = $props();
 
 	// ── App meta ──────────────────────────────────────────────
 	let appLabel = $state(data.app.label);
-	let appIcon = $state(data.app.icon ?? '📋');
+	let appIcon = $state(data.app.icon ?? 'layout-grid');
 	let savingMeta = $state(false);
 	let metaSaved = $state(false);
 
@@ -42,7 +44,6 @@
 		deletingApp = false;
 	}
 
-	const ICON_OPTIONS = ['📋', '📊', '👥', '🏢', '📦', '💼', '🛒', '📅', '🎯', '⚙️', '📝', '🔧'];
 
 	// ── Fields ────────────────────────────────────────────────
 	type SelectOption = { label: string; value: string };
@@ -94,10 +95,46 @@
 	let saveError = $state('');
 	let expandedId = $state<string | null>(null);
 
-	// Sync from server when AI changes fields
+	// ── Drag & drop reorder ───────────────────────────────────
+	let dragSrcId = $state<string | null>(null);
+	let dragOverId = $state<string | null>(null);
+
+	function onDragStart(e: DragEvent, id: string) {
+		dragSrcId = id;
+		e.dataTransfer!.effectAllowed = 'move';
+	}
+
+	function onDragOver(e: DragEvent, id: string) {
+		e.preventDefault();
+		e.dataTransfer!.dropEffect = 'move';
+		if (id !== dragSrcId) dragOverId = id;
+	}
+
+	function onDrop(e: DragEvent, targetId: string) {
+		e.preventDefault();
+		if (!dragSrcId || dragSrcId === targetId) return;
+		const from = rows.findIndex(r => r._id === dragSrcId);
+		const to   = rows.findIndex(r => r._id === targetId);
+		if (from === -1 || to === -1) return;
+		const next = [...rows];
+		const [moved] = next.splice(from, 1);
+		next.splice(to, 0, moved);
+		rows = next;
+		dirty = true;
+		dragSrcId = null;
+		dragOverId = null;
+	}
+
+	function onDragEnd() {
+		dragSrcId = null;
+		dragOverId = null;
+	}
+
+	// Sync from server when AI adds/removes fields.
+	// rows は untrack で読むことで依存に含めず、data.fields の変化のみ検知する。
 	$effect(() => {
-		const serverKeys = data.fields.map((f) => f.key).join(',');
-		const localKeys = rows.map((r) => r.key).join(',');
+		const serverKeys = data.fields.map((f) => f.key).sort().join(',');
+		const localKeys = untrack(() => rows.map((r) => r.key).sort().join(','));
 		if (serverKeys !== localKeys) {
 			rows = fromServerFields();
 			dirty = false;
@@ -194,9 +231,34 @@
 	function typeLabel(type: string) {
 		return FIELD_TYPES.find(t => t.value === type)?.label ?? type;
 	}
+
+	// ── Resizable split ───────────────────────────────────────
+	const CHAT_MIN = 220;
+	const CHAT_MAX = 640;
+	let chatWidth = $state(340);
+	let resizing = $state(false);
+
+	function onResizerMouseDown(e: MouseEvent) {
+		e.preventDefault();
+		resizing = true;
+		const startX = e.clientX;
+		const startWidth = chatWidth;
+
+		function onMove(e: MouseEvent) {
+			const delta = startX - e.clientX;
+			chatWidth = Math.min(CHAT_MAX, Math.max(CHAT_MIN, startWidth + delta));
+		}
+		function onUp() {
+			resizing = false;
+			window.removeEventListener('mousemove', onMove);
+			window.removeEventListener('mouseup', onUp);
+		}
+		window.addEventListener('mousemove', onMove);
+		window.addEventListener('mouseup', onUp);
+	}
 </script>
 
-<div class="build-layout">
+<div class="build-layout" style="grid-template-columns: 1fr 5px {chatWidth}px" class:resizing>
 	<!-- Left panel -->
 	<div class="settings-panel">
 		<div class="panel-header">
@@ -212,8 +274,10 @@
 				<h2 class="section-title">アプリ情報</h2>
 				<div class="meta-row">
 					<div class="meta-icon-picker">
-						{#each ICON_OPTIONS as icon}
-							<button class="icon-opt" class:selected={appIcon === icon} onclick={() => (appIcon = icon)}>{icon}</button>
+						{#each ICON_OPTIONS as opt}
+							<button class="icon-opt" class:selected={appIcon === opt.name} onclick={() => (appIcon = opt.name)} title={opt.name}>
+								<AppIcon icon={opt.name} size={16} />
+							</button>
 						{/each}
 					</div>
 					<div class="meta-label-wrap">
@@ -254,13 +318,30 @@
 				<div class="field-list">
 					{#each rows as row, i (row._id)}
 						{@const isOpen = expandedId === row._id}
-						<div class="field-card" class:is-open={isOpen}>
+						<div
+							class="field-card"
+							class:is-open={isOpen}
+							class:is-dragging={dragSrcId === row._id}
+							class:drag-over={dragOverId === row._id}
+							ondragover={(e) => onDragOver(e, row._id)}
+							ondrop={(e) => onDrop(e, row._id)}
+							ondragend={onDragEnd}
+						>
 							<!-- Card header (always visible) -->
-							<button
-								class="field-card-header"
-								onclick={() => { expandedId = isOpen ? null : row._id; }}
-								aria-expanded={isOpen}
-							>
+							<div class="field-card-header">
+								<span
+									class="drag-handle"
+									draggable="true"
+									ondragstart={(e) => onDragStart(e, row._id)}
+									aria-hidden="true"
+								>
+									<GripVertical size={14} />
+								</span>
+								<button
+									class="field-card-header-btn"
+									onclick={() => { expandedId = isOpen ? null : row._id; }}
+									aria-expanded={isOpen}
+								>
 								<span class="field-no">{i + 1}</span>
 								<span class="field-card-label" class:placeholder={!row.label}>
 									{row.label || 'フィールド名未入力'}
@@ -270,7 +351,8 @@
 									<span class="field-req-badge">必須</span>
 								{/if}
 								<span class="field-chevron" class:rotated={isOpen}>›</span>
-							</button>
+								</button>
+							</div>
 
 							<!-- Expanded form -->
 							{#if isOpen}
@@ -415,6 +497,15 @@
 		</div>
 	</div>
 
+	<!-- Resize handle -->
+	<div
+		class="resizer"
+		onmousedown={onResizerMouseDown}
+		role="separator"
+		aria-label="パネル幅を調整"
+		aria-orientation="vertical"
+	></div>
+
 	<!-- Right panel: AI chat -->
 	<div class="chat-col">
 		<div class="chat-col-header">
@@ -424,6 +515,7 @@
 		<ChatPanel
 			placeholder="フィールドを追加・変更する指示を入力…"
 			onAction={() => invalidateAll()}
+			context={{ entityTypeId: data.app.id, appLabel: data.app.label, appName: data.app.name }}
 		/>
 	</div>
 </div>
@@ -431,9 +523,32 @@
 <style lang="scss">
 	.build-layout {
 		display: grid;
-		grid-template-columns: 1fr 340px;
+		grid-template-columns: 1fr 5px 340px;
 		height: 100%;
 		overflow: hidden;
+
+		&.resizing {
+			cursor: col-resize;
+			user-select: none;
+		}
+	}
+
+	.resizer {
+		width: 5px;
+		cursor: col-resize;
+		background: var(--color-border);
+		transition: background 0.15s;
+		position: relative;
+
+		&::after {
+			content: '';
+			position: absolute;
+			inset: 0 -4px;
+		}
+
+		&:hover, .resizing & {
+			background: var(--color-primary);
+		}
 	}
 
 	.settings-panel {
@@ -481,7 +596,7 @@
 	/* ── App meta ───────────────────────────── */
 	.meta-row {
 		display: flex;
-		align-items: center;
+		flex-direction: column;
 		gap: 12px;
 		flex-wrap: wrap;
 	}
@@ -624,29 +739,64 @@
 		border-radius: 8px;
 		overflow: hidden;
 		background: var(--color-surface);
-		transition: border-color 0.15s;
+		transition: border-color 0.15s, opacity 0.15s, box-shadow 0.15s;
+		cursor: grab;
+
+		&:active { cursor: grabbing; }
 
 		&.is-open {
 			border-color: var(--color-primary);
+		}
+
+		&.is-dragging {
+			opacity: 0.4;
+		}
+
+		&.drag-over {
+			border-color: var(--color-primary);
+			box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-primary) 30%, transparent);
 		}
 	}
 
 	.field-card-header {
 		display: flex;
 		align-items: center;
-		gap: 8px;
 		width: 100%;
-		padding: 10px 12px;
-		border: none;
-		background: none;
-		cursor: pointer;
-		text-align: left;
-		font-family: inherit;
 		transition: background 0.1s;
 
 		&:hover {
 			background: color-mix(in srgb, var(--color-primary) 3%, var(--color-surface));
 		}
+	}
+
+	.drag-handle {
+		flex-shrink: 0;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		padding: 10px 4px 10px 10px;
+		color: var(--color-text-muted);
+		opacity: 0.3;
+		cursor: grab;
+		transition: opacity 0.1s;
+		user-select: none;
+
+		&:active { cursor: grabbing; }
+		.field-card:hover & { opacity: 0.7; }
+	}
+
+	.field-card-header-btn {
+		display: flex;
+		align-items: center;
+		gap: 8px;
+		flex: 1;
+		min-width: 0;
+		padding: 10px 12px 10px 4px;
+		border: none;
+		background: none;
+		cursor: pointer;
+		text-align: left;
+		font-family: inherit;
 	}
 
 	.field-no {

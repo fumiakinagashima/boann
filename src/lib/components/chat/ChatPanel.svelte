@@ -8,11 +8,13 @@
 	import type { StreamEvent } from '$lib/server/ai/stream';
 	import * as m from '$lib/paraglide/messages.js';
 
+	type AppContext = { entityTypeId: string; appLabel: string; appName: string };
 	type Props = {
 		placeholder?: string;
 		onAction?: () => void;
+		context?: AppContext;
 	};
-	let { placeholder = 'AIに相談する…', onAction }: Props = $props();
+	let { placeholder = 'AIに相談する…', onAction, context }: Props = $props();
 
 	let messages = $state<Message[]>([]);
 	let input = $state('');
@@ -52,7 +54,7 @@
 			const res = await fetch('/api/chat', {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ message: text, history: messages })
+				body: JSON.stringify({ message: text, history: messages, ...(context ? { context } : {}) })
 			});
 
 			if (!res.ok || !res.body) {

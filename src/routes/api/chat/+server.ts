@@ -66,6 +66,7 @@ export const POST: RequestHandler = async ({ request, platform, locals }) => {
 		tool?: string;
 		data?: Record<string, string>;
 		history?: Message[];
+		context?: { entityTypeId: string; appLabel: string; appName: string };
 	};
 
 	// フォーム送信（tool + data）はJSONで返す
@@ -202,7 +203,7 @@ export const POST: RequestHandler = async ({ request, platform, locals }) => {
 		async start(controller) {
 			const enqueue = (e: StreamEvent) => controller.enqueue(new TextEncoder().encode(sse(e)));
 			try {
-				await streamChat(db, apiKey, history, model, enqueue, toolEnv, platform.ctx);
+				await streamChat(db, apiKey, history, model, enqueue, toolEnv, platform.ctx, body.context);
 				enqueue({ type: 'done' });
 			} catch (e) {
 				enqueue({ type: 'error', message: e instanceof Error ? e.message : String(e) });

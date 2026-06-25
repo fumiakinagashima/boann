@@ -9,6 +9,9 @@
 	import Settings from '$lib/components/icon/Settings.svelte';
 	import LogOut from '$lib/components/icon/LogOut.svelte';
 	import ChevronRight from '$lib/components/icon/ChevronRight.svelte';
+	import AppIcon from '$lib/components/AppIcon.svelte';
+	import LayoutGrid from '@lucide/svelte/icons/layout-grid';
+	import Star from '@lucide/svelte/icons/star';
 	import type { AccountRow } from '$lib/server/db/account-service';
 
 	type AppItem = { id: string; name: string; label: string; icon: string | null };
@@ -55,7 +58,7 @@
 
 	<nav class="nav">
 		<a href="/" class="nav-item" class:active={isActive('/')}>
-			<span class="nav-icon">📋</span>
+			<span class="nav-icon"><LayoutGrid size={15} /></span>
 			<span>アプリ一覧</span>
 		</a>
 
@@ -66,7 +69,7 @@
 					onclick={() => (bookmarksOpen = !bookmarksOpen)}
 					aria-expanded={bookmarksOpen}
 				>
-					<span class="nav-icon">⭐</span>
+					<span class="nav-icon"><Star size={14} /></span>
 					<span>ブックマーク</span>
 					<span class="chevron" class:open={bookmarksOpen}>
 						<ChevronRight size={12} />
@@ -80,7 +83,7 @@
 								class="nav-item nav-sub"
 								class:active={isUnderPath(`/apps/${app.id}`)}
 							>
-								<span class="app-icon">{app.icon ?? '📄'}</span>
+								<span class="app-icon"><AppIcon icon={app.icon} size={13} /></span>
 								<span>{app.label}</span>
 							</a>
 						{/each}
@@ -186,15 +189,17 @@
 	.nav-icon {
 		flex-shrink: 0;
 		width: 18px;
-		text-align: center;
-		font-size: 0.875rem;
+		display: flex;
+		align-items: center;
+		justify-content: center;
 	}
 
 	.app-icon {
 		flex-shrink: 0;
-		width: 18px;
-		text-align: center;
-		font-size: 0.8125rem;
+		width: 16px;
+		display: flex;
+		align-items: center;
+		justify-content: center;
 	}
 
 	.section {

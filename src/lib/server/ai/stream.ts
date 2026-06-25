@@ -1,7 +1,7 @@
 import Anthropic from '@anthropic-ai/sdk';
 import type { MessageParam } from '@anthropic-ai/sdk/resources/messages';
 import { eq } from 'drizzle-orm';
-import { buildSystemPrompt } from './prompt';
+import { buildSystemPrompt, type AppContext } from './prompt';
 import { tools as allTools, dispatchTool } from '$lib/server/mcp';
 import { entityTypes } from '$lib/server/db/schema';
 
@@ -191,7 +191,8 @@ export async function streamChat(
 	model: string | undefined,
 	emit: (event: StreamEvent) => void,
 	env?: ToolEnv,
-	ctx?: ExecutionContext
+	ctx?: ExecutionContext,
+	appContext?: AppContext
 ): Promise<void> {
 	const anthropic = new Anthropic({ apiKey });
 	let messages: MessageParam[] = [...history];
@@ -211,7 +212,7 @@ export async function streamChat(
 		const stream = anthropic.messages.stream({
 			model: model ?? DEFAULT_AI_MODEL,
 			max_tokens: 8192,
-			system: buildSystemPrompt(),
+			system: buildSystemPrompt(appContext),
 			tools,
 			messages
 		});
