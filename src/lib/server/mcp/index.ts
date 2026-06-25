@@ -28,7 +28,9 @@ export type ToolName =
 	| 'get_help'
 	| 'save_workflow'
 	| 'list_workflows'
-	| 'get_workflow';
+	| 'get_workflow'
+	| 'create_table'
+	| 'create_page';
 
 export const tools: Tool[] = [
 	...integrations.tools,
@@ -66,6 +68,8 @@ export async function dispatchTool(
 		case 'save_workflow':                  return workflows.handleSaveWorkflow(db, input, env);
 		case 'list_workflows':                 return workflows.handleListWorkflows(db, env);
 		case 'get_workflow':                   return workflows.handleGetWorkflow(db, input, env);
+		case 'create_table':                   return entities.handleCreateTable(db, input);
+		case 'create_page':                    return entities.handleCreatePage(db, input);
 		default:
 			throw new Error(`Unknown tool: ${name}`);
 	}

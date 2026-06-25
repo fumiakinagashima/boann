@@ -605,7 +605,12 @@
 		<ChatPanel
 			placeholder="フィールドを追加・変更する指示を入力…"
 			onAction={() => invalidateAll()}
-			context={{ entityTypeId: data.app.id, appLabel: data.app.label, appName: data.app.name }}
+			context={{
+				appId: data.appId,
+				appLabel: data.app.label,
+				appName: data.app.name,
+				tables: [{ id: data.app.id, name: data.app.name, label: data.app.label }]
+			}}
 		/>
 	</div>
 </div>

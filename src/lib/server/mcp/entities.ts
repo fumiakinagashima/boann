@@ -2,7 +2,7 @@ import { eq, desc } from 'drizzle-orm';
 import { z } from 'zod';
 import type { Tool } from '@anthropic-ai/sdk/resources/messages';
 import type { Db } from '../db';
-import { entityTypes, entityFields, entities } from '../db/schema';
+import { entityTypes, entityFields, entities, appPages } from '../db/schema';
 import { createApp, createEntityType, createRecord } from '../db/table-service';
 import { parseJson, now } from './shared';
 
@@ -162,6 +162,73 @@ export const tools: Tool[] = [
 			},
 			required: ['id', 'data']
 		}
+	},
+	{
+		name: 'create_table',
+		description:
+			'現在編集中のアプリにテーブルを追加する。テーブル名・フィールド定義を指定して新しいデータテーブルを作成する。作成後は app_pages にもページが自動追加される。',
+		input_schema: {
+			type: 'object',
+			properties: {
+				app_id: { type: 'string', description: '追加先のアプリID' },
+				name: {
+					type: 'string',
+					description: 'テーブルの識別名（英小文字・数字・アンダースコアのみ、例: customers）'
+				},
+				label: { type: 'string', description: 'テーブルの表示名（例: 顧客）' },
+				icon: { type: 'string', description: 'アイコン（絵文字推奨 例: 👥）' },
+				fields: {
+					type: 'array',
+					description: 'フィールド定義の一覧（表示順）',
+					items: {
+						type: 'object',
+						properties: {
+							key: { type: 'string', description: 'フィールドキー（英小文字・数字・アンダースコアのみ）' },
+							label: { type: 'string', description: 'フィールドの表示名' },
+							type: {
+								type: 'string',
+								enum: ['text', 'number', 'select', 'date', 'email', 'tel', 'textarea', 'recordSelect'],
+								description: 'フィールドの型'
+							},
+							required: { type: 'boolean', description: '必須フィールドかどうか' },
+							options: {
+								type: 'array',
+								items: { type: 'object', properties: { value: { type: 'string' }, label: { type: 'string' } } },
+								description: 'type が select のときの選択肢'
+							},
+							ref_table: {
+								type: 'string',
+								description: 'type が recordSelect のときの関係先テーブル名'
+							}
+						},
+						required: ['key', 'label']
+					}
+				}
+			},
+			required: ['app_id', 'name', 'label', 'fields']
+		}
+	},
+	{
+		name: 'create_page',
+		description:
+			'現在編集中のアプリにページを追加する。テーブルとビュータイプを指定して表示画面を定義する。create_table 実行後に追加のビューを作りたい場合に使う。',
+		input_schema: {
+			type: 'object',
+			properties: {
+				app_id: { type: 'string', description: 'アプリID' },
+				label: { type: 'string', description: 'ページの表示名' },
+				table_id: {
+					type: 'string',
+					description: '表示するテーブルのID（list_entity_types や create_table の結果から取得）'
+				},
+				view_type: {
+					type: 'string',
+					enum: ['list', 'kanban'],
+					description: 'ビュータイプ（list: 一覧, kanban: カンバン）'
+				}
+			},
+			required: ['app_id', 'label', 'view_type']
+		}
 	}
 ];
 
@@ -201,6 +268,32 @@ const createEntitySchema = z.object({
 const updateEntitySchema = z.object({
 	id: z.string(),
 	data: z.record(z.string(), z.unknown())
+});
+
+const createTableSchema = z.object({
+	app_id: z.string(),
+	name: z.string().min(1).regex(/^[a-z0-9_]+$/, '英小文字・数字・アンダースコアのみ使用可'),
+	label: z.string().min(1),
+	icon: z.string().optional(),
+	fields: z.array(
+		z.object({
+			key: z.string().min(1).regex(/^[a-z0-9_]+$/),
+			label: z.string().min(1),
+			type: z
+				.enum(['text', 'number', 'select', 'date', 'email', 'tel', 'textarea', 'recordSelect'])
+				.default('text'),
+			required: z.boolean().default(false),
+			options: z.array(z.object({ value: z.string(), label: z.string() })).optional().default([]),
+			ref_table: z.string().optional()
+		})
+	)
+});
+
+const createPageSchema = z.object({
+	app_id: z.string(),
+	label: z.string().min(1),
+	table_id: z.string().optional(),
+	view_type: z.enum(['list', 'kanban']).default('list')
 });
 
 const createAppFieldSchema = z.object({
@@ -347,4 +440,45 @@ export async function handleUpdateEntity(db: Db, input: unknown) {
 	await db.update(entities).set({ data: merged, updatedAt: now() }).where(eq(entities.id, id));
 	const [row] = await db.select().from(entities).where(eq(entities.id, id));
 	return { ...row, data: parseJson(row.data) };
+}
+
+export async function handleCreateTable(db: Db, input: unknown) {
+	const data = createTableSchema.parse(input);
+	const result = await createEntityType(db, {
+		name: data.name,
+		label: data.label,
+		icon: data.icon,
+		appId: data.app_id,
+		fields: data.fields.map((f) => ({
+			_id: crypto.randomUUID(),
+			key: f.key,
+			label: f.label,
+			type: f.type,
+			required: f.required,
+			options: f.options,
+			refTable: f.ref_table
+		}))
+	});
+	return { id: result.id, name: result.name, label: data.label, appId: data.app_id, fieldCount: data.fields.length };
+}
+
+export async function handleCreatePage(db: Db, input: unknown) {
+	const data = createPageSchema.parse(input);
+	const id = crypto.randomUUID();
+	const [maxRow] = await db
+		.select({ sortOrder: appPages.sortOrder })
+		.from(appPages)
+		.where(eq(appPages.appId, data.app_id))
+		.orderBy(desc(appPages.sortOrder))
+		.limit(1);
+	const sortOrder = (maxRow?.sortOrder ?? -1) + 1;
+	await db.insert(appPages).values({
+		id,
+		appId: data.app_id,
+		label: data.label,
+		tableId: data.table_id ?? null,
+		viewType: data.view_type,
+		sortOrder
+	});
+	return { id, label: data.label, viewType: data.view_type, appId: data.app_id };
 }

@@ -341,9 +341,11 @@ text / email / tel / number / textarea / select / date / datetime-local / hidden
 **multiselect フィールドの使い方**: 複数選択に使う。\`options\` で選択肢を指定し、value は選択済みの値をカンマ区切りにした文字列（例: \`"notification,slack:abc123"\`）。`;
 
 export type AppContext = {
-	entityTypeId: string;
+	appId: string;
 	appLabel: string;
 	appName: string;
+	spec?: string | null;
+	tables: Array<{ id: string; name: string; label: string }>;
 };
 
 export function buildSystemPrompt(appContext?: AppContext): string {
@@ -358,7 +360,26 @@ export function buildSystemPrompt(appContext?: AppContext): string {
 	}).format(new Date());
 	let prompt = `${SYSTEM_PROMPT}\n\n## 現在日時\n${now}`;
 	if (appContext) {
-		prompt += `\n\n## 現在編集中のアプリ\n- entity_type_id: ${appContext.entityTypeId}\n- 表示名: ${appContext.appLabel}\n- 識別名 (name): ${appContext.appName}\n\nフィールドの追加・変更は必ず entity_type_id = "${appContext.entityTypeId}" を使って add_entity_field を呼ぶこと。create_app は使わない。`;
+		const tableList =
+			appContext.tables.length > 0
+				? appContext.tables.map((t) => `- ${t.label}（name: ${t.name}, id: \`${t.id}\`）`).join('\n')
+				: '（まだテーブルがありません）';
+		const specText = appContext.spec?.trim() || '（仕様書は未入力です）';
+		prompt += `\n\n## アプリビルダーモード
+現在、アプリ「${appContext.appLabel}」（app_id: \`${appContext.appId}\`, name: ${appContext.appName}）の設計・構築中です。
+
+### 仕様書
+${specText}
+
+### テーブル一覧
+${tableList}
+
+### 操作ルール
+- 新しいテーブルを追加する場合: \`create_table\` を使い \`app_id: "${appContext.appId}"\` を必ず指定する。作成後はページも自動追加される
+- 既存テーブルにフィールドを追加する場合: \`add_entity_field\` を使い、上記テーブル一覧の id を指定する
+- 追加のビュー（カンバン等）を作りたい場合: \`create_page\` を使い \`app_id: "${appContext.appId}"\` を指定する
+- レコードの登録・編集はフォームUIを通じて行う（create_entity 等は使用不可）
+- create_app は使わない（アプリはすでに存在する）`;
 	}
 	return prompt;
 }

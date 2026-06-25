@@ -66,7 +66,13 @@ export const POST: RequestHandler = async ({ request, platform, locals }) => {
 		tool?: string;
 		data?: Record<string, string>;
 		history?: Message[];
-		context?: { entityTypeId: string; appLabel: string; appName: string };
+		context?: {
+			appId: string;
+			appLabel: string;
+			appName: string;
+			spec?: string | null;
+			tables: Array<{ id: string; name: string; label: string }>;
+		};
 	};
 
 	// フォーム送信（tool + data）はJSONで返す

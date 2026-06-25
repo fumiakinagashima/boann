@@ -7,9 +7,18 @@ import { entityTypes } from '$lib/server/db/schema';
 
 // メインチャットはSELECTのみ。create_* / update_* / delete_* はダイアログ経由でユーザーが実行する。
 const WRITE_TOOL_PREFIX = ['create_', 'update_', 'delete_'];
-const tools = allTools.filter(
+const mainChatTools = allTools.filter(
 	(t) => !WRITE_TOOL_PREFIX.some((prefix) => t.name.startsWith(prefix))
 );
+
+// アプリビルダーモード: スキーマ生成（create_table, create_page, add_entity_field）を許可し、レコード操作のみ禁止
+const APP_BUILDER_BLOCKED = new Set([
+	'create_entity', 'update_entity',
+	'create_app', 'create_entity_type',
+	'create_reminder', 'create_reminders_bulk',
+	'delete_sent_reminders', 'delete_read_notifications'
+]);
+const appBuilderTools = allTools.filter((t) => !APP_BUILDER_BLOCKED.has(t.name));
 import { DEFAULT_AI_MODEL } from './settings';
 import type { Db } from '$lib/server/db';
 import type { MessageContent, WorkflowStep } from '$lib/types/chat';
@@ -209,6 +218,7 @@ export async function streamChat(
 		let currentTool: { id: string; name: string; inputJson: string } | null = null;
 		const turnEvents: StreamEvent[] = [];
 
+		const tools = appContext?.appId ? appBuilderTools : mainChatTools;
 		const stream = anthropic.messages.stream({
 			model: model ?? DEFAULT_AI_MODEL,
 			max_tokens: 8192,

@@ -11,6 +11,7 @@
 	let spec = $state(data.app.spec ?? '');
 	let saving = $state(false);
 	let saved = $state(false);
+	let aiTrigger = $state<string | null>(null);
 
 	$effect(() => { spec = data.app.spec ?? ''; });
 
@@ -27,6 +28,12 @@
 		} finally {
 			saving = false;
 		}
+	}
+
+	async function generateFromSpec() {
+		if (!spec.trim()) return;
+		await saveSpec();
+		aiTrigger = `以下の仕様書に基づいて、このアプリのテーブルとページを設計・作成してください:\n\n${spec}`;
 	}
 
 	// ── Tabs ──────────────────────────────────────────────────
@@ -76,11 +83,13 @@
 		window.addEventListener('mouseup', onUp);
 	}
 
-	const chatContext = $derived(
-		data.tables.length > 0
-			? { entityTypeId: data.tables[0].id, appLabel: data.app.label, appName: data.app.name }
-			: undefined
-	);
+	const chatContext = $derived({
+		appId: data.app.id,
+		appLabel: data.app.label,
+		appName: data.app.name,
+		spec: data.app.spec,
+		tables: data.tables.map((t) => ({ id: t.id, name: t.name, label: t.label }))
+	});
 
 	function padTime(n: number) { return String(n).padStart(2, '0'); }
 </script>
@@ -113,6 +122,9 @@
 					bind:value={spec}
 					placeholder="アプリの仕様をここに記述してください。AIが設計をサポートします。&#10;&#10;例:&#10;## 顧客商談管理&#10;&#10;### データ&#10;- 顧客マスタ（会社名, 担当者, 業種）&#10;- 商談（顧客, ステータス, 金額）&#10;- 活動履歴（商談, 種別, 日時, 内容）&#10;&#10;### ページ&#10;- 商談ボード（カンバン, ステータス別）"
 				></textarea>
+				<button class="btn-generate" onclick={generateFromSpec} disabled={!spec.trim() || saving}>
+					✨ AIに設計・作成してもらう
+				</button>
 			</section>
 
 			<!-- Tab bar -->
@@ -173,7 +185,7 @@
 							<span class="item-arrow">›</span>
 						</a>
 					{:else}
-						<p class="empty-hint">AIにページ設計を依頼できます（準備中）。</p>
+						<p class="empty-hint">AIに「ページを追加して」と話しかけるか、仕様書を書いて「AIに設計・作成してもらう」ボタンを使ってください。</p>
 					{/each}
 				</div>
 
@@ -188,10 +200,10 @@
 							<span class="item-badge">{wf.steps.length} ステップ</span>
 						</div>
 					{:else}
-						<p class="empty-hint">AIにワークフロー設計を依頼できます（準備中）。</p>
+						<p class="empty-hint">AIに「ワークフローを作って」と話しかけてください。</p>
 					{/each}
 					{#if data.workflows.length > 0}
-						<a href="/settings/quick-actions" class="link-more">ワークフロー設定を開く →</a>
+						<a href="/workflows" class="link-more">ワークフロー設定を開く →</a>
 					{/if}
 				</div>
 			{/if}
@@ -214,6 +226,8 @@
 			placeholder="仕様の相談・テーブル追加・修正の指示を入力…"
 			onAction={() => invalidateAll()}
 			context={chatContext}
+			triggerMessage={aiTrigger}
+			onTriggerConsumed={() => (aiTrigger = null)}
 		/>
 	</div>
 </div>
@@ -360,6 +374,27 @@
 
 		&:focus { border-color: var(--color-primary); }
 		&::placeholder { color: var(--color-text-muted); opacity: 0.5; }
+	}
+
+	.btn-generate {
+		width: 100%;
+		margin-top: 8px;
+		padding: 9px 14px;
+		border-radius: 8px;
+		font-size: 0.875rem;
+		font-weight: 500;
+		background: color-mix(in srgb, var(--color-primary) 10%, transparent);
+		color: var(--color-primary);
+		border: 1px solid color-mix(in srgb, var(--color-primary) 30%, transparent);
+		cursor: pointer;
+		font-family: inherit;
+		transition: background 0.15s, border-color 0.15s;
+
+		&:hover:not(:disabled) {
+			background: color-mix(in srgb, var(--color-primary) 18%, transparent);
+			border-color: var(--color-primary);
+		}
+		&:disabled { opacity: 0.4; cursor: not-allowed; }
 	}
 
 	/* ── Tabs ────────────────────────────────────────────────── */

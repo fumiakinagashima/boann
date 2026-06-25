@@ -8,13 +8,21 @@
 	import type { StreamEvent } from '$lib/server/ai/stream';
 	import * as m from '$lib/paraglide/messages.js';
 
-	type AppContext = { entityTypeId: string; appLabel: string; appName: string };
+	type AppContext = {
+		appId: string;
+		appLabel: string;
+		appName: string;
+		spec?: string | null;
+		tables: Array<{ id: string; name: string; label: string }>;
+	};
 	type Props = {
 		placeholder?: string;
 		onAction?: () => void;
 		context?: AppContext;
+		triggerMessage?: string | null;
+		onTriggerConsumed?: () => void;
 	};
-	let { placeholder = 'AIに相談する…', onAction, context }: Props = $props();
+	let { placeholder = 'AIに相談する…', onAction, context, triggerMessage = null, onTriggerConsumed }: Props = $props();
 
 	let messages = $state<Message[]>([]);
 	let input = $state('');
@@ -40,6 +48,14 @@
 		streamingText = '';
 		onAction?.();
 	}
+
+	$effect(() => {
+		if (triggerMessage) {
+			input = triggerMessage;
+			onTriggerConsumed?.();
+			sendMessage();
+		}
+	});
 
 	async function sendMessage() {
 		const text = input.trim();
