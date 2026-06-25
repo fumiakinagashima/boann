@@ -38,10 +38,10 @@
 		deletingApp = true;
 		const res = await fetch(`/api/database/tables/${data.app.name}`, { method: 'DELETE' });
 		if (res.ok || res.status === 204) {
-			await invalidateAll();
 			goto('/');
+		} else {
+			deletingApp = false;
 		}
-		deletingApp = false;
 	}
 
 
@@ -52,21 +52,24 @@
 		_id: string;
 		label: string;
 		key: string;
-		type: 'text' | 'textarea' | 'number' | 'date' | 'select' | 'email' | 'tel';
+		type: 'text' | 'textarea' | 'number' | 'date' | 'select' | 'email' | 'tel' | 'recordSelect';
 		required: boolean;
 		defaultValue: string;
 		description: string;
 		options: SelectOption[];
+		refTable: string;
+		refLabelKey: string;
 	};
 
 	const FIELD_TYPES = [
-		{ value: 'text',     label: 'テキスト' },
-		{ value: 'textarea', label: '長文テキスト' },
-		{ value: 'number',   label: '数値' },
-		{ value: 'date',     label: '日付' },
-		{ value: 'select',   label: '選択肢' },
-		{ value: 'email',    label: 'メールアドレス' },
-		{ value: 'tel',      label: '電話番号' },
+		{ value: 'text',         label: 'テキスト' },
+		{ value: 'textarea',     label: '長文テキスト' },
+		{ value: 'number',       label: '数値' },
+		{ value: 'date',         label: '日付' },
+		{ value: 'select',       label: '選択肢' },
+		{ value: 'email',        label: 'メールアドレス' },
+		{ value: 'tel',          label: '電話番号' },
+		{ value: 'recordSelect', label: 'リレーション' },
 	] as const;
 
 	function slugify(s: string): string {
@@ -86,6 +89,8 @@
 			defaultValue: f.defaultValue ?? '',
 			description: f.description ?? '',
 			options: (f.options as SelectOption[]) ?? [],
+			refTable: f.refTable ?? '',
+			refLabelKey: f.refLabelKey ?? '',
 		}));
 	}
 
@@ -94,6 +99,14 @@
 	let saving = $state(false);
 	let saveError = $state('');
 	let expandedId = $state<string | null>(null);
+
+	// ── Relation combobox ─────────────────────────────────────
+	let refTableQuery = $state('');
+	let refTableDropdownOpen = $state(false);
+
+	function refTableLabel(name: string): string {
+		return data.otherApps.find(a => a.name === name)?.label ?? '';
+	}
 
 	// ── Drag & drop reorder ───────────────────────────────────
 	let dragSrcId = $state<string | null>(null);
@@ -144,7 +157,7 @@
 	function addField() {
 		const newRow: FieldRow = {
 			_id: crypto.randomUUID(), label: '', key: '', type: 'text',
-			required: false, defaultValue: '', description: '', options: []
+			required: false, defaultValue: '', description: '', options: [], refTable: '', refLabelKey: ''
 		};
 		rows = [...rows, newRow];
 		expandedId = newRow._id;
@@ -162,7 +175,13 @@
 
 	function onLabelInput(row: FieldRow, val: string) {
 		row.label = val;
-		row.key = slugify(val) || row.key;
+		const slug = slugify(val);
+		if (slug) {
+			row.key = slug;
+		} else if (!row.key) {
+			const idx = rows.findIndex(r => r._id === row._id);
+			row.key = 'field_' + (idx + 1);
+		}
 		dirty = true;
 	}
 
@@ -212,6 +231,8 @@
 						options: r.options.filter(o => o.label.trim()),
 						defaultValue: r.defaultValue || null,
 						description: r.description || null,
+						refTable: r.refTable || null,
+						refLabelKey: r.refLabelKey || null,
 						sortOrder: i
 					}))
 				})
@@ -339,10 +360,9 @@
 								</span>
 								<button
 									class="field-card-header-btn"
-									onclick={() => { expandedId = isOpen ? null : row._id; }}
+									onclick={() => { expandedId = isOpen ? null : row._id; refTableQuery = ''; refTableDropdownOpen = false; }}
 									aria-expanded={isOpen}
 								>
-								<span class="field-no">{i + 1}</span>
 								<span class="field-card-label" class:placeholder={!row.label}>
 									{row.label || 'フィールド名未入力'}
 								</span>
@@ -365,7 +385,16 @@
 											class="form-input"
 											value={row.label}
 											placeholder="例: 担当者名、ステータス"
-											oninput={(e) => onLabelInput(row, (e.currentTarget as HTMLInputElement).value)}
+											oninput={(e) => {
+												const input = e.currentTarget as HTMLInputElement;
+												if ((e as unknown as InputEvent).isComposing) {
+													row.label = input.value;
+													dirty = true;
+												} else {
+													onLabelInput(row, input.value);
+												}
+											}}
+											oncompositionend={(e) => onLabelInput(row, (e.currentTarget as HTMLInputElement).value)}
 										/>
 										{#if row.key}
 											<p class="form-hint">識別キー: {row.key}</p>
@@ -399,6 +428,67 @@
 											</label>
 										</div>
 									</div>
+
+									{#if row.type === 'recordSelect'}
+										<div class="form-row">
+											<label class="form-label">参照先アプリ</label>
+											<div class="combobox">
+												<input
+													type="text"
+													class="form-input combobox-input"
+													value={refTableDropdownOpen ? refTableQuery : refTableLabel(row.refTable)}
+													placeholder="アプリを検索…"
+													autocomplete="off"
+													onfocus={() => { refTableQuery = ''; refTableDropdownOpen = true; }}
+													oninput={(e) => { refTableQuery = (e.currentTarget as HTMLInputElement).value; }}
+													onblur={() => setTimeout(() => { refTableDropdownOpen = false; }, 150)}
+												/>
+												{#if refTableDropdownOpen}
+													{@const filtered = data.otherApps.filter(a =>
+														!refTableQuery ||
+														a.label.toLowerCase().includes(refTableQuery.toLowerCase()) ||
+														a.name.toLowerCase().includes(refTableQuery.toLowerCase())
+													)}
+													<div class="combobox-dropdown">
+														{#if filtered.length === 0}
+															<div class="combobox-empty">一致するアプリがありません</div>
+														{:else}
+															{#each filtered as app}
+																<button
+																	type="button"
+																	class="combobox-option"
+																	class:selected={app.name === row.refTable}
+																	onmousedown={() => { row.refTable = app.name; row.refLabelKey = ''; markDirty(); refTableDropdownOpen = false; refTableQuery = ''; }}
+																>{app.label}</button>
+															{/each}
+														{/if}
+													</div>
+												{/if}
+											</div>
+											{#if row.refTable}
+												<p class="form-hint">{row.refTable} のレコードIDを参照します</p>
+											{/if}
+										</div>
+
+										{@const refApp = data.otherApps.find(a => a.name === row.refTable)}
+										{#if refApp && refApp.fields.length > 0}
+											<div class="form-row">
+												<label class="form-label" for="reflabelkey-{row._id}">ラベルフィールド</label>
+												<select
+													id="reflabelkey-{row._id}"
+													class="form-select"
+													bind:value={row.refLabelKey}
+													onchange={markDirty}
+												>
+													<option value="">（先頭フィールド）</option>
+													{#each refApp.fields as f}
+														<option value={f.key}>{f.label}</option>
+													{/each}
+												</select>
+												<p class="form-hint">選択肢・一覧に表示するフィールド</p>
+											</div>
+										{/if}
+									{/if}
 
 									{#if row.type === 'select'}
 										<div class="form-row">
@@ -469,7 +559,7 @@
 											class="form-textarea"
 											bind:value={row.description}
 											placeholder="このフィールドに関するメモや説明"
-											rows="2"
+											rows="4"
 											oninput={markDirty}
 										></textarea>
 									</div>
@@ -1006,7 +1096,7 @@
 		padding: 10px;
 		border: 1px solid var(--color-border);
 		border-radius: 6px;
-		background: color-mix(in srgb, var(--color-primary) 2%, var(--color-surface));
+		background: color-mix(in srgb, var(--color-primary) 10%, var(--color-surface));
 	}
 
 	.options-head {
@@ -1027,9 +1117,7 @@
 	}
 
 	.opt-value-input {
-		font-family: ui-monospace, monospace;
 		font-size: 0.8125rem;
-		color: var(--color-text-muted);
 	}
 
 	.opt-del {
@@ -1059,9 +1147,62 @@
 		font-size: 0.8125rem;
 		font-family: inherit;
 		cursor: pointer;
-		transition: border-color 0.1s, color 0.1s;
+		border-color: var(--color-primary);
+		color: var(--color-primary);
+	}
 
-		&:hover { border-color: var(--color-primary); color: var(--color-primary); }
+	/* ── Relation combobox ──────────────────── */
+	.combobox {
+		position: relative;
+	}
+
+	.combobox-input {
+		cursor: pointer;
+
+		&:focus { cursor: text; }
+	}
+
+	.combobox-dropdown {
+		position: absolute;
+		top: calc(100% + 4px);
+		left: 0;
+		right: 0;
+		background: var(--color-surface);
+		border: 1px solid var(--color-border);
+		border-radius: 8px;
+		box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+		z-index: 100;
+		max-height: 200px;
+		overflow-y: auto;
+		padding: 4px;
+	}
+
+	.combobox-option {
+		display: block;
+		width: 100%;
+		padding: 7px 10px;
+		border: none;
+		background: none;
+		color: var(--color-text);
+		font-size: 0.875rem;
+		font-family: inherit;
+		text-align: left;
+		border-radius: 5px;
+		cursor: pointer;
+		transition: background 0.1s;
+
+		&:hover { background: var(--color-background); }
+		&.selected {
+			background: color-mix(in srgb, var(--color-primary) 10%, transparent);
+			color: var(--color-primary);
+			font-weight: 500;
+		}
+	}
+
+	.combobox-empty {
+		padding: 10px 12px;
+		font-size: 0.875rem;
+		color: var(--color-text-muted);
 	}
 
 	.field-card-footer {

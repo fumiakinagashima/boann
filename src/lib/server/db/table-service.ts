@@ -23,6 +23,7 @@ export type FieldDef = {
 	listable?: boolean;
 	isCustom?: boolean;
 	refTable?: string;
+	refLabelKey?: string;
 };
 
 export type TableInfo = {
@@ -65,7 +66,8 @@ export async function getTableInfo(db: Db, type: string): Promise<TableInfo | nu
 			options: JSON.parse(f.options ?? '[]'), listable: true,
 			defaultValue: f.defaultValue ?? undefined,
 			description: f.description ?? undefined,
-			refTable: f.refTable ?? undefined
+			refTable: f.refTable ?? undefined,
+			refLabelKey: f.refLabelKey ?? undefined
 		}))
 	};
 }
@@ -232,7 +234,8 @@ export async function getFieldsByEntityTypeId(db: Db, entityTypeId: string): Pro
 		options: JSON.parse(f.options ?? '[]'), listable: true,
 		defaultValue: f.defaultValue ?? undefined,
 		description: f.description ?? undefined,
-		refTable: f.refTable ?? undefined
+		refTable: f.refTable ?? undefined,
+		refLabelKey: f.refLabelKey ?? undefined
 	}));
 }
 
@@ -268,6 +271,7 @@ export async function createEntityType(db: Db, input: EntityTypeInput): Promise<
 				defaultValue: f.defaultValue ?? null,
 				description: f.description ?? null,
 				refTable: f.refTable ?? null,
+				refLabelKey: f.refLabelKey ?? null,
 				sortOrder: i
 			})
 		)
@@ -309,6 +313,7 @@ export async function updateEntityType(db: Db, name: string, input: Partial<Enti
 					defaultValue: f.defaultValue ?? null,
 					description: f.description ?? null,
 					refTable: f.refTable ?? null,
+					refLabelKey: f.refLabelKey ?? null,
 					sortOrder: i
 				})
 			);

@@ -19,18 +19,21 @@
 	let recordOptions = $state<Record<string, { value: string; label: string }[]>>({});
 
 	onMount(async () => {
-		const refTables = [...new Set(
-			fields.filter(f => f.type === 'recordSelect' && f.refTable).map(f => f.refTable!)
-		)];
-		for (const refTable of refTables) {
-			const res = await fetch(`/api/database/${refTable}/records`);
-			if (res.ok) {
-				const data = (await res.json()) as { rows: Record<string, unknown>[] };
-				recordOptions[refTable] = data.rows.map(r => ({
-					value: String(r.id),
-					label: String(r.name ?? r.id)
-				}));
+		const refFields = fields.filter(f => f.type === 'recordSelect' && f.refTable);
+		const tableCache: Record<string, { info: { fields: { key: string }[] }; rows: Record<string, unknown>[] }> = {};
+		for (const field of refFields) {
+			const refTable = field.refTable!;
+			if (!tableCache[refTable]) {
+				const res = await fetch(`/api/database/${refTable}/records`);
+				if (!res.ok) continue;
+				tableCache[refTable] = await res.json() as { info: { fields: { key: string }[] }; rows: Record<string, unknown>[] };
 			}
+			const { info, rows } = tableCache[refTable];
+			const labelKey = field.refLabelKey || info.fields[0]?.key || 'id';
+			recordOptions[field.key] = rows.map(r => ({
+				value: String(r.id),
+				label: String(r[labelKey] ?? r.id)
+			}));
 		}
 	});
 
@@ -60,7 +63,7 @@
 					label={field.label}
 					required={field.required}
 					bind:value={values[field.key]}
-					options={recordOptions[field.refTable ?? ''] ?? []}
+					options={recordOptions[field.key] ?? []}
 				/>
 			{:else}
 				<label for={field.key}>

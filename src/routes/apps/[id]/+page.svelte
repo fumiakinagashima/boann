@@ -3,12 +3,15 @@
 	import { formatJstDateTime } from '$lib/datetime';
 	import ChevronLeft from '$lib/components/icon/ChevronLeft.svelte';
 	import AppIcon from '$lib/components/AppIcon.svelte';
+	import SearchSelect from '$lib/components/ui/SearchSelect.svelte';
 	import type { PageData } from './$types';
 	import type { FieldDef, RecordRow } from '$lib/server/db/table-service';
 
 	let { data }: { data: PageData } = $props();
 
 	let records = $state<RecordRow[]>(data.records);
+
+	const recordOptions = $derived(data.recordOptions as Record<string, { value: string; label: string }[]>);
 	$effect(() => { records = data.records; });
 
 	const fields = $derived(data.fields as FieldDef[]);
@@ -96,6 +99,11 @@
 	function formatCell(row: RecordRow, field: FieldDef): string {
 		const val = row[field.key];
 		if (val == null || val === '') return '—';
+		if (field.type === 'recordSelect') {
+			const opts = recordOptions[field.key] ?? [];
+			const opt = opts.find(o => o.value === String(val));
+			return opt ? opt.label : String(val);
+		}
 		if (field.type === 'select') {
 			const opt = (field.options ?? []).find(o => o.value === String(val));
 			return opt ? opt.label : String(val);
@@ -207,7 +215,14 @@
 							{#if field.required}<span class="req-mark">*</span>{/if}
 						</label>
 
-						{#if field.type === 'select'}
+						{#if field.type === 'recordSelect'}
+							<SearchSelect
+								bind:value={formData[field.key]}
+								options={recordOptions[field.key] ?? []}
+								placeholder="選択または検索…"
+								required={field.required}
+							/>
+						{:else if field.type === 'select'}
 							<select
 								id="field-{field.key}"
 								class="form-select"

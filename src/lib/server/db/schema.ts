@@ -26,6 +26,7 @@ export const entityFields = sqliteTable('entity_fields', {
 	defaultValue: text('default_value'),
 	description: text('description'),
 	refTable: text('ref_table'),
+	refLabelKey: text('ref_label_key'),
 	sortOrder: integer('sort_order').notNull().default(0),
 	createdAt: integer('created_at', { mode: 'timestamp' })
 		.notNull()

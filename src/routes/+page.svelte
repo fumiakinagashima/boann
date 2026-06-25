@@ -17,19 +17,18 @@
 
 	async function createApp() {
 		creating = true;
-		try {
-			const name = 'app_' + Date.now();
-			const res = await fetch('/api/database/tables', {
-				method: 'POST',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ label: '新しいアプリ', name, icon: 'layout-grid', fields: [] })
-			});
-			if (!res.ok) return;
-			const { id } = (await res.json()) as { id: string };
-			goto(`/apps/${id}/build`);
-		} finally {
+		const name = 'app_' + Date.now();
+		const res = await fetch('/api/database/tables', {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({ label: '新しいアプリ', name, icon: 'layout-grid', fields: [] })
+		});
+		if (!res.ok) {
 			creating = false;
+			return;
 		}
+		const { id } = (await res.json()) as { id: string };
+		goto(`/apps/${id}/build`);
 	}
 
 	async function toggleBookmark(app: AppCard, e: MouseEvent) {
@@ -61,7 +60,7 @@
 		</div>
 		{#if data.account?.permission === 'admin'}
 			<button class="btn-primary" onclick={createApp} disabled={creating}>
-				{creating ? '作成中…' : '+ 新規アプリ作成'}
+				新規アプリ作成
 			</button>
 		{/if}
 	</div>
@@ -73,7 +72,7 @@
 			{#if data.account?.permission === 'admin'}
 				<p class="empty-desc">「新規アプリ作成」からアプリを追加してください。<br>AIがフィールド設計をサポートします。</p>
 				<button class="btn-primary" onclick={createApp} disabled={creating}>
-					{creating ? '作成中…' : '+ 新規アプリ作成'}
+					新規アプリ作成
 				</button>
 			{:else}
 				<p class="empty-desc">管理者にアプリの作成を依頼してください。</p>
@@ -126,7 +125,6 @@
 <style lang="scss">
 	.page {
 		padding: 32px 40px;
-		max-width: 1200px;
 	}
 
 	.page-header {
