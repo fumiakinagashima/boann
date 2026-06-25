@@ -1,16 +1,13 @@
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { createDb } from '$lib/server/db';
-import { updateAppSpec, updateAppMeta, deleteApp } from '$lib/server/db/table-service';
+import { updateAppSpec, deleteApp } from '$lib/server/db/table-service';
 
 export const PATCH: RequestHandler = async ({ params, request, platform }) => {
 	if (!platform?.env?.DB) return json({ error: 'DB not available' }, { status: 500 });
 	const db = createDb(platform.env.DB);
-	const body = await request.json() as { spec?: string; label?: string; icon?: string };
-	if (body.spec !== undefined) await updateAppSpec(db, params.id, body.spec ?? '');
-	if (body.label !== undefined || body.icon !== undefined) {
-		await updateAppMeta(db, params.id, { label: body.label, icon: body.icon });
-	}
+	const { spec } = await request.json() as { spec: string };
+	await updateAppSpec(db, params.id, spec ?? '');
 	return json({ ok: true });
 };
 
