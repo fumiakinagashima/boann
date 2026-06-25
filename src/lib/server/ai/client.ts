@@ -104,9 +104,6 @@ function parseTextContent(text: string): MessageContent[] {
 			} else if (type === 'values') {
 				const items = JSON.parse(body);
 				contents.push({ type: 'values', title, items });
-			} else if (type === 'gantt') {
-				const opts = body ? JSON.parse(body) : {};
-				contents.push({ type: 'gantt', title, filter: opts.filter });
 			}
 		} catch {
 			contents.push({ type: 'text', text: body });

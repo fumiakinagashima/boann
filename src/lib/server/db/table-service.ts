@@ -18,6 +18,8 @@ export type FieldDef = {
 	required?: boolean;
 	options?: { label: string; value: string }[];
 	formOptions?: { label: string; value: string }[];
+	defaultValue?: string;
+	description?: string;
 	listable?: boolean;
 	isCustom?: boolean;
 	refTable?: string;
@@ -40,7 +42,7 @@ export const CORE_TABLE_NAMES: string[] = [];
 
 // /database/[type] ルートと衝突する予約済み名
 const RESERVED_NAMES = new Set([
-	'approvals', 'accounts', 'reminders', 'workflows', // 固定ルート
+	'accounts', 'reminders', 'workflows', // 固定ルート
 	'entity_types', 'entity_fields', 'entities', 'core_custom_fields',
 	'integrations',
 	'new', 'schema', // サブルート名
@@ -61,6 +63,8 @@ export async function getTableInfo(db: Db, type: string): Promise<TableInfo | nu
 		fields: fields.map(f => ({
 			key: f.key, label: f.label, type: f.type, required: f.required,
 			options: JSON.parse(f.options ?? '[]'), listable: true,
+			defaultValue: f.defaultValue ?? undefined,
+			description: f.description ?? undefined,
 			refTable: f.refTable ?? undefined
 		}))
 	};
@@ -82,8 +86,39 @@ export async function listAllTables(db: Db): Promise<(TableInfo & { count: numbe
 				fields: fields.map(f => ({
 					key: f.key, label: f.label, type: f.type, required: f.required,
 					options: JSON.parse(f.options ?? '[]'), listable: true,
+					defaultValue: f.defaultValue ?? undefined,
+					description: f.description ?? undefined,
 					refTable: f.refTable ?? undefined
 				}))
+			};
+		})
+	);
+}
+
+export type AppCard = {
+	id: string;
+	name: string;
+	label: string;
+	icon: string | null;
+	fieldCount: number;
+	recordCount: number;
+};
+
+export async function listApps(db: Db): Promise<AppCard[]> {
+	const types = await db.select().from(entityTypes);
+	return Promise.all(
+		types.map(async (et) => {
+			const [[fieldRow], [recordRow]] = await Promise.all([
+				db.select({ count: sql<number>`count(*)` }).from(entityFields).where(eq(entityFields.entityTypeId, et.id)),
+				db.select({ count: sql<number>`count(*)` }).from(entities).where(eq(entities.entityTypeId, et.id))
+			]);
+			return {
+				id: et.id,
+				name: et.name,
+				label: et.label,
+				icon: et.icon,
+				fieldCount: fieldRow.count,
+				recordCount: recordRow.count
 			};
 		})
 	);
@@ -94,6 +129,18 @@ export type EntityTypeForWorkflow = {
 	label: string;
 	fields: { key: string; label: string }[];
 };
+
+export type EntityTypeSimple = { id: string; name: string; label: string; icon: string | null };
+
+export async function listEntityTypesSimple(db: Db): Promise<EntityTypeSimple[]> {
+	const rows = await db.select({
+		id: entityTypes.id,
+		name: entityTypes.name,
+		label: entityTypes.label,
+		icon: entityTypes.icon
+	}).from(entityTypes);
+	return rows;
+}
 
 export async function getEntityTypeByName(db: Db, name: string): Promise<{ id: string } | null> {
 	const [et] = await db.select({ id: entityTypes.id }).from(entityTypes).where(eq(entityTypes.name, name));
@@ -165,6 +212,30 @@ export async function deleteRecord(db: Db, type: string, id: string): Promise<vo
 	await db.delete(entities).where(eq(entities.id, id));
 }
 
+export async function listRecordsByEntityTypeId(db: Db, entityTypeId: string, limit = 200): Promise<RecordRow[]> {
+	return (await db.select().from(entities)
+		.where(eq(entities.entityTypeId, entityTypeId))
+		.orderBy(desc(entities.createdAt)).limit(limit))
+		.map(e => ({
+			id: e.id,
+			...(JSON.parse(e.data ?? '{}') as RecordRow),
+			createdAt: toTs(e.createdAt), updatedAt: toTs(e.updatedAt)
+		}));
+}
+
+export async function getFieldsByEntityTypeId(db: Db, entityTypeId: string): Promise<FieldDef[]> {
+	const fields = await db.select().from(entityFields)
+		.where(eq(entityFields.entityTypeId, entityTypeId))
+		.orderBy(entityFields.sortOrder);
+	return fields.map(f => ({
+		key: f.key, label: f.label, type: f.type, required: f.required,
+		options: JSON.parse(f.options ?? '[]'), listable: true,
+		defaultValue: f.defaultValue ?? undefined,
+		description: f.description ?? undefined,
+		refTable: f.refTable ?? undefined
+	}));
+}
+
 // ── Entity type (custom table) management ──────────────────────────────────
 
 export type EditableField = Omit<FieldDef, 'listable' | 'isCustom'> & { _id: string };
@@ -176,7 +247,7 @@ export type EntityTypeInput = {
 	fields: EditableField[];
 };
 
-export async function createEntityType(db: Db, input: EntityTypeInput): Promise<void> {
+export async function createEntityType(db: Db, input: EntityTypeInput): Promise<{ id: string; name: string }> {
 	if (RESERVED_NAMES.has(input.name)) {
 		throw new Error(`テーブル名 "${input.name}" はシステムで予約されています。別の名前を使用してください。`);
 	}
@@ -194,11 +265,20 @@ export async function createEntityType(db: Db, input: EntityTypeInput): Promise<
 				key: f.key, label: f.label, type: f.type as CustomFieldType,
 				required: f.required ?? false,
 				options: JSON.stringify(f.options ?? []),
+				defaultValue: f.defaultValue ?? null,
+				description: f.description ?? null,
 				refTable: f.refTable ?? null,
 				sortOrder: i
 			})
 		)
 	]);
+	return { id, name: input.name };
+}
+
+export async function getEntityTypeById(db: Db, id: string): Promise<{ id: string; name: string; label: string; icon: string | null } | null> {
+	const [et] = await db.select({ id: entityTypes.id, name: entityTypes.name, label: entityTypes.label, icon: entityTypes.icon })
+		.from(entityTypes).where(eq(entityTypes.id, id));
+	return et ?? null;
 }
 
 export async function updateEntityType(db: Db, name: string, input: Partial<EntityTypeInput>): Promise<void> {
@@ -226,6 +306,8 @@ export async function updateEntityType(db: Db, name: string, input: Partial<Enti
 					key: f.key, label: f.label, type: f.type as CustomFieldType,
 					required: f.required ?? false,
 					options: JSON.stringify(f.options ?? []),
+					defaultValue: f.defaultValue ?? null,
+					description: f.description ?? null,
 					refTable: f.refTable ?? null,
 					sortOrder: i
 				})

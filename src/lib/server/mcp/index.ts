@@ -13,17 +13,10 @@ export type ToolName =
 	| 'list_integrations'
 	| 'call_external_api'
 	| 'build_handoff_data'
-	| 'create_word_document'
-	| 'create_excel_workbook'
-	| 'create_powerpoint_presentation'
-	| 'delete_sent_reminders'
 	| 'delete_read_notifications'
-	| 'list_reminders'
 	| 'send_email'
 	| 'send_notification'
 	| 'send_slack_notification'
-	| 'create_reminder'
-	| 'create_reminders_bulk'
 	| 'list_entity_types'
 	| 'create_app'
 	| 'get_entity_fields'
@@ -57,17 +50,10 @@ export async function dispatchTool(
 		case 'list_integrations':              return integrations.handleListIntegrations(db);
 		case 'call_external_api':              return integrations.handleCallExternalApi(db, input);
 		case 'build_handoff_data':             return documents.handleBuildHandoffData(input, env);
-		case 'create_word_document':           return documents.handleCreateWordDocument(db, input, env, ctx);
-		case 'create_excel_workbook':          return documents.handleCreateExcelWorkbook(db, input, env, ctx);
-		case 'create_powerpoint_presentation': return documents.handleCreatePowerpointPresentation(db, input, env, ctx);
-		case 'delete_sent_reminders':          return communication.handleDeleteSentReminders(db, input, env);
 		case 'delete_read_notifications':      return communication.handleDeleteReadNotifications(db, input, env);
-		case 'list_reminders':                 return communication.handleListReminders(db, input, env);
 		case 'send_email':                     return communication.handleSendEmail(db, input, env);
 		case 'send_notification':              return communication.handleSendNotification(db, input, env);
 		case 'send_slack_notification':        return communication.handleSendSlackNotification(db, input, env);
-		case 'create_reminder':                return communication.handleCreateReminder(db, input, env);
-		case 'create_reminders_bulk':          return communication.handleCreateRemindersBulk(db, input, env);
 		case 'list_entity_types':              return entities.handleListEntityTypes(db);
 		case 'create_app':                     return entities.handleCreateApp(db, input);
 		case 'get_entity_fields':              return entities.handleGetEntityFields(db, input);

@@ -23,6 +23,8 @@ export const entityFields = sqliteTable('entity_fields', {
 		.default('text'),
 	required: integer('required', { mode: 'boolean' }).notNull().default(false),
 	options: text('options').default('[]'),
+	defaultValue: text('default_value'),
+	description: text('description'),
 	refTable: text('ref_table'),
 	sortOrder: integer('sort_order').notNull().default(0),
 	createdAt: integer('created_at', { mode: 'timestamp' })
@@ -192,6 +194,17 @@ export const workflowRuns = sqliteTable('workflow_runs', {
 	finishedAt: integer('finished_at', { mode: 'timestamp' }).notNull()
 });
 
+export const bookmarks = sqliteTable('bookmarks', {
+	id: text('id').primaryKey(),
+	accountId: text('account_id').notNull(),
+	entityTypeId: text('entity_type_id')
+		.notNull()
+		.references(() => entityTypes.id),
+	createdAt: integer('created_at', { mode: 'timestamp' })
+		.notNull()
+		.default(sql`(unixepoch())`)
+});
+
 export type EntityType = typeof entityTypes.$inferSelect;
 export type EntityField = typeof entityFields.$inferSelect;
 export type Entity = typeof entities.$inferSelect;
@@ -210,3 +223,5 @@ export type Workflow = typeof workflows.$inferSelect;
 export type NewWorkflow = typeof workflows.$inferInsert;
 export type WorkflowRun = typeof workflowRuns.$inferSelect;
 export type NewWorkflowRun = typeof workflowRuns.$inferInsert;
+export type Bookmark = typeof bookmarks.$inferSelect;
+export type NewBookmark = typeof bookmarks.$inferInsert;

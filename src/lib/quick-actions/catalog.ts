@@ -4,8 +4,7 @@
 export type QuickActionId =
 	| 'list_entity_types'
 	| 'list_workflows'
-	| 'create_app'
-	| 'create_reminder';
+	| 'create_app';
 
 export type QuickActionDef = {
 	id: QuickActionId;
@@ -17,14 +16,12 @@ export type QuickActionDef = {
 export const quickActionCatalog: QuickActionDef[] = [
 	{ id: 'list_entity_types', label: 'テーブル一覧', description: '作成済みのカスタムテーブルを表示します', icon: '🗂️' },
 	{ id: 'list_workflows', label: 'ワークフロー一覧', description: '設定済みのワークフローを表示します', icon: '⚙️' },
-	{ id: 'create_app', label: 'アプリ作成', description: 'AIにアプリの説明を送ってテーブルを作成します', icon: '✨' },
-	{ id: 'create_reminder', label: 'リマインダー設定', description: 'リマインダーの登録フォームを表示します', icon: '⏰' }
+	{ id: 'create_app', label: 'アプリ作成', description: 'AIにアプリの説明を送ってテーブルを作成します', icon: '✨' }
 ];
 
 export const DEFAULT_QUICK_ACTION_IDS: QuickActionId[] = [
 	'list_entity_types',
-	'list_workflows',
-	'create_reminder'
+	'list_workflows'
 ];
 
 export const MAX_QUICK_ACTIONS = 5;

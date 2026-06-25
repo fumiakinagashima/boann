@@ -2,9 +2,6 @@ import type { FieldDef } from '$lib/server/db/table-service';
 import type { FormField } from '$lib/types/chat';
 import { toJstDatetimeLocal } from '$lib/datetime';
 
-/** RecordDialog が扱うコアエンティティ種別 */
-export type CoreType = 'customers' | 'contacts' | 'deals' | 'activities';
-
 /** 詳細から編集/新規フォームを開く際の指定。snake_case の FormContent ではなく camelCase の prefill を使う */
 export type RecordFormSpec = {
 	type: string;

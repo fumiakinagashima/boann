@@ -177,7 +177,7 @@
 		}
 	}
 
-	// get_contacts 等、同じtoolが複数カテゴリ（検索・集計）から参照される場合に、
+	// 同じtoolが複数カテゴリから参照される場合に、
 	// 再読込後どちらのカテゴリで表示するかをstep.categoryで覚えておく。未設定（AI生成・旧データ）はtoolからの逆引きにフォールバックする。
 	function currentCategoryKey(step: { id: string; tool: string; category?: string }): string {
 		if (step.tool) return step.category ?? findWorkflowActionCategory(step.tool)?.key ?? '';

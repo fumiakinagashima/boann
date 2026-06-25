@@ -37,47 +37,6 @@
 			profileSaving = false;
 		}
 	}
-
-	let currentPassword = $state('');
-	let newPassword = $state('');
-	let newPasswordConfirm = $state('');
-
-	let passwordSaving = $state(false);
-	let passwordSaved = $state(false);
-	let passwordError = $state('');
-
-	async function savePassword() {
-		passwordError = '';
-		if (newPassword.length < 8) {
-			passwordError = m.account_settings_password_too_short();
-			return;
-		}
-		if (newPassword !== newPasswordConfirm) {
-			passwordError = m.account_settings_password_mismatch();
-			return;
-		}
-		passwordSaving = true;
-		passwordSaved = false;
-		try {
-			const res = await fetch('/api/account/password', {
-				method: 'PATCH',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ currentPassword, newPassword })
-			});
-			if (!res.ok) {
-				const body = (await res.json()) as { error?: string };
-				passwordError = body.error ?? m.chat_error();
-				return;
-			}
-			currentPassword = '';
-			newPassword = '';
-			newPasswordConfirm = '';
-			passwordSaved = true;
-			setTimeout(() => (passwordSaved = false), 2000);
-		} finally {
-			passwordSaving = false;
-		}
-	}
 </script>
 
 <div class="page">
@@ -87,12 +46,12 @@
 		{#if data.account.permission === 'admin'}
 			<a href="/settings/integrations">{m.integrations()}</a>
 		{/if}
-		<a href="/settings/quick-actions">{m.quick_actions()}</a>
 		{#if data.account.permission === 'admin'}
 			<a href="/settings/email">{m.email_settings()}</a>
 			<a href="/settings/ai">{m.ai_settings()}</a>
 		{/if}
 		<a href="/settings/account" class="active">{m.account_settings()}</a>
+		<a href="/settings/password">パスワード変更</a>
 	</nav>
 
 	<section>
@@ -115,19 +74,6 @@
 		</div>
 	</section>
 
-	<section>
-		<h2>{m.account_settings_password()}</h2>
-		<div class="fields">
-			<Textbox label={m.account_settings_current_password()} type="password" bind:value={currentPassword} />
-			<Textbox label={m.account_settings_new_password()} type="password" bind:value={newPassword} />
-			<Textbox label={m.account_settings_new_password_confirm()} type="password" bind:value={newPasswordConfirm} />
-		</div>
-		<div class="actions">
-			<button class="save-btn" onclick={savePassword} disabled={passwordSaving || !currentPassword || !newPassword}>{m.settings_save()}</button>
-			{#if passwordSaved}<span class="saved">{m.settings_saved()}</span>{/if}
-			{#if passwordError}<span class="error">{passwordError}</span>{/if}
-		</div>
-	</section>
 </div>
 
 <style lang="scss">

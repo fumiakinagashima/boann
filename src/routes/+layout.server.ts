@@ -1,17 +1,18 @@
 import type { LayoutServerLoad } from './$types';
 import { createDb } from '$lib/server/db';
 import { countUnreadNotifications } from '$lib/server/db/notification-service';
-import { listChats } from '$lib/server/db/chat-service';
+import { listBookmarks } from '$lib/server/db/bookmark-service';
+import { listEntityTypesSimple } from '$lib/server/db/table-service';
 
 export const load: LayoutServerLoad = async ({ platform, locals, url }) => {
 	if (!locals.account || url.pathname === '/signin' || !platform?.env?.DB) {
-		return { account: locals.account, unreadNotificationCount: 0, chats: [] };
+		return { account: locals.account, unreadNotificationCount: 0, bookmarkedIds: [], apps: [] };
 	}
 	const db = createDb(platform.env.DB);
-	const [unreadNotificationCount, chatRows] = await Promise.all([
+	const [unreadNotificationCount, bookmarkedIds, apps] = await Promise.all([
 		countUnreadNotifications(db, locals.account.id),
-		listChats(db, locals.account.id)
+		listBookmarks(db, locals.account.id),
+		listEntityTypesSimple(db)
 	]);
-	const chats = chatRows.map((c) => ({ id: c.id, title: c.title, updatedAt: c.updatedAt.toISOString() }));
-	return { account: locals.account, unreadNotificationCount, chats };
+	return { account: locals.account, unreadNotificationCount, bookmarkedIds, apps };
 };

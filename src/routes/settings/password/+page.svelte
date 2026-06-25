@@ -1,25 +1,44 @@
 <script lang="ts">
-	import { untrack } from 'svelte';
-	import Select from '$lib/components/ui/Select.svelte';
+	import Textbox from '$lib/components/ui/Textbox.svelte';
 	import * as m from '$lib/paraglide/messages.js';
 	import type { PageData } from './$types';
 
 	let { data }: { data: PageData } = $props();
 
-	let model = $state(untrack(() => data.model));
+	let currentPassword = $state('');
+	let newPassword = $state('');
+	let newPasswordConfirm = $state('');
 
 	let saving = $state(false);
 	let saved = $state(false);
+	let error = $state('');
 
-	async function save() {
+	async function savePassword() {
+		error = '';
+		if (newPassword.length < 8) {
+			error = m.account_settings_password_too_short();
+			return;
+		}
+		if (newPassword !== newPasswordConfirm) {
+			error = m.account_settings_password_mismatch();
+			return;
+		}
 		saving = true;
 		saved = false;
 		try {
-			await fetch('/api/ai/settings', {
-				method: 'PUT',
+			const res = await fetch('/api/account/password', {
+				method: 'PATCH',
 				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ model })
+				body: JSON.stringify({ currentPassword, newPassword })
 			});
+			if (!res.ok) {
+				const body = (await res.json()) as { error?: string };
+				error = body.error ?? m.chat_error();
+				return;
+			}
+			currentPassword = '';
+			newPassword = '';
+			newPasswordConfirm = '';
 			saved = true;
 			setTimeout(() => (saved = false), 2000);
 		} finally {
@@ -37,22 +56,25 @@
 		{/if}
 		{#if data.account.permission === 'admin'}
 			<a href="/settings/email">{m.email_settings()}</a>
-			<a href="/settings/ai" class="active">{m.ai_settings()}</a>
+			<a href="/settings/ai">{m.ai_settings()}</a>
 		{/if}
 		<a href="/settings/account">{m.account_settings()}</a>
-		<a href="/settings/password">パスワード変更</a>
+		<a href="/settings/password" class="active">パスワード変更</a>
 	</nav>
 
 	<section>
-		<h2>{m.ai_settings_model()}</h2>
-		<p class="hint">{m.ai_settings_model_desc()}</p>
-		<Select bind:value={model} options={data.options} />
+		<h2>{m.account_settings_password()}</h2>
+		<div class="fields">
+			<Textbox label={m.account_settings_current_password()} type="password" bind:value={currentPassword} />
+			<Textbox label={m.account_settings_new_password()} type="password" bind:value={newPassword} />
+			<Textbox label={m.account_settings_new_password_confirm()} type="password" bind:value={newPasswordConfirm} />
+		</div>
+		<div class="actions">
+			<button class="save-btn" onclick={savePassword} disabled={saving || !currentPassword || !newPassword}>{m.settings_save()}</button>
+			{#if saved}<span class="saved">{m.settings_saved()}</span>{/if}
+			{#if error}<span class="error">{error}</span>{/if}
+		</div>
 	</section>
-
-	<div class="actions">
-		<button class="save-btn" onclick={save} disabled={saving || !model}>{m.settings_save()}</button>
-		{#if saved}<span class="saved">{m.settings_saved()}</span>{/if}
-	</div>
 </div>
 
 <style lang="scss">
@@ -107,16 +129,17 @@
 		font-weight: 500;
 	}
 
-	.hint {
-		margin-bottom: 12px;
-		font-size: 0.8125rem;
-		color: var(--color-text-muted);
+	.fields {
+		display: flex;
+		flex-direction: column;
+		gap: 16px;
 	}
 
 	.actions {
 		display: flex;
 		align-items: center;
 		gap: 12px;
+		margin-top: 20px;
 	}
 
 	.save-btn {
@@ -135,5 +158,10 @@
 	.saved {
 		font-size: 0.8125rem;
 		color: var(--color-text-muted);
+	}
+
+	.error {
+		font-size: 0.8125rem;
+		color: var(--color-danger);
 	}
 </style>

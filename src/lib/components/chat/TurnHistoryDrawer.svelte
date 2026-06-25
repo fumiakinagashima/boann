@@ -29,8 +29,6 @@
 		table: '一覧',
 		actions: '選択肢',
 		values: '詳細',
-		gantt: 'ガントチャート',
-		timeline: 'タイムライン',
 		chart: 'グラフ',
 		kanban: 'カンバン',
 		link: 'リンク',

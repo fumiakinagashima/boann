@@ -1,6 +1,5 @@
 import type { Db } from '../db';
 import { dispatchTool, type ToolName, type ToolEnv } from '../mcp';
-import { getReminderChannelOptions } from '../db/reminder-service';
 import type { MessageContent } from '$lib/types/chat';
 import type { QuickActionId } from '$lib/quick-actions/catalog';
 
@@ -87,31 +86,6 @@ const handlers: Record<QuickActionId, QuickActionHandler> = {
 				submitLabel: 'AIに相談する'
 			}
 		]
-	},
-
-	create_reminder: {
-		build: async (db, env) => {
-			const options = await getReminderChannelOptions(db, env);
-			return [
-				{
-					type: 'form',
-					title: 'リマインダー設定',
-					tool: 'create_reminder',
-					fields: [
-						{ key: 'remind_at', label: '日時', type: 'datetime-local', required: true },
-						{
-							key: 'channels',
-							label: '通知先',
-							type: 'multiselect',
-							required: true,
-							value: 'notification',
-							options
-						},
-						{ key: 'content', label: '内容', type: 'textarea', required: true }
-					]
-				}
-			];
-		}
 	}
 };
 

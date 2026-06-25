@@ -8,6 +8,20 @@
       "when": 1750000000000,
       "tag": "0000_initial",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "6",
+      "when": 1750500000000,
+      "tag": "0001_bookmarks",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1750600000000,
+      "tag": "0002_field_extras",
+      "breakpoints": true
     }
   ]
 }

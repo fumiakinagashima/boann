@@ -15,8 +15,8 @@ export const POST: RequestHandler = async ({ request, platform }) => {
 	const db = createDb(platform.env.DB);
 	try {
 		const input = await request.json() as EntityTypeInput;
-		await createEntityType(db, input);
-		return json({ ok: true }, { status: 201 });
+		const result = await createEntityType(db, input);
+		return json(result, { status: 201 });
 	} catch (e) {
 		return json({ error: e instanceof Error ? e.message : String(e) }, { status: 400 });
 	}

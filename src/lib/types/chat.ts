@@ -46,7 +46,7 @@ export type TableContent = {
 	type: 'table';
 	columns: TableColumn[];
 	rows: Record<string, unknown>[];
-	// 行がレコードを表すテーブルの場合、そのテーブル種別（customers/contacts/deals/activities やカスタムテーブル名）。
+	// 行がレコードを表すテーブルの場合、そのカスタムテーブル名。
 	// 設定されていると行クリックで詳細ダイアログを開ける（rows に id が必要）
 	entity?: string;
 };
@@ -75,25 +75,6 @@ export type ValuesContent = {
 	type: 'values';
 	title?: string;
 	items: ValueItem[];
-};
-
-export type GanttContent = {
-	type: 'gantt';
-	title?: string;
-	filter?: {
-		status?: string[];
-		customerId?: string;
-	};
-};
-
-export type TimelineContent = {
-	type: 'timeline';
-	title?: string;
-	filter?: {
-		customerId?: string;
-		// 活動種別（note/call/email/meeting/deal_created）で絞り込む
-		type?: string[];
-	};
 };
 
 export type ChartSeries = { name: string; data: { label: string; value: number }[] };
@@ -136,12 +117,6 @@ export type LinkContent = {
 	newTab?: boolean;
 };
 
-export type BizcardContent = {
-	type: 'bizcard';
-	title?: string;
-	completed?: boolean;
-};
-
 export type DocumentJobContent = {
 	type: 'document_job';
 	jobId: string;
@@ -176,59 +151,6 @@ export type ReplyContent = {
 	fields: ReplyField[];
 	submitLabel?: string;
 	completed?: boolean;
-};
-
-export type CustomerDetailCustomer = {
-	id: string;
-	name: string;
-	email?: string | null;
-	phone?: string | null;
-	postal_code?: string | null;
-	address?: string | null;
-	website?: string | null;
-	status?: string | null;
-	notes?: string | null;
-	// キャッシュ済みAIヘルススコア（get_customer_detail の customer 行に含まれる）
-	healthScore?: number | null;
-	healthScoreLevel?: 'good' | 'warning' | 'risk' | null;
-	healthScoreSummary?: string | null;
-	healthScorePositives?: string | null;
-	healthScoreConcerns?: string | null;
-	healthScoreUpdatedAt?: string | number | null;
-};
-
-export type CustomerDetailContact = {
-	id: string;
-	name: string;
-	role?: string | null;
-	department?: string | null;
-	email?: string | null;
-	phone?: string | null;
-};
-
-export type CustomerDetailDeal = {
-	id: string;
-	title: string;
-	amount?: number | null;
-	status: string;
-	plannedStart?: string | null;
-	plannedEnd?: string | null;
-};
-
-export type CustomerDetailActivity = {
-	id: string;
-	type: string;
-	content: string;
-	createdAt: string | number;
-	activityDate?: string | number | null;
-};
-
-export type CustomerDetailContent = {
-	type: 'customer_detail';
-	customer: CustomerDetailCustomer;
-	contacts: CustomerDetailContact[];
-	deals: CustomerDetailDeal[];
-	activities: CustomerDetailActivity[];
 };
 
 export type WorkflowResultType = 'boolean' | 'number' | 'string';
@@ -293,16 +215,12 @@ export type MessageContent =
 	| TableContent
 	| ActionContent
 	| ValuesContent
-	| GanttContent
-	| TimelineContent
 	| ChartContent
 	| KanbanContent
 	| LinkContent
-	| BizcardContent
 	| DocumentJobContent
 	| DocHandoffContent
 	| ReplyContent
-	| CustomerDetailContent
 	| WorkflowContent;
 
 export type Message = {
