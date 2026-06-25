@@ -4,19 +4,19 @@ import { createDb } from '$lib/server/db';
 import { getEntityTypeById, getFieldsByEntityTypeId, listEntityTypesSimple } from '$lib/server/db/table-service';
 
 export const load: PageServerLoad = async ({ params, platform, locals }) => {
-	if (locals.account?.permission !== 'admin') redirect(303, `/apps/${params.id}`);
+	if (locals.account?.permission !== 'admin') redirect(303, `/apps/${params.id}/tables/${params.tableId}`);
 	if (!platform?.env?.DB) error(500);
 	const db = createDb(platform.env.DB);
 	const [app, allApps] = await Promise.all([
-		getEntityTypeById(db, params.id),
+		getEntityTypeById(db, params.tableId),
 		listEntityTypesSimple(db)
 	]);
-	if (!app) error(404, 'アプリが見つかりません');
+	if (!app) error(404, 'テーブルが見つかりません');
 	const [fields, otherApps] = await Promise.all([
-		getFieldsByEntityTypeId(db, params.id),
+		getFieldsByEntityTypeId(db, params.tableId),
 		Promise.all(
 			allApps
-				.filter(a => a.id !== params.id)
+				.filter(a => a.id !== params.tableId)
 				.map(async a => {
 					const appFields = await getFieldsByEntityTypeId(db, a.id);
 					return {
@@ -29,5 +29,5 @@ export const load: PageServerLoad = async ({ params, platform, locals }) => {
 				})
 		)
 	]);
-	return { app, fields, otherApps };
+	return { app, appId: params.id, fields, otherApps };
 };

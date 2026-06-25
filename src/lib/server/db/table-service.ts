@@ -282,6 +282,22 @@ export async function createEntityType(db: Db, input: EntityTypeInput): Promise<
 	return { id, name: input.name };
 }
 
+export async function getAppById(db: Db, id: string): Promise<{ id: string; name: string; label: string; icon: string | null; spec: string | null } | null> {
+	const [a] = await db.select({ id: apps.id, name: apps.name, label: apps.label, icon: apps.icon, spec: apps.spec })
+		.from(apps).where(eq(apps.id, id));
+	return a ?? null;
+}
+
+export async function getTablesByAppId(db: Db, appId: string): Promise<{ id: string; name: string; label: string; icon: string | null; recordCount: number }[]> {
+	const rows = await db.select({ id: entityTypes.id, name: entityTypes.name, label: entityTypes.label, icon: entityTypes.icon })
+		.from(entityTypes).where(eq(entityTypes.appId, appId));
+	return Promise.all(rows.map(async (et) => {
+		const [{ count }] = await db.select({ count: sql<number>`count(*)` })
+			.from(entities).where(eq(entities.entityTypeId, et.id));
+		return { ...et, recordCount: count };
+	}));
+}
+
 export async function getEntityTypeById(db: Db, id: string): Promise<{ id: string; name: string; label: string; icon: string | null } | null> {
 	const [et] = await db.select({ id: entityTypes.id, name: entityTypes.name, label: entityTypes.label, icon: entityTypes.icon })
 		.from(entityTypes).where(eq(entityTypes.id, id));

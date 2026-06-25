@@ -283,7 +283,7 @@
 	<!-- Left panel -->
 	<div class="settings-panel">
 		<div class="panel-header">
-			<a href="/apps/{data.app.id}" class="back-link">
+			<a href="/apps/{data.appId}/tables/{data.app.id}" class="back-link">
 				<ChevronLeft size={15} />
 				{data.app.label}
 			</a>

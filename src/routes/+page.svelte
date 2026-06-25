@@ -28,7 +28,7 @@
 			return;
 		}
 		const { id } = (await res.json()) as { id: string };
-		goto(`/apps/${id}/build`);
+		goto(`/apps/${id}/tables/${id}/build`);
 	}
 
 	async function toggleBookmark(app: TableCard, e: MouseEvent) {
