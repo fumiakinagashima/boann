@@ -1,11 +1,38 @@
 <script lang="ts">
 	import { goto, invalidateAll } from '$app/navigation';
 	import ChevronLeft from '$lib/components/icon/ChevronLeft.svelte';
-	import AppIcon from '$lib/components/AppIcon.svelte';
+	import AppIcon, { ICON_OPTIONS } from '$lib/components/AppIcon.svelte';
 	import ChatPanel from '$lib/components/chat/ChatPanel.svelte';
 	import type { PageData } from './$types';
 
 	let { data }: { data: PageData } = $props();
+
+	// ── App meta edit ─────────────────────────────────────────
+	let appLabel = $state(data.app.label);
+	let appIcon = $state(data.app.icon ?? 'layout-grid');
+	let metaDirty = $state(false);
+	let savingMeta = $state(false);
+	let metaSaved = $state(false);
+
+	$effect(() => { appLabel = data.app.label; appIcon = data.app.icon ?? 'layout-grid'; });
+
+	async function saveMeta() {
+		if (!appLabel.trim()) return;
+		savingMeta = true;
+		try {
+			await fetch(`/api/apps/${data.app.id}`, {
+				method: 'PATCH',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ label: appLabel.trim(), icon: appIcon })
+			});
+			await invalidateAll();
+			metaDirty = false;
+			metaSaved = true;
+			setTimeout(() => (metaSaved = false), 2000);
+		} finally {
+			savingMeta = false;
+		}
+	}
 
 	// ── Spec editor ───────────────────────────────────────────
 	let spec = $state(data.app.spec ?? '');
@@ -99,10 +126,43 @@
 	<div class="builder-panel">
 		<div class="panel-header">
 			<a href="/" class="back-link"><ChevronLeft size={15} />アプリ一覧</a>
-			<div class="app-title-row">
-				<span class="app-icon"><AppIcon icon={data.app.icon} size={20} /></span>
-				<h1>{data.app.label}</h1>
-			</div>
+			{#if data.account?.permission === 'admin'}
+				<div class="app-meta-edit">
+					<div class="icon-grid">
+						{#each ICON_OPTIONS as opt (opt.name)}
+							<button
+								type="button"
+								class="icon-opt"
+								class:selected={appIcon === opt.name}
+								onclick={() => { appIcon = opt.name; metaDirty = true; }}
+								title={opt.name}
+							><AppIcon icon={opt.name} size={15} /></button>
+						{/each}
+					</div>
+					<div class="app-name-row">
+						<input
+							class="app-name-input"
+							type="text"
+							bind:value={appLabel}
+							oninput={() => (metaDirty = true)}
+							placeholder="アプリ名"
+						/>
+						{#if metaDirty || metaSaved}
+							{#if metaSaved}<span class="saved-msg">✓</span>{/if}
+							{#if metaDirty}
+								<button class="btn-save-meta" onclick={saveMeta} disabled={savingMeta || !appLabel.trim()}>
+									{savingMeta ? '…' : '保存'}
+								</button>
+							{/if}
+						{/if}
+					</div>
+				</div>
+			{:else}
+				<div class="app-title-row">
+					<span class="app-icon"><AppIcon icon={data.app.icon} size={20} /></span>
+					<h1>{data.app.label}</h1>
+				</div>
+			{/if}
 		</div>
 
 		<div class="panel-body">
@@ -266,6 +326,77 @@
 		padding: 16px 24px 12px;
 		border-bottom: 1px solid var(--color-border);
 		flex-shrink: 0;
+		display: flex;
+		flex-direction: column;
+		gap: 10px;
+	}
+
+	.app-meta-edit {
+		display: flex;
+		flex-direction: column;
+		gap: 8px;
+	}
+
+	.icon-grid {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 4px;
+	}
+
+	.icon-opt {
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		width: 28px;
+		height: 28px;
+		border-radius: 6px;
+		border: 1px solid var(--color-border);
+		background: var(--color-background);
+		color: var(--color-text-muted);
+		cursor: pointer;
+		transition: border-color 0.12s, color 0.12s, background 0.12s;
+		&:hover { border-color: var(--color-primary); color: var(--color-primary); }
+		&.selected {
+			border-color: var(--color-primary);
+			background: color-mix(in srgb, var(--color-primary) 10%, transparent);
+			color: var(--color-primary);
+		}
+	}
+
+	.app-name-row {
+		display: flex;
+		align-items: center;
+		gap: 8px;
+	}
+
+	.app-name-input {
+		flex: 1;
+		padding: 6px 10px;
+		border: 1px solid var(--color-border);
+		border-radius: 7px;
+		background: var(--color-background);
+		color: var(--color-text);
+		font-size: 1rem;
+		font-weight: 600;
+		font-family: inherit;
+		outline: none;
+		transition: border-color 0.15s;
+		&:focus { border-color: var(--color-primary); }
+	}
+
+	.btn-save-meta {
+		padding: 5px 12px;
+		border-radius: 6px;
+		font-size: 0.8125rem;
+		font-weight: 500;
+		background: var(--color-primary);
+		color: #fff;
+		border: none;
+		cursor: pointer;
+		white-space: nowrap;
+		transition: opacity 0.15s;
+		&:hover { opacity: 0.88; }
+		&:disabled { opacity: 0.45; cursor: not-allowed; }
 	}
 
 	.back-link {
