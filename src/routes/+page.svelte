@@ -1,13 +1,13 @@
 <script lang="ts">
 	import { goto, invalidateAll } from '$app/navigation';
 	import type { PageData } from './$types';
-	import type { TableCard } from '$lib/server/db/table-service';
+	import type { AppCard } from '$lib/server/db/table-service';
 	import AppIcon from '$lib/components/AppIcon.svelte';
 	import Star from '@lucide/svelte/icons/star';
 
 	let { data }: { data: PageData } = $props();
 
-	let apps = $state<TableCard[]>(data.apps);
+	let apps = $state<AppCard[]>(data.apps);
 	$effect(() => { apps = data.apps; });
 
 	let bookmarkedIds = $state<string[]>(data.bookmarkedIds ?? []);
@@ -18,20 +18,20 @@
 	async function createApp() {
 		creating = true;
 		const name = 'app_' + Date.now();
-		const res = await fetch('/api/database/tables', {
+		const res = await fetch('/api/apps', {
 			method: 'POST',
 			headers: { 'Content-Type': 'application/json' },
-			body: JSON.stringify({ label: '新しいテーブル', name, icon: 'layout-grid', fields: [] })
+			body: JSON.stringify({ name, label: '新しいアプリ', icon: 'layout-grid' })
 		});
 		if (!res.ok) {
 			creating = false;
 			return;
 		}
 		const { id } = (await res.json()) as { id: string };
-		goto(`/apps/${id}/tables/${id}/build`);
+		goto(`/apps/${id}`);
 	}
 
-	async function toggleBookmark(app: TableCard, e: MouseEvent) {
+	async function toggleBookmark(app: AppCard, e: MouseEvent) {
 		e.preventDefault();
 		e.stopPropagation();
 		const res = await fetch('/api/bookmarks', {
@@ -55,27 +55,27 @@
 <div class="page">
 	<div class="page-header">
 		<div>
-			<h1>テーブル一覧</h1>
-			<p class="subtitle">カスタムテーブルを作成・管理できます</p>
+			<h1>アプリ一覧</h1>
+			<p class="subtitle">AIと対話してノーコードアプリを設計・作成します</p>
 		</div>
 		{#if data.account?.permission === 'admin'}
 			<button class="btn-primary" onclick={createApp} disabled={creating}>
-				テーブルを追加
+				アプリを作成
 			</button>
 		{/if}
 	</div>
 
 	{#if apps.length === 0}
 		<div class="empty">
-			<div class="empty-icon">📋</div>
-			<p class="empty-title">テーブルがまだありません</p>
+			<div class="empty-icon">🚀</div>
+			<p class="empty-title">アプリがまだありません</p>
 			{#if data.account?.permission === 'admin'}
-				<p class="empty-desc">「テーブルを追加」からテーブルを作成してください。<br>AIがフィールド設計をサポートします。</p>
+				<p class="empty-desc">「アプリを作成」からはじめて、AIに仕様を伝えましょう。</p>
 				<button class="btn-primary" onclick={createApp} disabled={creating}>
-					テーブルを追加
+					アプリを作成
 				</button>
 			{:else}
-				<p class="empty-desc">管理者にテーブルの作成を依頼してください。</p>
+				<p class="empty-desc">管理者にアプリの作成を依頼してください。</p>
 			{/if}
 		</div>
 	{:else}
@@ -103,17 +103,7 @@
 						<p class="card-name">{app.name}</p>
 					</div>
 					<div class="card-footer">
-						<span class="card-meta">フィールド {app.fieldCount}件</span>
-						<span class="card-dot">·</span>
-						<span class="card-meta">レコード {app.recordCount}件</span>
-						{#if data.account?.permission === 'admin'}
-							<button
-								class="card-settings"
-								onclick={(e) => { e.stopPropagation(); goto(`/apps/${app.id}/build`); }}
-							>
-								設定
-							</button>
-						{/if}
+						<span class="card-meta">テーブル {app.tableCount}件</span>
 					</div>
 				</div>
 			{/each}

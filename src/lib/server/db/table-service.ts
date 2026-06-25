@@ -3,6 +3,16 @@ import type { BatchItem } from 'drizzle-orm/batch';
 import type { Db } from './index';
 import { apps, appPages, entityTypes, entityFields, entities } from './schema';
 
+export type AppPageRow = {
+	id: string;
+	label: string;
+	tableId: string | null;
+	tableLabel: string | null;
+	tableName: string | null;
+	viewType: string;
+	sortOrder: number;
+};
+
 /** クエリ件数が可変の場合に `db.batch([...])` を呼ぶためのヘルパー。空配列なら何もしない。 */
 async function batchIfNonEmpty<U extends BatchItem<'sqlite'>>(db: Db, queries: U[]): Promise<void> {
 	if (queries.length === 0) return;
@@ -106,6 +116,14 @@ export type TableCard = {
 	recordCount: number;
 };
 
+export type AppCard = {
+	id: string;
+	name: string;
+	label: string;
+	icon: string | null;
+	tableCount: number;
+};
+
 export async function listTables(db: Db): Promise<TableCard[]> {
 	const types = await db.select().from(entityTypes);
 	return Promise.all(
@@ -124,6 +142,15 @@ export async function listTables(db: Db): Promise<TableCard[]> {
 			} satisfies TableCard;
 		})
 	);
+}
+
+export async function listApps(db: Db): Promise<AppCard[]> {
+	const appRows = await db.select().from(apps);
+	return Promise.all(appRows.map(async (app) => {
+		const [{ count }] = await db.select({ count: sql<number>`count(*)` })
+			.from(entityTypes).where(eq(entityTypes.appId, app.id));
+		return { id: app.id, name: app.name, label: app.label, icon: app.icon, tableCount: count };
+	}));
 }
 
 export type EntityTypeForWorkflow = {
@@ -247,8 +274,42 @@ export type EntityTypeInput = {
 	name: string;
 	label: string;
 	icon?: string;
+	appId: string;
 	fields: EditableField[];
 };
+
+export type AppInput = {
+	name: string;
+	label: string;
+	icon?: string;
+};
+
+export async function createApp(db: Db, input: AppInput): Promise<{ id: string; name: string }> {
+	if (RESERVED_NAMES.has(input.name)) {
+		throw new Error(`アプリ名 "${input.name}" はシステムで予約されています。`);
+	}
+	const [existing] = await db.select({ id: apps.id }).from(apps).where(eq(apps.name, input.name));
+	if (existing) {
+		throw new Error(`アプリ名 "${input.name}" はすでに使用されています。`);
+	}
+	const id = crypto.randomUUID();
+	await db.insert(apps).values({ id, name: input.name, label: input.label, icon: input.icon ?? 'layout-grid' });
+	return { id, name: input.name };
+}
+
+export async function deleteApp(db: Db, id: string): Promise<void> {
+	const tables = await db.select({ id: entityTypes.id })
+		.from(entityTypes).where(eq(entityTypes.appId, id));
+	const queries: BatchItem<'sqlite'>[] = [];
+	for (const table of tables) {
+		queries.push(db.delete(entities).where(eq(entities.entityTypeId, table.id)));
+		queries.push(db.delete(entityFields).where(eq(entityFields.entityTypeId, table.id)));
+		queries.push(db.delete(entityTypes).where(eq(entityTypes.id, table.id)));
+	}
+	queries.push(db.delete(appPages).where(eq(appPages.appId, id)));
+	queries.push(db.delete(apps).where(eq(apps.id, id)));
+	await db.batch(queries as [BatchItem<'sqlite'>, ...BatchItem<'sqlite'>[]]);
+}
 
 export async function createEntityType(db: Db, input: EntityTypeInput): Promise<{ id: string; name: string }> {
 	if (RESERVED_NAMES.has(input.name)) {
@@ -262,9 +323,8 @@ export async function createEntityType(db: Db, input: EntityTypeInput): Promise<
 	const id = crypto.randomUUID();
 	const pageId = crypto.randomUUID();
 	await db.batch([
-		db.insert(apps).values({ id, name: input.name, label: input.label, icon: input.icon }),
-		db.insert(entityTypes).values({ id, name: input.name, label: input.label, icon: input.icon, appId: id }),
-		db.insert(appPages).values({ id: pageId, appId: id, label: input.label, tableId: id, viewType: 'list', sortOrder: 0 }),
+		db.insert(entityTypes).values({ id, name: input.name, label: input.label, icon: input.icon, appId: input.appId }),
+		db.insert(appPages).values({ id: pageId, appId: input.appId, label: input.label, tableId: id, viewType: 'list', sortOrder: 0 }),
 		...input.fields.map((f, i) =>
 			db.insert(entityFields).values({
 				id: crypto.randomUUID(), entityTypeId: id,
@@ -282,6 +342,10 @@ export async function createEntityType(db: Db, input: EntityTypeInput): Promise<
 	return { id, name: input.name };
 }
 
+export async function updateAppSpec(db: Db, id: string, spec: string): Promise<void> {
+	await db.update(apps).set({ spec, updatedAt: new Date() }).where(eq(apps.id, id));
+}
+
 export async function getAppById(db: Db, id: string): Promise<{ id: string; name: string; label: string; icon: string | null; spec: string | null } | null> {
 	const [a] = await db.select({ id: apps.id, name: apps.name, label: apps.label, icon: apps.icon, spec: apps.spec })
 		.from(apps).where(eq(apps.id, id));
@@ -296,6 +360,37 @@ export async function getTablesByAppId(db: Db, appId: string): Promise<{ id: str
 			.from(entities).where(eq(entities.entityTypeId, et.id));
 		return { ...et, recordCount: count };
 	}));
+}
+
+export async function getPageById(db: Db, pageId: string): Promise<AppPageRow | null> {
+	const [row] = await db.select({
+		id: appPages.id,
+		label: appPages.label,
+		tableId: appPages.tableId,
+		viewType: appPages.viewType,
+		sortOrder: appPages.sortOrder,
+		tableLabel: entityTypes.label,
+		tableName: entityTypes.name
+	}).from(appPages)
+		.leftJoin(entityTypes, eq(appPages.tableId, entityTypes.id))
+		.where(eq(appPages.id, pageId));
+	return row ?? null;
+}
+
+export async function getPagesByAppId(db: Db, appId: string): Promise<AppPageRow[]> {
+	const rows = await db.select({
+		id: appPages.id,
+		label: appPages.label,
+		tableId: appPages.tableId,
+		viewType: appPages.viewType,
+		sortOrder: appPages.sortOrder,
+		tableLabel: entityTypes.label,
+		tableName: entityTypes.name
+	}).from(appPages)
+		.leftJoin(entityTypes, eq(appPages.tableId, entityTypes.id))
+		.where(eq(appPages.appId, appId))
+		.orderBy(appPages.sortOrder);
+	return rows;
 }
 
 export async function getEntityTypeById(db: Db, id: string): Promise<{ id: string; name: string; label: string; icon: string | null } | null> {
@@ -316,7 +411,6 @@ export async function updateEntityType(db: Db, name: string, input: Partial<Enti
 			...(input.icon != null ? { icon: input.icon } : {})
 		};
 		queries.push(db.update(entityTypes).set(metaUpdate).where(eq(entityTypes.id, et.id)));
-		queries.push(db.update(apps).set({ ...metaUpdate, updatedAt: new Date() }).where(eq(apps.id, et.id)));
 	}
 
 	if (input.fields != null) {
@@ -348,8 +442,7 @@ export async function deleteEntityType(db: Db, name: string): Promise<void> {
 	await db.batch([
 		db.delete(entities).where(eq(entities.entityTypeId, et.id)),
 		db.delete(entityFields).where(eq(entityFields.entityTypeId, et.id)),
-		db.delete(appPages).where(eq(appPages.appId, et.id)),
-		db.delete(entityTypes).where(eq(entityTypes.id, et.id)),
-		db.delete(apps).where(eq(apps.id, et.id))
+		db.delete(appPages).where(eq(appPages.tableId, et.id)),
+		db.delete(entityTypes).where(eq(entityTypes.id, et.id))
 	]);
 }

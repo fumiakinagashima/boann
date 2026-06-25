@@ -3,7 +3,7 @@ import { z } from 'zod';
 import type { Tool } from '@anthropic-ai/sdk/resources/messages';
 import type { Db } from '../db';
 import { entityTypes, entityFields, entities } from '../db/schema';
-import { createEntityType, createRecord } from '../db/table-service';
+import { createApp, createEntityType, createRecord } from '../db/table-service';
 import { parseJson, now } from './shared';
 
 export const tools: Tool[] = [
@@ -242,10 +242,12 @@ export async function handleGetEntityFields(db: Db, input: unknown) {
 export async function handleCreateApp(db: Db, input: unknown) {
 	const data = createAppSchema.parse(input);
 
+	const app = await createApp(db, { name: data.name, label: data.label, icon: data.icon });
 	await createEntityType(db, {
 		name: data.name,
 		label: data.label,
 		icon: data.icon,
+		appId: app.id,
 		fields: data.fields.map((f) => ({
 			_id: crypto.randomUUID(),
 			key: f.key,
