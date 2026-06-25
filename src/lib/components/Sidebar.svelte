@@ -59,7 +59,7 @@
 	<nav class="nav">
 		<a href="/" class="nav-item" class:active={isActive('/')}>
 			<span class="nav-icon"><LayoutGrid size={15} /></span>
-			<span>アプリ一覧</span>
+			<span>テーブル一覧</span>
 		</a>
 
 		{#if bookmarkedApps.length > 0}

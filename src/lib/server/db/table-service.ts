@@ -97,7 +97,7 @@ export async function listAllTables(db: Db): Promise<(TableInfo & { count: numbe
 	);
 }
 
-export type AppCard = {
+export type TableCard = {
 	id: string;
 	name: string;
 	label: string;
@@ -106,7 +106,7 @@ export type AppCard = {
 	recordCount: number;
 };
 
-export async function listApps(db: Db): Promise<AppCard[]> {
+export async function listTables(db: Db): Promise<TableCard[]> {
 	const types = await db.select().from(entityTypes);
 	return Promise.all(
 		types.map(async (et) => {
@@ -121,7 +121,7 @@ export async function listApps(db: Db): Promise<AppCard[]> {
 				icon: et.icon,
 				fieldCount: fieldRow.count,
 				recordCount: recordRow.count
-			};
+			} satisfies TableCard;
 		})
 	);
 }

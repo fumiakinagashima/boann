@@ -126,7 +126,7 @@
 		<div class="page-header">
 			<a href="/" class="back-link">
 				<ChevronLeft size={16} />
-				アプリ一覧
+				テーブル一覧
 			</a>
 			<div class="header-main">
 				<div class="header-title">
@@ -137,7 +137,7 @@
 				</div>
 				<div class="header-actions">
 					{#if data.account?.permission === 'admin'}
-						<a href="/apps/{data.app.id}/build" class="btn-secondary">アプリ設定</a>
+						<a href="/apps/{data.app.id}/build" class="btn-secondary">テーブル設定</a>
 					{/if}
 					<button class="btn-primary" onclick={openNew}>+ レコード追加</button>
 				</div>
@@ -148,8 +148,8 @@
 			<div class="empty">
 				<p class="empty-title">フィールドが設定されていません</p>
 				{#if data.account?.permission === 'admin'}
-					<p class="empty-desc">アプリ設定でフィールドを追加してください。</p>
-					<a href="/apps/{data.app.id}/build" class="btn-primary">アプリ設定を開く</a>
+					<p class="empty-desc">テーブル設定でフィールドを追加してください。</p>
+					<a href="/apps/{data.app.id}/build" class="btn-primary">テーブル設定を開く</a>
 				{/if}
 			</div>
 		{:else if records.length === 0}

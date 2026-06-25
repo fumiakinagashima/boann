@@ -34,7 +34,7 @@
 
 	let deletingApp = $state(false);
 	async function deleteApp() {
-		if (!confirm(`アプリ「${data.app.label}」を削除しますか？\n全てのレコードも削除されます。`)) return;
+		if (!confirm(`テーブル「${data.app.label}」を削除しますか？\n全てのレコードも削除されます。`)) return;
 		deletingApp = true;
 		const res = await fetch(`/api/database/tables/${data.app.name}`, { method: 'DELETE' });
 		if (res.ok || res.status === 204) {
@@ -292,7 +292,7 @@
 		<div class="panel-body">
 			<!-- App meta -->
 			<section>
-				<h2 class="section-title">アプリ情報</h2>
+				<h2 class="section-title">テーブル情報</h2>
 				<div class="meta-row">
 					<div class="meta-icon-picker">
 						{#each ICON_OPTIONS as opt}
@@ -306,7 +306,7 @@
 							type="text"
 							class="meta-label-input"
 							bind:value={appLabel}
-							placeholder="アプリ名"
+							placeholder="テーブル名"
 						/>
 						<span class="meta-name-hint">{data.app.name}</span>
 					</div>
@@ -315,7 +315,7 @@
 							{savingMeta ? '…' : '保存'}
 						</button>
 						{#if metaSaved}<span class="saved-msg">✓</span>{/if}
-						<button class="btn-danger-sm" onclick={deleteApp} disabled={deletingApp} title="アプリを削除">
+						<button class="btn-danger-sm" onclick={deleteApp} disabled={deletingApp} title="テーブルを削除">
 							削除
 						</button>
 					</div>
@@ -431,13 +431,13 @@
 
 									{#if row.type === 'recordSelect'}
 										<div class="form-row">
-											<label class="form-label">参照先アプリ</label>
+											<label class="form-label">参照先テーブル</label>
 											<div class="combobox">
 												<input
 													type="text"
 													class="form-input combobox-input"
 													value={refTableDropdownOpen ? refTableQuery : refTableLabel(row.refTable)}
-													placeholder="アプリを検索…"
+													placeholder="テーブルを検索…"
 													autocomplete="off"
 													onfocus={() => { refTableQuery = ''; refTableDropdownOpen = true; }}
 													oninput={(e) => { refTableQuery = (e.currentTarget as HTMLInputElement).value; }}
@@ -451,7 +451,7 @@
 													)}
 													<div class="combobox-dropdown">
 														{#if filtered.length === 0}
-															<div class="combobox-empty">一致するアプリがありません</div>
+															<div class="combobox-empty">一致するテーブルがありません</div>
 														{:else}
 															{#each filtered as app}
 																<button
