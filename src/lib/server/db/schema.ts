@@ -1,11 +1,26 @@
 import { sql } from 'drizzle-orm';
 import { integer, sqliteTable, text } from 'drizzle-orm/sqlite-core';
 
+export const apps = sqliteTable('apps', {
+	id: text('id').primaryKey(),
+	name: text('name').notNull(),
+	label: text('label').notNull(),
+	icon: text('icon'),
+	spec: text('spec'),
+	createdAt: integer('created_at', { mode: 'timestamp' })
+		.notNull()
+		.default(sql`(unixepoch())`),
+	updatedAt: integer('updated_at', { mode: 'timestamp' })
+		.notNull()
+		.default(sql`(unixepoch())`)
+});
+
 export const entityTypes = sqliteTable('entity_types', {
 	id: text('id').primaryKey(),
 	name: text('name').notNull().unique(),
 	label: text('label').notNull(),
 	icon: text('icon'),
+	appId: text('app_id').references(() => apps.id),
 	createdAt: integer('created_at', { mode: 'timestamp' })
 		.notNull()
 		.default(sql`(unixepoch())`)
@@ -206,6 +221,18 @@ export const bookmarks = sqliteTable('bookmarks', {
 		.default(sql`(unixepoch())`)
 });
 
+export const appPages = sqliteTable('app_pages', {
+	id: text('id').primaryKey(),
+	appId: text('app_id').notNull().references(() => apps.id),
+	label: text('label').notNull(),
+	tableId: text('table_id').references(() => entityTypes.id),
+	viewType: text('view_type').notNull().default('list'),
+	sortOrder: integer('sort_order').notNull().default(0),
+	createdAt: integer('created_at', { mode: 'timestamp' })
+		.notNull()
+		.default(sql`(unixepoch())`)
+});
+
 export type EntityType = typeof entityTypes.$inferSelect;
 export type EntityField = typeof entityFields.$inferSelect;
 export type Entity = typeof entities.$inferSelect;
@@ -226,3 +253,7 @@ export type WorkflowRun = typeof workflowRuns.$inferSelect;
 export type NewWorkflowRun = typeof workflowRuns.$inferInsert;
 export type Bookmark = typeof bookmarks.$inferSelect;
 export type NewBookmark = typeof bookmarks.$inferInsert;
+export type App = typeof apps.$inferSelect;
+export type NewApp = typeof apps.$inferInsert;
+export type AppPage = typeof appPages.$inferSelect;
+export type NewAppPage = typeof appPages.$inferInsert;

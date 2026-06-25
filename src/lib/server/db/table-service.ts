@@ -1,7 +1,7 @@
 import { eq, desc, sql } from 'drizzle-orm';
 import type { BatchItem } from 'drizzle-orm/batch';
 import type { Db } from './index';
-import { entityTypes, entityFields, entities } from './schema';
+import { apps, appPages, entityTypes, entityFields, entities } from './schema';
 
 /** クエリ件数が可変の場合に `db.batch([...])` を呼ぶためのヘルパー。空配列なら何もしない。 */
 async function batchIfNonEmpty<U extends BatchItem<'sqlite'>>(db: Db, queries: U[]): Promise<void> {
@@ -260,8 +260,11 @@ export async function createEntityType(db: Db, input: EntityTypeInput): Promise<
 	}
 
 	const id = crypto.randomUUID();
+	const pageId = crypto.randomUUID();
 	await db.batch([
-		db.insert(entityTypes).values({ id, name: input.name, label: input.label, icon: input.icon }),
+		db.insert(apps).values({ id, name: input.name, label: input.label, icon: input.icon }),
+		db.insert(entityTypes).values({ id, name: input.name, label: input.label, icon: input.icon, appId: id }),
+		db.insert(appPages).values({ id: pageId, appId: id, label: input.label, tableId: id, viewType: 'list', sortOrder: 0 }),
 		...input.fields.map((f, i) =>
 			db.insert(entityFields).values({
 				id: crypto.randomUUID(), entityTypeId: id,
@@ -292,12 +295,12 @@ export async function updateEntityType(db: Db, name: string, input: Partial<Enti
 	const queries: BatchItem<'sqlite'>[] = [];
 
 	if (input.label != null || input.icon != null) {
-		queries.push(
-			db.update(entityTypes).set({
-				...(input.label != null ? { label: input.label } : {}),
-				...(input.icon != null ? { icon: input.icon } : {})
-			}).where(eq(entityTypes.id, et.id))
-		);
+		const metaUpdate = {
+			...(input.label != null ? { label: input.label } : {}),
+			...(input.icon != null ? { icon: input.icon } : {})
+		};
+		queries.push(db.update(entityTypes).set(metaUpdate).where(eq(entityTypes.id, et.id)));
+		queries.push(db.update(apps).set({ ...metaUpdate, updatedAt: new Date() }).where(eq(apps.id, et.id)));
 	}
 
 	if (input.fields != null) {
@@ -329,6 +332,8 @@ export async function deleteEntityType(db: Db, name: string): Promise<void> {
 	await db.batch([
 		db.delete(entities).where(eq(entities.entityTypeId, et.id)),
 		db.delete(entityFields).where(eq(entityFields.entityTypeId, et.id)),
-		db.delete(entityTypes).where(eq(entityTypes.id, et.id))
+		db.delete(appPages).where(eq(appPages.appId, et.id)),
+		db.delete(entityTypes).where(eq(entityTypes.id, et.id)),
+		db.delete(apps).where(eq(apps.id, et.id))
 	]);
 }
