@@ -13,22 +13,8 @@
 	let bookmarkedIds = $state<string[]>(data.bookmarkedIds ?? []);
 	$effect(() => { bookmarkedIds = data.bookmarkedIds ?? []; });
 
-	let creating = $state(false);
-
-	async function createApp() {
-		creating = true;
-		const name = 'app_' + Date.now();
-		const res = await fetch('/api/apps', {
-			method: 'POST',
-			headers: { 'Content-Type': 'application/json' },
-			body: JSON.stringify({ name, label: '新しいアプリ', icon: 'layout-grid' })
-		});
-		if (!res.ok) {
-			creating = false;
-			return;
-		}
-		const { id } = (await res.json()) as { id: string };
-		goto(`/apps/${id}`);
+	function createApp() {
+		goto('/apps/new');
 	}
 
 	async function toggleBookmark(app: AppCard, e: MouseEvent) {
@@ -59,7 +45,7 @@
 			<p class="subtitle">AIと対話してノーコードアプリを設計・作成します</p>
 		</div>
 		{#if data.account?.permission === 'admin'}
-			<button class="btn-primary" onclick={createApp} disabled={creating}>
+			<button class="btn-primary" onclick={createApp} disabled={false}>
 				アプリを作成
 			</button>
 		{/if}
@@ -71,7 +57,7 @@
 			<p class="empty-title">アプリがまだありません</p>
 			{#if data.account?.permission === 'admin'}
 				<p class="empty-desc">「アプリを作成」からはじめて、AIに仕様を伝えましょう。</p>
-				<button class="btn-primary" onclick={createApp} disabled={creating}>
+				<button class="btn-primary" onclick={createApp} disabled={false}>
 					アプリを作成
 				</button>
 			{:else}

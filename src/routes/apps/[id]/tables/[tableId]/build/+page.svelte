@@ -5,14 +5,12 @@
 	import ChevronLeft from '$lib/components/icon/ChevronLeft.svelte';
 	import GripVertical from '$lib/components/icon/GripVertical.svelte';
 	import ChatPanel from '$lib/components/chat/ChatPanel.svelte';
-	import AppIcon, { ICON_OPTIONS } from '$lib/components/AppIcon.svelte';
 	import type { PageData } from './$types';
 
 	let { data }: { data: PageData } = $props();
 
 	// ── App meta ──────────────────────────────────────────────
 	let appLabel = $state(data.app.label);
-	let appIcon = $state(data.app.icon ?? 'layout-grid');
 	let savingMeta = $state(false);
 	let metaSaved = $state(false);
 
@@ -22,7 +20,7 @@
 			await fetch(`/api/database/tables/${data.app.name}`, {
 				method: 'PATCH',
 				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ label: appLabel, icon: appIcon })
+				body: JSON.stringify({ label: appLabel })
 			});
 			await invalidateAll();
 			metaSaved = true;
@@ -294,13 +292,6 @@
 			<section>
 				<h2 class="section-title">テーブル情報</h2>
 				<div class="meta-row">
-					<div class="meta-icon-picker">
-						{#each ICON_OPTIONS as opt}
-							<button class="icon-opt" class:selected={appIcon === opt.name} onclick={() => (appIcon = opt.name)} title={opt.name}>
-								<AppIcon icon={opt.name} size={16} />
-							</button>
-						{/each}
-					</div>
 					<div class="meta-label-wrap">
 						<input
 							type="text"
@@ -696,31 +687,6 @@
 		flex-wrap: wrap;
 	}
 
-	.meta-icon-picker {
-		display: flex;
-		flex-wrap: wrap;
-		gap: 4px;
-		flex-shrink: 0;
-	}
-
-	.icon-opt {
-		width: 28px;
-		height: 28px;
-		border: 1px solid var(--color-border);
-		border-radius: 5px;
-		background: var(--color-background);
-		font-size: 0.875rem;
-		cursor: pointer;
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		transition: border-color 0.15s;
-
-		&.selected {
-			border-color: var(--color-primary);
-			background: color-mix(in srgb, var(--color-primary) 10%, var(--color-background));
-		}
-	}
 
 	.meta-label-wrap {
 		display: flex;
