@@ -13,6 +13,25 @@ export function createPageBuildState(getData: () => PageData) {
 	let saving = $state(false);
 	let saved = $state(false);
 	let deleting = $state(false);
+	let settingIndex = $state(false);
+
+	const isIndexPage = $derived(getData().app.indexPageId === getData().page.id);
+
+	async function setAsIndexPage() {
+		settingIndex = true;
+		try {
+			const appId = getData().app.id;
+			const pageId = getData().page.id;
+			await fetch(`/api/apps/${appId}`, {
+				method: 'PATCH',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ indexPageId: isIndexPage ? null : pageId })
+			});
+			await invalidateAll();
+		} finally {
+			settingIndex = false;
+		}
+	}
 
 	function markDirty() { dirty = true; saved = false; }
 
@@ -163,6 +182,9 @@ export function createPageBuildState(getData: () => PageData) {
 		get saving() { return saving; },
 		get saved() { return saved; },
 		get deleting() { return deleting; },
+		get isIndexPage() { return isIndexPage; },
+		get settingIndex() { return settingIndex; },
+		setAsIndexPage,
 		markDirty,
 		save,
 		deletePage,

@@ -130,7 +130,8 @@ export type AppCard = {
 	name: string;
 	label: string;
 	icon: string | null;
-	tableCount: number;
+	indexPageId: string | null;
+	pageCount: number;
 };
 
 export async function listTables(db: Db): Promise<TableCard[]> {
@@ -156,10 +157,21 @@ export async function listTables(db: Db): Promise<TableCard[]> {
 export async function listApps(db: Db): Promise<AppCard[]> {
 	const appRows = await db.select().from(apps);
 	return Promise.all(appRows.map(async (app) => {
-		const [{ count }] = await db.select({ count: sql<number>`count(*)` })
-			.from(entityTypes).where(eq(entityTypes.appId, app.id));
-		return { id: app.id, name: app.name, label: app.label, icon: app.icon, tableCount: count };
+		const [pageRow] = await db.select({ count: sql<number>`count(*)` })
+			.from(appPages).where(eq(appPages.appId, app.id));
+		return {
+			id: app.id,
+			name: app.name,
+			label: app.label,
+			icon: app.icon,
+			indexPageId: app.indexPageId ?? null,
+			pageCount: pageRow.count,
+		};
 	}));
+}
+
+export async function setAppIndexPage(db: Db, appId: string, pageId: string | null): Promise<void> {
+	await db.update(apps).set({ indexPageId: pageId }).where(eq(apps.id, appId));
 }
 
 export type EntityTypeForWorkflow = {
@@ -365,10 +377,10 @@ export async function updateAppMeta(db: Db, id: string, input: { label?: string;
 	await db.update(apps).set(set).where(eq(apps.id, id));
 }
 
-export async function getAppById(db: Db, id: string): Promise<{ id: string; name: string; label: string; icon: string | null; spec: string | null } | null> {
-	const [a] = await db.select({ id: apps.id, name: apps.name, label: apps.label, icon: apps.icon, spec: apps.spec })
+export async function getAppById(db: Db, id: string): Promise<{ id: string; name: string; label: string; icon: string | null; spec: string | null; indexPageId: string | null } | null> {
+	const [a] = await db.select({ id: apps.id, name: apps.name, label: apps.label, icon: apps.icon, spec: apps.spec, indexPageId: apps.indexPageId })
 		.from(apps).where(eq(apps.id, id));
-	return a ?? null;
+	return a ? { ...a, indexPageId: a.indexPageId ?? null } : null;
 }
 
 export async function getTablesByAppId(db: Db, appId: string): Promise<{ id: string; name: string; label: string; icon: string | null; recordCount: number }[]> {

@@ -1,4 +1,4 @@
-import { goto, invalidateAll } from '$app/navigation';
+import { invalidateAll } from '$app/navigation';
 import type { PageData } from './$types';
 
 export const CHAT_MIN = 220;
@@ -83,9 +83,7 @@ export function createAppBuilderState(getData: () => PageData) {
 			body: JSON.stringify({ name, label: '新しいテーブル', appId: getData().app.id, fields: [] })
 		});
 		if (res.ok) {
-			const { id } = (await res.json()) as { id: string };
 			await invalidateAll();
-			goto(`/apps/${getData().app.id}/tables/${id}/build`);
 		}
 		addingTable = false;
 	}

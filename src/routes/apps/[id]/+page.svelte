@@ -385,7 +385,7 @@
 
 	.spec-textarea {
 		width: 100%;
-		min-height: 200px;
+		min-height: 300px;
 		padding: 12px 14px;
 		border: 1px solid var(--color-border);
 		border-radius: 8px;

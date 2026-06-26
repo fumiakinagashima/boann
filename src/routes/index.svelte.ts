@@ -1,4 +1,4 @@
-import { goto, invalidateAll } from '$app/navigation';
+import { invalidateAll } from '$app/navigation';
 import type { PageData } from './$types';
 import type { AppCard } from '$lib/server/db/table-service';
 
@@ -19,8 +19,7 @@ export function createAppListState(getData: () => PageData) {
 			body: JSON.stringify({ name, label: '新しいアプリ', icon: 'layout-grid' })
 		});
 		if (!res.ok) { creating = false; return; }
-		const { id } = (await res.json()) as { id: string };
-		goto(`/apps/${id}`);
+		await invalidateAll();
 	}
 
 	async function toggleBookmark(app: AppCard, e: MouseEvent) {
