@@ -1,12 +1,29 @@
-import { goto, invalidateAll } from '$app/navigation';
+import { goto, invalidateAll, replaceState } from '$app/navigation';
 import type { PageData } from './$types';
 
 export const CHAT_MIN = 220;
 export const CHAT_MAX = 640;
 
 export type AppTab = 'tables' | 'pages' | 'workflows';
+const VALID_TABS: AppTab[] = ['tables', 'pages', 'workflows'];
 
 export function createAppBuilderState(getData: () => PageData) {
+	// ── Tab ──────────────────────────────────────────────────────
+	// SSR では load が返す data.tab、クライアントでは実際のブラウザ URL を真実とする。
+	// replaceState は load を再実行しないため data.tab が stale になる。
+	// ブラウザバック時はコンポーネントが再マウントされ、復元された URL を読み直す。
+	function readInitialTab(): AppTab {
+		if (typeof window === 'undefined') return getData().tab;
+		const t = new URLSearchParams(window.location.search).get('tab') as AppTab | null;
+		return t && VALID_TABS.includes(t) ? t : 'tables';
+	}
+
+	let activeTab = $state<AppTab>(readInitialTab());
+	function setActiveTab(tab: AppTab) {
+		activeTab = tab;
+		replaceState(`?tab=${tab}`, {});
+	}
+
 	// ── App meta + spec (unified) ────────────────────────────────
 	let appLabel = $state(getData().app.label);
 	let appIcon = $state(getData().app.icon ?? 'layout-grid');
@@ -62,8 +79,6 @@ export function createAppBuilderState(getData: () => PageData) {
 
 	function clearTrigger() { aiTrigger = null; }
 
-	// ── Tabs ─────────────────────────────────────────────────────
-	let activeTab = $state<AppTab>('tables');
 
 	// ── Add table ─────────────────────────────────────────────────
 	let addingTable = $state(false);
@@ -147,6 +162,8 @@ export function createAppBuilderState(getData: () => PageData) {
 	});
 
 	return {
+		get activeTab() { return activeTab; },
+		setActiveTab,
 		get appLabel() { return appLabel; },
 		set appLabel(v) { appLabel = v; },
 		get appIcon() { return appIcon; },
@@ -158,8 +175,6 @@ export function createAppBuilderState(getData: () => PageData) {
 		get saved() { return saved; },
 		get deleting() { return deleting; },
 		get aiTrigger() { return aiTrigger; },
-		get activeTab() { return activeTab; },
-		set activeTab(v) { activeTab = v; },
 		get addingTable() { return addingTable; },
 		get addingPage() { return addingPage; },
 		get addingWorkflow() { return addingWorkflow; },

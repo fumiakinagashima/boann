@@ -1,6 +1,6 @@
 <script lang="ts">
-	import { goto, invalidateAll } from '$app/navigation';
-	import { createAppBuilderState } from './index.svelte';
+	import { invalidateAll } from '$app/navigation';
+	import { createAppBuilderState, type AppTab } from './index.svelte';
 	import ChevronLeft from '$lib/components/icon/ChevronLeft.svelte';
 	import AppIcon, { ICON_OPTIONS } from '$lib/components/AppIcon.svelte';
 	import ChatPanel from '$lib/components/chat/ChatPanel.svelte';
@@ -65,13 +65,13 @@
 
 			<!-- Tab bar -->
 			<div class="tab-bar" role="tablist">
-				{#each [['tables', 'テーブル'], ['pages', 'ページ'], ['workflows', 'ワークフロー']] as [id, label] (id)}
+				{#each [['tables', 'テーブル'], ['pages', 'ページ'], ['workflows', 'ワークフロー']] as [tabId, label] (tabId)}
 					<button
 						class="tab-btn"
-						class:active={s.activeTab === id}
+						class:active={s.activeTab === tabId}
 						role="tab"
-						aria-selected={s.activeTab === id}
-						onclick={() => (s.activeTab = id as 'tables' | 'pages' | 'workflows')}
+						aria-selected={s.activeTab === tabId}
+						onclick={() => s.setActiveTab(tabId as AppTab)}
 					>{label}</button>
 				{/each}
 			</div>
@@ -93,8 +93,6 @@
 							>データ管理</a>
 							</div>
 						</div>
-					{:else}
-						<p class="empty-hint">AIに「テーブルを追加して」と話しかけるか、手動で追加できます。</p>
 					{/each}
 					<button class="btn-add-table" onclick={s.addTable} disabled={s.addingTable}>
 						{s.addingTable ? '作成中…' : '+ テーブルを追加'}
@@ -104,22 +102,20 @@
 			<!-- Tab: Pages -->
 			{:else if s.activeTab === 'pages'}
 				<div class="tab-content">
-					{#each data.pages as page (page.id)}
+					{#each data.pages as pg (pg.id)}
 						<div class="item-row">
-							<p class="item-label">{page.label}</p>
+							<p class="item-label">{pg.label}</p>
 							<div class="item-footer">
 							<a
-								href="/apps/{data.app.id}/pages/{page.id}/build"
+								href="/apps/{data.app.id}/pages/{pg.id}/build"
 								class="item-action"
 							>ページ設定</a>
 							<a
 								class="item-action"
-								href={`/apps/${data.app.id}/pages/${page.id}`}
+								href={`/apps/${data.app.id}/pages/${pg.id}`}
 							>ページ表示</a>
 							</div>
 						</div>
-					{:else}
-						<p class="empty-hint">AIに「ページを追加して」と話しかけるか、仕様書を書いて「AIに設計・作成してもらう」ボタンを使ってください。</p>
 					{/each}
 					<button class="btn-add-table" onclick={s.addPage} disabled={s.addingPage}>
 						{s.addingPage ? '作成中…' : '+ ページを追加'}
@@ -139,8 +135,6 @@
 								>ワークフロー設定</a>
 							</div>
 						</div>
-					{:else}
-						<p class="empty-hint">AIに「ワークフローを作って」と話しかけてください。</p>
 					{/each}
 					<button class="btn-add-table" onclick={s.addWorkflow} disabled={s.addingWorkflow}>
 						{s.addingWorkflow ? '作成中…' : '+ ワークフローを追加'}
@@ -432,7 +426,7 @@
 	.item-label { flex: 1; font-weight: 600; }
 	.item-footer {
 		display: flex;
-		gap: 8px;
+		gap: 16px;
 		margin-top: 4px;
 		& .item-action {
 			font-size: 0.8125rem;

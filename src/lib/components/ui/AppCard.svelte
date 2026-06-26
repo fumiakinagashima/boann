@@ -83,7 +83,7 @@
 	.card-footer {
 		display: flex;
 		align-items: center;
-		gap: 8px;
+		gap: 16px;
 		& a {
 			color: var(--color-primary);
 			text-decoration: none;
