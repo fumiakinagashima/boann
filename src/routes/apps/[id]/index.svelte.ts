@@ -1,4 +1,4 @@
-import { invalidateAll } from '$app/navigation';
+import { goto, invalidateAll } from '$app/navigation';
 import type { PageData } from './$types';
 
 export const CHAT_MIN = 220;
@@ -7,52 +7,35 @@ export const CHAT_MAX = 640;
 export type AppTab = 'tables' | 'pages' | 'workflows';
 
 export function createAppBuilderState(getData: () => PageData) {
-	// ── App meta ────────────────────────────────────────────────
+	// ── App meta + spec (unified) ────────────────────────────────
 	let appLabel = $state(getData().app.label);
 	let appIcon = $state(getData().app.icon ?? 'layout-grid');
-	let metaDirty = $state(false);
-	let savingMeta = $state(false);
-	let metaSaved = $state(false);
+	let spec = $state(getData().app.spec ?? '');
+	let dirty = $state(false);
+	let saving = $state(false);
+	let saved = $state(false);
+	let deleting = $state(false);
+	let aiTrigger = $state<string | null>(null);
 
 	$effect(() => {
 		appLabel = getData().app.label;
 		appIcon = getData().app.icon ?? 'layout-grid';
+		spec = getData().app.spec ?? '';
 	});
 
-	async function saveMeta() {
+	function markDirty() { dirty = true; saved = false; }
+
+	async function save() {
 		if (!appLabel.trim()) return;
-		savingMeta = true;
-		try {
-			await fetch(`/api/apps/${getData().app.id}`, {
-				method: 'PATCH',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ label: appLabel.trim(), icon: appIcon })
-			});
-			await invalidateAll();
-			metaDirty = false;
-			metaSaved = true;
-			setTimeout(() => (metaSaved = false), 2000);
-		} finally {
-			savingMeta = false;
-		}
-	}
-
-	// ── Spec editor ─────────────────────────────────────────────
-	let spec = $state(getData().app.spec ?? '');
-	let saving = $state(false);
-	let saved = $state(false);
-	let aiTrigger = $state<string | null>(null);
-
-	$effect(() => { spec = getData().app.spec ?? ''; });
-
-	async function saveSpec() {
 		saving = true;
 		try {
 			await fetch(`/api/apps/${getData().app.id}`, {
 				method: 'PATCH',
 				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ spec })
+				body: JSON.stringify({ label: appLabel.trim(), icon: appIcon, spec })
 			});
+			await invalidateAll();
+			dirty = false;
 			saved = true;
 			setTimeout(() => (saved = false), 2000);
 		} finally {
@@ -60,9 +43,20 @@ export function createAppBuilderState(getData: () => PageData) {
 		}
 	}
 
+	async function deleteApp() {
+		if (!confirm(`「${appLabel}」を削除しますか？この操作は元に戻せません。`)) return;
+		deleting = true;
+		try {
+			const res = await fetch(`/api/apps/${getData().app.id}`, { method: 'DELETE' });
+			if (res.ok || res.status === 204) goto('/');
+		} finally {
+			deleting = false;
+		}
+	}
+
 	async function generateFromSpec() {
 		if (!spec.trim()) return;
-		await saveSpec();
+		await save();
 		aiTrigger = `以下の仕様書に基づいて、このアプリのテーブルとページを設計・作成してください:\n\n${spec}`;
 	}
 
@@ -125,14 +119,12 @@ export function createAppBuilderState(getData: () => PageData) {
 		set appLabel(v) { appLabel = v; },
 		get appIcon() { return appIcon; },
 		set appIcon(v) { appIcon = v; },
-		get metaDirty() { return metaDirty; },
-		set metaDirty(v) { metaDirty = v; },
-		get savingMeta() { return savingMeta; },
-		get metaSaved() { return metaSaved; },
 		get spec() { return spec; },
 		set spec(v) { spec = v; },
+		get dirty() { return dirty; },
 		get saving() { return saving; },
 		get saved() { return saved; },
+		get deleting() { return deleting; },
 		get aiTrigger() { return aiTrigger; },
 		get activeTab() { return activeTab; },
 		set activeTab(v) { activeTab = v; },
@@ -140,8 +132,9 @@ export function createAppBuilderState(getData: () => PageData) {
 		get chatWidth() { return chatWidth; },
 		get resizing() { return resizing; },
 		get chatContext() { return chatContext; },
-		saveMeta,
-		saveSpec,
+		markDirty,
+		save,
+		deleteApp,
 		generateFromSpec,
 		clearTrigger,
 		addTable,

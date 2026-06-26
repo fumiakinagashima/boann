@@ -1,6 +1,5 @@
 <script lang="ts">
-	import { invalidateAll } from '$app/navigation';
-	import { goto } from '$app/navigation';
+	import { goto, invalidateAll } from '$app/navigation';
 	import { createAppBuilderState } from './index.svelte';
 	import ChevronLeft from '$lib/components/icon/ChevronLeft.svelte';
 	import AppIcon, { ICON_OPTIONS } from '$lib/components/AppIcon.svelte';
@@ -17,7 +16,18 @@
 	<!-- Left panel: builder -->
 	<div class="builder-panel">
 		<div class="panel-header">
-			<a href="/" class="back-link"><ChevronLeft size={15} />アプリ一覧</a>
+			<div class="header-top">
+				<a href="/" class="back-link"><ChevronLeft size={15} />アプリ一覧</a>
+				{#if data.account?.permission === 'admin'}
+					<div class="header-actions">
+						{#if s.saved}<span class="saved-msg">✓ 保存しました</span>{/if}
+						<button class="btn-danger-ghost" onclick={s.deleteApp} disabled={s.deleting}>削除</button>
+						<button class="btn-save" onclick={s.save} disabled={s.saving || !s.dirty}>
+							{s.saving ? '保存中…' : '保存'}
+						</button>
+					</div>
+				{/if}
+			</div>
 			{#if data.account?.permission === 'admin'}
 				<div class="app-meta-edit">
 					<div class="icon-grid">
@@ -26,7 +36,7 @@
 								type="button"
 								class="icon-opt"
 								class:selected={s.appIcon === opt.name}
-								onclick={() => { s.appIcon = opt.name; s.metaDirty = true; }}
+								onclick={() => { s.appIcon = opt.name; s.markDirty(); }}
 								title={opt.name}
 							><AppIcon icon={opt.name} size={15} /></button>
 						{/each}
@@ -36,17 +46,9 @@
 							class="app-name-input"
 							type="text"
 							bind:value={s.appLabel}
-							oninput={() => (s.metaDirty = true)}
+							oninput={s.markDirty}
 							placeholder="アプリ名"
 						/>
-						{#if s.metaDirty || s.metaSaved}
-							{#if s.metaSaved}<span class="saved-msg">✓</span>{/if}
-							{#if s.metaDirty}
-								<button class="btn-save-meta" onclick={s.saveMeta} disabled={s.savingMeta || !s.appLabel.trim()}>
-									{s.savingMeta ? '…' : '保存'}
-								</button>
-							{/if}
-						{/if}
 					</div>
 				</div>
 			{:else}
@@ -60,18 +62,11 @@
 		<div class="panel-body">
 			<!-- Spec editor -->
 			<section class="spec-section">
-				<div class="section-header">
-					<h2 class="section-label">仕様書</h2>
-					<div class="section-actions">
-						{#if s.saved}<span class="saved-msg">✓ 保存しました</span>{/if}
-						<button class="btn-save" onclick={s.saveSpec} disabled={s.saving}>
-							{s.saving ? '保存中…' : '保存'}
-						</button>
-					</div>
-				</div>
+				<h2 class="section-label">仕様書</h2>
 				<textarea
 					class="spec-textarea"
 					bind:value={s.spec}
+					oninput={s.markDirty}
 					placeholder="アプリの仕様をここに記述してください。AIが設計をサポートします。&#10;&#10;例:&#10;## 顧客商談管理&#10;&#10;### データ&#10;- 顧客マスタ（会社名, 担当者, 業種）&#10;- 商談（顧客, ステータス, 金額）&#10;- 活動履歴（商談, 種別, 日時, 内容）&#10;&#10;### ページ&#10;- 商談ボード（カンバン, ステータス別）"
 				></textarea>
 				<button class="btn-generate" onclick={s.generateFromSpec} disabled={!s.spec.trim() || s.saving}>
@@ -227,6 +222,18 @@
 		gap: 10px;
 	}
 
+	.header-top {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+	}
+
+	.header-actions {
+		display: flex;
+		align-items: center;
+		gap: 8px;
+	}
+
 	.app-meta-edit {
 		display: flex;
 		flex-direction: column;
@@ -280,21 +287,6 @@
 		&:focus { border-color: var(--color-primary); }
 	}
 
-	.btn-save-meta {
-		padding: 5px 12px;
-		border-radius: 6px;
-		font-size: 0.8125rem;
-		font-weight: 500;
-		background: var(--color-primary);
-		color: #fff;
-		border: none;
-		cursor: pointer;
-		white-space: nowrap;
-		transition: opacity 0.15s;
-		&:hover { opacity: 0.88; }
-		&:disabled { opacity: 0.45; cursor: not-allowed; }
-	}
-
 	.back-link {
 		display: inline-flex;
 		align-items: center;
@@ -302,7 +294,6 @@
 		font-size: 0.8125rem;
 		color: var(--color-text-muted);
 		text-decoration: none;
-		margin-bottom: 10px;
 		&:hover { color: var(--color-text); }
 	}
 
@@ -341,26 +332,13 @@
 	}
 
 	/* ── Spec editor ─────────────────────────────────────────── */
-	.section-header {
-		display: flex;
-		align-items: center;
-		justify-content: space-between;
-		margin-bottom: 8px;
-	}
-
 	.section-label {
 		font-size: 0.8125rem;
 		font-weight: 600;
 		color: var(--color-text-muted);
 		text-transform: uppercase;
 		letter-spacing: 0.05em;
-		margin: 0;
-	}
-
-	.section-actions {
-		display: flex;
-		align-items: center;
-		gap: 8px;
+		margin: 0 0 8px;
 	}
 
 	.saved-msg {
@@ -381,6 +359,19 @@
 
 		&:hover { opacity: 0.88; }
 		&:disabled { opacity: 0.45; cursor: not-allowed; }
+	}
+
+	.btn-danger-ghost {
+		padding: 5px 12px;
+		border-radius: 6px;
+		font-size: 0.8125rem;
+		border: 1px solid var(--color-border);
+		background: none;
+		color: var(--color-text-muted);
+		cursor: pointer;
+		transition: border-color 0.15s, color 0.15s;
+		&:hover:not(:disabled) { border-color: var(--color-danger); color: var(--color-danger); }
+		&:disabled { opacity: 0.4; cursor: not-allowed; }
 	}
 
 	.spec-textarea {
@@ -481,10 +472,6 @@
 		&--static {
 			cursor: default;
 			&:hover { border-color: var(--color-border); }
-		}
-
-		&--link {
-			text-decoration: none;
 		}
 	}
 
