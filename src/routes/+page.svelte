@@ -1,55 +1,11 @@
 <script lang="ts">
-	import { goto, invalidateAll } from '$app/navigation';
-	import type { PageData } from './$types';
-	import type { AppCard } from '$lib/server/db/table-service';
+	import { createAppListState } from './index.svelte';
 	import AppIcon from '$lib/components/AppIcon.svelte';
 	import Star from '@lucide/svelte/icons/star';
+	import type { PageData } from './$types';
 
 	let { data }: { data: PageData } = $props();
-
-	let apps = $state<AppCard[]>(data.apps);
-	$effect(() => { apps = data.apps; });
-
-	let bookmarkedIds = $state<string[]>(data.bookmarkedIds ?? []);
-	$effect(() => { bookmarkedIds = data.bookmarkedIds ?? []; });
-
-	let creating = $state(false);
-
-	async function createApp() {
-		creating = true;
-		const name = 'app_' + Date.now();
-		const res = await fetch('/api/apps', {
-			method: 'POST',
-			headers: { 'Content-Type': 'application/json' },
-			body: JSON.stringify({ name, label: '新しいアプリ', icon: 'layout-grid' })
-		});
-		if (!res.ok) {
-			creating = false;
-			return;
-		}
-		const { id } = (await res.json()) as { id: string };
-		goto(`/apps/${id}`);
-	}
-
-	async function toggleBookmark(app: AppCard, e: MouseEvent) {
-		e.preventDefault();
-		e.stopPropagation();
-		const res = await fetch('/api/bookmarks', {
-			method: 'POST',
-			headers: { 'Content-Type': 'application/json' },
-			body: JSON.stringify({ entityTypeId: app.id })
-		});
-		if (res.ok) {
-			const { bookmarked } = (await res.json()) as { bookmarked: boolean };
-			if (bookmarked) {
-				bookmarkedIds = [...bookmarkedIds, app.id];
-			} else {
-				bookmarkedIds = bookmarkedIds.filter((id) => id !== app.id);
-			}
-			await invalidateAll();
-		}
-	}
-
+	const s = createAppListState(() => data);
 </script>
 
 <div class="page">
@@ -59,19 +15,19 @@
 			<p class="subtitle">AIと対話してノーコードアプリを設計・作成します</p>
 		</div>
 		{#if data.account?.permission === 'admin'}
-			<button class="btn-primary" onclick={createApp} disabled={creating}>
+			<button class="btn-primary" onclick={s.createApp} disabled={s.creating}>
 				アプリを作成
 			</button>
 		{/if}
 	</div>
 
-	{#if apps.length === 0}
+	{#if s.apps.length === 0}
 		<div class="empty">
 			<div class="empty-icon">🚀</div>
 			<p class="empty-title">アプリがまだありません</p>
 			{#if data.account?.permission === 'admin'}
 				<p class="empty-desc">「アプリを作成」からはじめて、AIに仕様を伝えましょう。</p>
-				<button class="btn-primary" onclick={createApp} disabled={creating}>
+				<button class="btn-primary" onclick={s.createApp} disabled={s.creating}>
 					アプリを作成
 				</button>
 			{:else}
@@ -80,10 +36,10 @@
 		</div>
 	{:else}
 		<div class="app-grid">
-			{#each apps as app (app.id)}
+			{#each s.apps as app (app.id)}
 				<div class="app-card" role="link" tabindex="0"
-					onclick={() => goto(`/apps/${app.id}`)}
-					onkeydown={(e) => { if (e.key === 'Enter') goto(`/apps/${app.id}`); }}
+					onclick={() => location.assign(`/apps/${app.id}`)}
+					onkeydown={(e) => { if (e.key === 'Enter') location.assign(`/apps/${app.id}`); }}
 				>
 					<div class="card-header">
 						<span class="card-icon">
@@ -91,11 +47,11 @@
 						</span>
 						<button
 							class="bookmark-btn"
-							class:bookmarked={bookmarkedIds.includes(app.id)}
-							onclick={(e) => toggleBookmark(app, e)}
-							aria-label={bookmarkedIds.includes(app.id) ? 'ブックマーク解除' : 'ブックマーク'}
+							class:bookmarked={s.bookmarkedIds.includes(app.id)}
+							onclick={(e) => s.toggleBookmark(app, e)}
+							aria-label={s.bookmarkedIds.includes(app.id) ? 'ブックマーク解除' : 'ブックマーク'}
 						>
-							<Star size={15} fill={bookmarkedIds.includes(app.id) ? 'currentColor' : 'none'} />
+							<Star size={15} fill={s.bookmarkedIds.includes(app.id) ? 'currentColor' : 'none'} />
 						</button>
 					</div>
 					<div class="card-body">

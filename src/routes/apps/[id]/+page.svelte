@@ -1,127 +1,19 @@
 <script lang="ts">
-	import { goto, invalidateAll } from '$app/navigation';
+	import { invalidateAll } from '$app/navigation';
+	import { goto } from '$app/navigation';
+	import { createAppBuilderState } from './index.svelte';
 	import ChevronLeft from '$lib/components/icon/ChevronLeft.svelte';
 	import AppIcon, { ICON_OPTIONS } from '$lib/components/AppIcon.svelte';
 	import ChatPanel from '$lib/components/chat/ChatPanel.svelte';
 	import type { PageData } from './$types';
 
 	let { data }: { data: PageData } = $props();
-
-	// ── App meta edit ─────────────────────────────────────────
-	let appLabel = $state(data.app.label);
-	let appIcon = $state(data.app.icon ?? 'layout-grid');
-	let metaDirty = $state(false);
-	let savingMeta = $state(false);
-	let metaSaved = $state(false);
-
-	$effect(() => { appLabel = data.app.label; appIcon = data.app.icon ?? 'layout-grid'; });
-
-	async function saveMeta() {
-		if (!appLabel.trim()) return;
-		savingMeta = true;
-		try {
-			await fetch(`/api/apps/${data.app.id}`, {
-				method: 'PATCH',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ label: appLabel.trim(), icon: appIcon })
-			});
-			await invalidateAll();
-			metaDirty = false;
-			metaSaved = true;
-			setTimeout(() => (metaSaved = false), 2000);
-		} finally {
-			savingMeta = false;
-		}
-	}
-
-	// ── Spec editor ───────────────────────────────────────────
-	let spec = $state(data.app.spec ?? '');
-	let saving = $state(false);
-	let saved = $state(false);
-	let aiTrigger = $state<string | null>(null);
-
-	$effect(() => { spec = data.app.spec ?? ''; });
-
-	async function saveSpec() {
-		saving = true;
-		try {
-			await fetch(`/api/apps/${data.app.id}`, {
-				method: 'PATCH',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ spec })
-			});
-			saved = true;
-			setTimeout(() => (saved = false), 2000);
-		} finally {
-			saving = false;
-		}
-	}
-
-	async function generateFromSpec() {
-		if (!spec.trim()) return;
-		await saveSpec();
-		aiTrigger = `以下の仕様書に基づいて、このアプリのテーブルとページを設計・作成してください:\n\n${spec}`;
-	}
-
-	// ── Tabs ──────────────────────────────────────────────────
-	type Tab = 'tables' | 'pages' | 'workflows';
-	let activeTab = $state<Tab>('tables');
-
-	// ── Add table ─────────────────────────────────────────────
-	let addingTable = $state(false);
-
-	async function addTable() {
-		addingTable = true;
-		const name = 'table_' + Date.now();
-		const res = await fetch('/api/database/tables', {
-			method: 'POST',
-			headers: { 'Content-Type': 'application/json' },
-			body: JSON.stringify({ name, label: '新しいテーブル', appId: data.app.id, fields: [] })
-		});
-		if (res.ok) {
-			const { id } = (await res.json()) as { id: string };
-			await invalidateAll();
-			goto(`/apps/${data.app.id}/tables/${id}/build`);
-		}
-		addingTable = false;
-	}
-
-	// ── Resizable split ───────────────────────────────────────
-	const CHAT_MIN = 220;
-	const CHAT_MAX = 640;
-	let chatWidth = $state(340);
-	let resizing = $state(false);
-
-	function onResizerMouseDown(e: MouseEvent) {
-		e.preventDefault();
-		resizing = true;
-		const startX = e.clientX;
-		const startWidth = chatWidth;
-		function onMove(e: MouseEvent) {
-			const delta = startX - e.clientX;
-			chatWidth = Math.min(CHAT_MAX, Math.max(CHAT_MIN, startWidth + delta));
-		}
-		function onUp() {
-			resizing = false;
-			window.removeEventListener('mousemove', onMove);
-			window.removeEventListener('mouseup', onUp);
-		}
-		window.addEventListener('mousemove', onMove);
-		window.addEventListener('mouseup', onUp);
-	}
-
-	const chatContext = $derived({
-		appId: data.app.id,
-		appLabel: data.app.label,
-		appName: data.app.name,
-		spec: data.app.spec,
-		tables: data.tables.map((t) => ({ id: t.id, name: t.name, label: t.label }))
-	});
+	const s = createAppBuilderState(() => data);
 
 	function padTime(n: number) { return String(n).padStart(2, '0'); }
 </script>
 
-<div class="builder-layout" style="grid-template-columns: 1fr 5px {chatWidth}px" class:resizing>
+<div class="builder-layout" style="grid-template-columns: 1fr 5px {s.chatWidth}px" class:resizing={s.resizing}>
 	<!-- Left panel: builder -->
 	<div class="builder-panel">
 		<div class="panel-header">
@@ -133,8 +25,8 @@
 							<button
 								type="button"
 								class="icon-opt"
-								class:selected={appIcon === opt.name}
-								onclick={() => { appIcon = opt.name; metaDirty = true; }}
+								class:selected={s.appIcon === opt.name}
+								onclick={() => { s.appIcon = opt.name; s.metaDirty = true; }}
 								title={opt.name}
 							><AppIcon icon={opt.name} size={15} /></button>
 						{/each}
@@ -143,15 +35,15 @@
 						<input
 							class="app-name-input"
 							type="text"
-							bind:value={appLabel}
-							oninput={() => (metaDirty = true)}
+							bind:value={s.appLabel}
+							oninput={() => (s.metaDirty = true)}
 							placeholder="アプリ名"
 						/>
-						{#if metaDirty || metaSaved}
-							{#if metaSaved}<span class="saved-msg">✓</span>{/if}
-							{#if metaDirty}
-								<button class="btn-save-meta" onclick={saveMeta} disabled={savingMeta || !appLabel.trim()}>
-									{savingMeta ? '…' : '保存'}
+						{#if s.metaDirty || s.metaSaved}
+							{#if s.metaSaved}<span class="saved-msg">✓</span>{/if}
+							{#if s.metaDirty}
+								<button class="btn-save-meta" onclick={s.saveMeta} disabled={s.savingMeta || !s.appLabel.trim()}>
+									{s.savingMeta ? '…' : '保存'}
 								</button>
 							{/if}
 						{/if}
@@ -171,18 +63,18 @@
 				<div class="section-header">
 					<h2 class="section-label">仕様書</h2>
 					<div class="section-actions">
-						{#if saved}<span class="saved-msg">✓ 保存しました</span>{/if}
-						<button class="btn-save" onclick={saveSpec} disabled={saving}>
-							{saving ? '保存中…' : '保存'}
+						{#if s.saved}<span class="saved-msg">✓ 保存しました</span>{/if}
+						<button class="btn-save" onclick={s.saveSpec} disabled={s.saving}>
+							{s.saving ? '保存中…' : '保存'}
 						</button>
 					</div>
 				</div>
 				<textarea
 					class="spec-textarea"
-					bind:value={spec}
+					bind:value={s.spec}
 					placeholder="アプリの仕様をここに記述してください。AIが設計をサポートします。&#10;&#10;例:&#10;## 顧客商談管理&#10;&#10;### データ&#10;- 顧客マスタ（会社名, 担当者, 業種）&#10;- 商談（顧客, ステータス, 金額）&#10;- 活動履歴（商談, 種別, 日時, 内容）&#10;&#10;### ページ&#10;- 商談ボード（カンバン, ステータス別）"
 				></textarea>
-				<button class="btn-generate" onclick={generateFromSpec} disabled={!spec.trim() || saving}>
+				<button class="btn-generate" onclick={s.generateFromSpec} disabled={!s.spec.trim() || s.saving}>
 					✨ AIに設計・作成してもらう
 				</button>
 			</section>
@@ -192,16 +84,16 @@
 				{#each [['tables', 'テーブル'], ['pages', 'ページ'], ['workflows', 'ワークフロー']] as [id, label] (id)}
 					<button
 						class="tab-btn"
-						class:active={activeTab === id}
+						class:active={s.activeTab === id}
 						role="tab"
-						aria-selected={activeTab === id}
-						onclick={() => (activeTab = id as Tab)}
+						aria-selected={s.activeTab === id}
+						onclick={() => (s.activeTab = id as 'tables' | 'pages' | 'workflows')}
 					>{label}</button>
 				{/each}
 			</div>
 
 			<!-- Tab: Tables -->
-			{#if activeTab === 'tables'}
+			{#if s.activeTab === 'tables'}
 				<div class="tab-content">
 					{#each data.tables as table (table.id)}
 						<button
@@ -223,14 +115,14 @@
 						<p class="empty-hint">AIに「テーブルを追加して」と話しかけるか、手動で追加できます。</p>
 					{/each}
 					{#if data.account?.permission === 'admin'}
-						<button class="btn-add-table" onclick={addTable} disabled={addingTable}>
-							{addingTable ? '作成中…' : '+ テーブルを追加'}
+						<button class="btn-add-table" onclick={s.addTable} disabled={s.addingTable}>
+							{s.addingTable ? '作成中…' : '+ テーブルを追加'}
 						</button>
 					{/if}
 				</div>
 
 			<!-- Tab: Pages -->
-			{:else if activeTab === 'pages'}
+			{:else if s.activeTab === 'pages'}
 				<div class="tab-content">
 					{#each data.pages as page (page.id)}
 						<button
@@ -254,7 +146,7 @@
 				</div>
 
 			<!-- Tab: Workflows -->
-			{:else if activeTab === 'workflows'}
+			{:else if s.activeTab === 'workflows'}
 				<div class="tab-content">
 					{#each data.workflows as wf (wf.id)}
 						<div class="item-row item-row--static">
@@ -277,7 +169,7 @@
 	<!-- Resize handle -->
 	<div
 		class="resizer"
-		onmousedown={onResizerMouseDown}
+		onmousedown={s.onResizerMouseDown}
 		role="separator"
 		aria-label="パネル幅を調整"
 		aria-orientation="vertical"
@@ -289,9 +181,9 @@
 		<ChatPanel
 			placeholder="仕様の相談・テーブル追加・修正の指示を入力…"
 			onAction={() => invalidateAll()}
-			context={chatContext}
-			triggerMessage={aiTrigger}
-			onTriggerConsumed={() => (aiTrigger = null)}
+			context={s.chatContext}
+			triggerMessage={s.aiTrigger}
+			onTriggerConsumed={s.clearTrigger}
 		/>
 	</div>
 </div>

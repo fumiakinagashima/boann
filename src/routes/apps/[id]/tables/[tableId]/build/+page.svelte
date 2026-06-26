@@ -1,283 +1,16 @@
 <script lang="ts">
 	import { invalidateAll } from '$app/navigation';
-	import { goto } from '$app/navigation';
-	import { tick, untrack } from 'svelte';
+	import { createTableBuildState, FIELD_TYPES } from './index.svelte';
 	import ChevronLeft from '$lib/components/icon/ChevronLeft.svelte';
 	import GripVertical from '$lib/components/icon/GripVertical.svelte';
 	import ChatPanel from '$lib/components/chat/ChatPanel.svelte';
 	import type { PageData } from './$types';
 
 	let { data }: { data: PageData } = $props();
-
-	// ── App meta ──────────────────────────────────────────────
-	let appLabel = $state(data.app.label);
-	let savingMeta = $state(false);
-	let metaSaved = $state(false);
-
-	async function saveMeta() {
-		savingMeta = true;
-		try {
-			await fetch(`/api/database/tables/${data.app.name}`, {
-				method: 'PATCH',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ label: appLabel })
-			});
-			await invalidateAll();
-			metaSaved = true;
-			setTimeout(() => (metaSaved = false), 2000);
-		} finally {
-			savingMeta = false;
-		}
-	}
-
-	let deletingApp = $state(false);
-	async function deleteApp() {
-		if (!confirm(`テーブル「${data.app.label}」を削除しますか？\n全てのレコードも削除されます。`)) return;
-		deletingApp = true;
-		const res = await fetch(`/api/database/tables/${data.app.name}`, { method: 'DELETE' });
-		if (res.ok || res.status === 204) {
-			goto('/');
-		} else {
-			deletingApp = false;
-		}
-	}
-
-
-	// ── Fields ────────────────────────────────────────────────
-	type SelectOption = { label: string; value: string };
-
-	type FieldRow = {
-		_id: string;
-		label: string;
-		key: string;
-		type: 'text' | 'textarea' | 'number' | 'date' | 'select' | 'email' | 'tel' | 'recordSelect';
-		required: boolean;
-		defaultValue: string;
-		description: string;
-		options: SelectOption[];
-		refTable: string;
-		refLabelKey: string;
-	};
-
-	const FIELD_TYPES = [
-		{ value: 'text',         label: 'テキスト' },
-		{ value: 'textarea',     label: '長文テキスト' },
-		{ value: 'number',       label: '数値' },
-		{ value: 'date',         label: '日付' },
-		{ value: 'select',       label: '選択肢' },
-		{ value: 'email',        label: 'メールアドレス' },
-		{ value: 'tel',          label: '電話番号' },
-		{ value: 'recordSelect', label: 'リレーション' },
-	] as const;
-
-	function slugify(s: string): string {
-		return s.toLowerCase()
-			.replace(/[\s　]+/g, '_')
-			.replace(/[^a-z0-9_]/g, '')
-			.replace(/^_+|_+$/g, '');
-	}
-
-	function fromServerFields(): FieldRow[] {
-		return data.fields.map((f) => ({
-			_id: crypto.randomUUID(),
-			label: f.label,
-			key: f.key,
-			type: f.type as FieldRow['type'],
-			required: f.required ?? false,
-			defaultValue: f.defaultValue ?? '',
-			description: f.description ?? '',
-			options: (f.options as SelectOption[]) ?? [],
-			refTable: f.refTable ?? '',
-			refLabelKey: f.refLabelKey ?? '',
-		}));
-	}
-
-	let rows = $state<FieldRow[]>(fromServerFields());
-	let dirty = $state(false);
-	let saving = $state(false);
-	let saveError = $state('');
-	let expandedId = $state<string | null>(null);
-
-	// ── Relation combobox ─────────────────────────────────────
-	let refTableQuery = $state('');
-	let refTableDropdownOpen = $state(false);
-
-	function refTableLabel(name: string): string {
-		return data.otherApps.find(a => a.name === name)?.label ?? '';
-	}
-
-	// ── Drag & drop reorder ───────────────────────────────────
-	let dragSrcId = $state<string | null>(null);
-	let dragOverId = $state<string | null>(null);
-
-	function onDragStart(e: DragEvent, id: string) {
-		dragSrcId = id;
-		e.dataTransfer!.effectAllowed = 'move';
-	}
-
-	function onDragOver(e: DragEvent, id: string) {
-		e.preventDefault();
-		e.dataTransfer!.dropEffect = 'move';
-		if (id !== dragSrcId) dragOverId = id;
-	}
-
-	function onDrop(e: DragEvent, targetId: string) {
-		e.preventDefault();
-		if (!dragSrcId || dragSrcId === targetId) return;
-		const from = rows.findIndex(r => r._id === dragSrcId);
-		const to   = rows.findIndex(r => r._id === targetId);
-		if (from === -1 || to === -1) return;
-		const next = [...rows];
-		const [moved] = next.splice(from, 1);
-		next.splice(to, 0, moved);
-		rows = next;
-		dirty = true;
-		dragSrcId = null;
-		dragOverId = null;
-	}
-
-	function onDragEnd() {
-		dragSrcId = null;
-		dragOverId = null;
-	}
-
-	// Sync from server when AI adds/removes fields.
-	// rows は untrack で読むことで依存に含めず、data.fields の変化のみ検知する。
-	$effect(() => {
-		const serverKeys = data.fields.map((f) => f.key).sort().join(',');
-		const localKeys = untrack(() => rows.map((r) => r.key).sort().join(','));
-		if (serverKeys !== localKeys) {
-			rows = fromServerFields();
-			dirty = false;
-		}
-	});
-
-	function addField() {
-		const newRow: FieldRow = {
-			_id: crypto.randomUUID(), label: '', key: '', type: 'text',
-			required: false, defaultValue: '', description: '', options: [], refTable: '', refLabelKey: ''
-		};
-		rows = [...rows, newRow];
-		expandedId = newRow._id;
-		dirty = true;
-		tick().then(() => {
-			document.querySelector<HTMLInputElement>(`#label-${newRow._id}`)?.focus();
-		});
-	}
-
-	function removeField(id: string) {
-		rows = rows.filter((r) => r._id !== id);
-		if (expandedId === id) expandedId = null;
-		dirty = true;
-	}
-
-	function onLabelInput(row: FieldRow, val: string) {
-		row.label = val;
-		const slug = slugify(val);
-		if (slug) {
-			row.key = slug;
-		} else if (!row.key) {
-			const idx = rows.findIndex(r => r._id === row._id);
-			row.key = 'field_' + (idx + 1);
-		}
-		dirty = true;
-	}
-
-	function markDirty() { dirty = true; }
-
-	// ── Select options ────────────────────────────────────────
-	function addOption(row: FieldRow) {
-		row.options = [...row.options, { label: '', value: '' }];
-		dirty = true;
-	}
-
-	function onOptionLabelInput(row: FieldRow, idx: number, val: string) {
-		const prevSlug = slugify(row.options[idx].label);
-		row.options[idx].label = val;
-		if (!row.options[idx].value || row.options[idx].value === prevSlug) {
-			row.options[idx].value = slugify(val) || val;
-		}
-		dirty = true;
-	}
-
-	function onOptionValueInput(row: FieldRow, idx: number, val: string) {
-		row.options[idx].value = val;
-		dirty = true;
-	}
-
-	function removeOption(row: FieldRow, idx: number) {
-		row.options = row.options.filter((_, i) => i !== idx);
-		dirty = true;
-	}
-
-	// ── Save ──────────────────────────────────────────────────
-	async function saveFields() {
-		const validRows = rows.filter((r) => r.label.trim() && r.key.trim());
-		saving = true;
-		saveError = '';
-		try {
-			const res = await fetch(`/api/database/tables/${data.app.name}`, {
-				method: 'PATCH',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({
-					fields: validRows.map((r, i) => ({
-						_id: r._id,
-						key: r.key,
-						label: r.label.trim(),
-						type: r.type,
-						required: r.required,
-						options: r.options.filter(o => o.label.trim()),
-						defaultValue: r.defaultValue || null,
-						description: r.description || null,
-						refTable: r.refTable || null,
-						refLabelKey: r.refLabelKey || null,
-						sortOrder: i
-					}))
-				})
-			});
-			if (!res.ok) {
-				const body = (await res.json()) as { error?: string };
-				saveError = body.error ?? '保存に失敗しました';
-				return;
-			}
-			dirty = false;
-			await invalidateAll();
-		} finally {
-			saving = false;
-		}
-	}
-
-	function typeLabel(type: string) {
-		return FIELD_TYPES.find(t => t.value === type)?.label ?? type;
-	}
-
-	// ── Resizable split ───────────────────────────────────────
-	const CHAT_MIN = 220;
-	const CHAT_MAX = 640;
-	let chatWidth = $state(340);
-	let resizing = $state(false);
-
-	function onResizerMouseDown(e: MouseEvent) {
-		e.preventDefault();
-		resizing = true;
-		const startX = e.clientX;
-		const startWidth = chatWidth;
-
-		function onMove(e: MouseEvent) {
-			const delta = startX - e.clientX;
-			chatWidth = Math.min(CHAT_MAX, Math.max(CHAT_MIN, startWidth + delta));
-		}
-		function onUp() {
-			resizing = false;
-			window.removeEventListener('mousemove', onMove);
-			window.removeEventListener('mouseup', onUp);
-		}
-		window.addEventListener('mousemove', onMove);
-		window.addEventListener('mouseup', onUp);
-	}
+	const s = createTableBuildState(() => data);
 </script>
 
-<div class="build-layout" style="grid-template-columns: 1fr 5px {chatWidth}px" class:resizing>
+<div class="build-layout" style="grid-template-columns: 1fr 5px {s.chatWidth}px" class:resizing={s.resizing}>
 	<!-- Left panel -->
 	<div class="settings-panel">
 		<div class="panel-header">
@@ -296,17 +29,17 @@
 						<input
 							type="text"
 							class="meta-label-input"
-							bind:value={appLabel}
+							bind:value={s.appLabel}
 							placeholder="テーブル名"
 						/>
 						<span class="meta-name-hint">{data.app.name}</span>
 					</div>
 					<div class="meta-actions">
-						<button class="btn-save-meta" onclick={saveMeta} disabled={savingMeta || !appLabel.trim()}>
-							{savingMeta ? '…' : '保存'}
+						<button class="btn-save-meta" onclick={s.saveMeta} disabled={s.savingMeta || !s.appLabel.trim()}>
+							{s.savingMeta ? '…' : '保存'}
 						</button>
-						{#if metaSaved}<span class="saved-msg">✓</span>{/if}
-						<button class="btn-danger-sm" onclick={deleteApp} disabled={deletingApp} title="テーブルを削除">
+						{#if s.metaSaved}<span class="saved-msg">✓</span>{/if}
+						<button class="btn-danger-sm" onclick={s.deleteApp} disabled={s.deletingApp} title="テーブルを削除">
 							削除
 						</button>
 					</div>
@@ -317,47 +50,47 @@
 			<section>
 				<div class="fields-header">
 					<h2 class="section-title">フィールド</h2>
-					{#if dirty}
+					{#if s.dirty}
 						<div class="dirty-actions">
-							{#if saveError}<span class="save-error">{saveError}</span>{/if}
-							<button class="btn-save-fields" onclick={saveFields} disabled={saving}>
-								{saving ? '保存中…' : '変更を保存'}
+							{#if s.saveError}<span class="save-error">{s.saveError}</span>{/if}
+							<button class="btn-save-fields" onclick={s.saveFields} disabled={s.saving}>
+								{s.saving ? '保存中…' : '変更を保存'}
 							</button>
 						</div>
 					{/if}
 				</div>
 
 				<div class="field-list">
-					{#each rows as row, i (row._id)}
-						{@const isOpen = expandedId === row._id}
+					{#each s.rows as row, i (row._id)}
+						{@const isOpen = s.expandedId === row._id}
 						<div
 							class="field-card"
 							class:is-open={isOpen}
-							class:is-dragging={dragSrcId === row._id}
-							class:drag-over={dragOverId === row._id}
-							ondragover={(e) => onDragOver(e, row._id)}
-							ondrop={(e) => onDrop(e, row._id)}
-							ondragend={onDragEnd}
+							class:is-dragging={s.dragSrcId === row._id}
+							class:drag-over={s.dragOverId === row._id}
+							ondragover={(e) => s.onDragOver(e, row._id)}
+							ondrop={(e) => s.onDrop(e, row._id)}
+							ondragend={s.onDragEnd}
 						>
 							<!-- Card header (always visible) -->
 							<div class="field-card-header">
 								<span
 									class="drag-handle"
 									draggable="true"
-									ondragstart={(e) => onDragStart(e, row._id)}
+									ondragstart={(e) => s.onDragStart(e, row._id)}
 									aria-hidden="true"
 								>
 									<GripVertical size={14} />
 								</span>
 								<button
 									class="field-card-header-btn"
-									onclick={() => { expandedId = isOpen ? null : row._id; refTableQuery = ''; refTableDropdownOpen = false; }}
+									onclick={() => { s.expandedId = isOpen ? null : row._id; s.refTableQuery = ''; s.refTableDropdownOpen = false; }}
 									aria-expanded={isOpen}
 								>
 								<span class="field-card-label" class:placeholder={!row.label}>
 									{row.label || 'フィールド名未入力'}
 								</span>
-								<span class="field-type-badge">{typeLabel(row.type)}</span>
+								<span class="field-type-badge">{s.typeLabel(row.type)}</span>
 								{#if row.required}
 									<span class="field-req-badge">必須</span>
 								{/if}
@@ -380,12 +113,12 @@
 												const input = e.currentTarget as HTMLInputElement;
 												if ((e as unknown as InputEvent).isComposing) {
 													row.label = input.value;
-													dirty = true;
+													s.markDirty();
 												} else {
-													onLabelInput(row, input.value);
+													s.onLabelInput(row, input.value);
 												}
 											}}
-											oncompositionend={(e) => onLabelInput(row, (e.currentTarget as HTMLInputElement).value)}
+											oncompositionend={(e) => s.onLabelInput(row, (e.currentTarget as HTMLInputElement).value)}
 										/>
 										{#if row.key}
 											<p class="form-hint">識別キー: {row.key}</p>
@@ -399,7 +132,7 @@
 												id="type-{row._id}"
 												class="form-select"
 												bind:value={row.type}
-												onchange={markDirty}
+												onchange={s.markDirty}
 											>
 												{#each FIELD_TYPES as t}
 													<option value={t.value}>{t.label}</option>
@@ -413,7 +146,7 @@
 													id="req-{row._id}"
 													type="checkbox"
 													bind:checked={row.required}
-													onchange={markDirty}
+													onchange={s.markDirty}
 												/>
 												<span class="toggle"></span>
 											</label>
@@ -427,18 +160,18 @@
 												<input
 													type="text"
 													class="form-input combobox-input"
-													value={refTableDropdownOpen ? refTableQuery : refTableLabel(row.refTable)}
+													value={s.refTableDropdownOpen ? s.refTableQuery : s.refTableLabel(row.refTable)}
 													placeholder="テーブルを検索…"
 													autocomplete="off"
-													onfocus={() => { refTableQuery = ''; refTableDropdownOpen = true; }}
-													oninput={(e) => { refTableQuery = (e.currentTarget as HTMLInputElement).value; }}
-													onblur={() => setTimeout(() => { refTableDropdownOpen = false; }, 150)}
+													onfocus={() => { s.refTableQuery = ''; s.refTableDropdownOpen = true; }}
+													oninput={(e) => { s.refTableQuery = (e.currentTarget as HTMLInputElement).value; }}
+													onblur={() => setTimeout(() => { s.refTableDropdownOpen = false; }, 150)}
 												/>
-												{#if refTableDropdownOpen}
+												{#if s.refTableDropdownOpen}
 													{@const filtered = data.otherApps.filter(a =>
-														!refTableQuery ||
-														a.label.toLowerCase().includes(refTableQuery.toLowerCase()) ||
-														a.name.toLowerCase().includes(refTableQuery.toLowerCase())
+														!s.refTableQuery ||
+														a.label.toLowerCase().includes(s.refTableQuery.toLowerCase()) ||
+														a.name.toLowerCase().includes(s.refTableQuery.toLowerCase())
 													)}
 													<div class="combobox-dropdown">
 														{#if filtered.length === 0}
@@ -449,7 +182,7 @@
 																	type="button"
 																	class="combobox-option"
 																	class:selected={app.name === row.refTable}
-																	onmousedown={() => { row.refTable = app.name; row.refLabelKey = ''; markDirty(); refTableDropdownOpen = false; refTableQuery = ''; }}
+																	onmousedown={() => { row.refTable = app.name; row.refLabelKey = ''; s.markDirty(); s.refTableDropdownOpen = false; s.refTableQuery = ''; }}
 																>{app.label}</button>
 															{/each}
 														{/if}
@@ -469,7 +202,7 @@
 													id="reflabelkey-{row._id}"
 													class="form-select"
 													bind:value={row.refLabelKey}
-													onchange={markDirty}
+													onchange={s.markDirty}
 												>
 													<option value="">（先頭フィールド）</option>
 													{#each refApp.fields as f}
@@ -498,19 +231,19 @@
 															type="text"
 															value={opt.label}
 															placeholder="例: 進行中"
-															oninput={(e) => onOptionLabelInput(row, oi, (e.currentTarget as HTMLInputElement).value)}
+															oninput={(e) => s.onOptionLabelInput(row, oi, (e.currentTarget as HTMLInputElement).value)}
 														/>
 														<input
 															class="form-input opt-value-input"
 															type="text"
 															value={opt.value}
 															placeholder="例: in_progress"
-															oninput={(e) => onOptionValueInput(row, oi, (e.currentTarget as HTMLInputElement).value)}
+															oninput={(e) => s.onOptionValueInput(row, oi, (e.currentTarget as HTMLInputElement).value)}
 														/>
-														<button class="opt-del" onclick={() => removeOption(row, oi)} aria-label="削除">×</button>
+														<button class="opt-del" onclick={() => s.removeOption(row, oi)} aria-label="削除">×</button>
 													</div>
 												{/each}
-												<button class="opt-add-btn" onclick={() => addOption(row)}>
+												<button class="opt-add-btn" onclick={() => s.addOption(row)}>
 													+ 選択肢を追加
 												</button>
 											</div>
@@ -524,7 +257,7 @@
 												id="default-{row._id}"
 												class="form-select"
 												bind:value={row.defaultValue}
-												onchange={markDirty}
+												onchange={s.markDirty}
 											>
 												<option value="">（なし）</option>
 												{#each row.options.filter(o => o.value) as opt}
@@ -538,7 +271,7 @@
 												class="form-input"
 												bind:value={row.defaultValue}
 												placeholder="入力がない場合のデフォルト値"
-												oninput={markDirty}
+												oninput={s.markDirty}
 											/>
 										{/if}
 									</div>
@@ -551,12 +284,12 @@
 											bind:value={row.description}
 											placeholder="このフィールドに関するメモや説明"
 											rows="4"
-											oninput={markDirty}
+											oninput={s.markDirty}
 										></textarea>
 									</div>
 
 									<div class="field-card-footer">
-										<button class="btn-remove-field" onclick={() => removeField(row._id)}>
+										<button class="btn-remove-field" onclick={() => s.removeField(row._id)}>
 											このフィールドを削除
 										</button>
 									</div>
@@ -565,13 +298,13 @@
 						</div>
 					{/each}
 
-					<button class="add-field-btn" onclick={addField}>
+					<button class="add-field-btn" onclick={s.addField}>
 						<span class="add-icon">+</span>
 						フィールドを追加
 					</button>
 				</div>
 
-				{#if rows.length === 0}
+				{#if s.rows.length === 0}
 					<p class="empty-hint">AIに「フィールドを追加して」と話しかけるか、「フィールドを追加」から手動で追加できます。</p>
 				{/if}
 			</section>
@@ -581,7 +314,7 @@
 	<!-- Resize handle -->
 	<div
 		class="resizer"
-		onmousedown={onResizerMouseDown}
+		onmousedown={s.onResizerMouseDown}
 		role="separator"
 		aria-label="パネル幅を調整"
 		aria-orientation="vertical"

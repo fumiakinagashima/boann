@@ -1,165 +1,10 @@
 <script lang="ts">
-	import { goto, invalidateAll } from '$app/navigation';
+	import { createPageBuildState } from './index.svelte';
 	import ChevronLeft from '$lib/components/icon/ChevronLeft.svelte';
 	import type { PageData } from './$types';
-	import type { PageComponent, FieldDef } from '$lib/server/db/table-service';
 
 	let { data }: { data: PageData } = $props();
-
-	type LocalComponent = PageComponent & {
-		expanded: boolean;
-	};
-
-	let pageLabel = $state(data.page.label);
-	let components = $state<LocalComponent[]>(
-		data.page.components.map(c => ({ ...c, expanded: false }))
-	);
-	let dirty = $state(false);
-	let saving = $state(false);
-	let saved = $state(false);
-	let deleting = $state(false);
-
-	function markDirty() { dirty = true; saved = false; }
-
-	// ── Save ─────────────────────────────────────────────────
-	async function save() {
-		if (!pageLabel.trim()) return;
-		saving = true;
-		try {
-			const payload = {
-				label: pageLabel.trim(),
-				components: components.map(({ expanded, ...c }) => ({
-					...c,
-					title: c.title || null,
-					fields: (c.fields?.length) ? c.fields : null
-				}))
-			};
-			const res = await fetch(`/api/apps/${data.app.id}/pages/${data.page.id}`, {
-				method: 'PATCH',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify(payload)
-			});
-			if (res.ok) {
-				dirty = false;
-				saved = true;
-				setTimeout(() => (saved = false), 2000);
-				await invalidateAll();
-			}
-		} finally {
-			saving = false;
-		}
-	}
-
-	// ── Delete page ───────────────────────────────────────────
-	async function deletePage() {
-		if (!confirm('このページを削除しますか？')) return;
-		deleting = true;
-		try {
-			const res = await fetch(`/api/apps/${data.app.id}/pages/${data.page.id}`, { method: 'DELETE' });
-			if (res.ok || res.status === 204) {
-				goto(`/apps/${data.app.id}`);
-			}
-		} finally {
-			deleting = false;
-		}
-	}
-
-	// ── Components ────────────────────────────────────────────
-	function addComponent() {
-		const firstTable = data.tables[0];
-		if (!firstTable) return;
-		components = [...components, {
-			id: crypto.randomUUID(),
-			type: 'list',
-			tableId: firstTable.id,
-			title: null,
-			fields: null,
-			actions: ['create', 'edit', 'delete'],
-			expanded: true
-		}];
-		markDirty();
-	}
-
-	function removeComponent(id: string) {
-		components = components.filter(c => c.id !== id);
-		markDirty();
-	}
-
-	function toggleExpand(id: string) {
-		components = components.map(c => c.id === id ? { ...c, expanded: !c.expanded } : c);
-	}
-
-	function moveUp(idx: number) {
-		if (idx === 0) return;
-		const arr = [...components];
-		[arr[idx - 1], arr[idx]] = [arr[idx], arr[idx - 1]];
-		components = arr;
-		markDirty();
-	}
-
-	function moveDown(idx: number) {
-		if (idx === components.length - 1) return;
-		const arr = [...components];
-		[arr[idx], arr[idx + 1]] = [arr[idx + 1], arr[idx]];
-		components = arr;
-		markDirty();
-	}
-
-	function updateComponent(id: string, patch: Partial<LocalComponent>) {
-		components = components.map(c => c.id === id ? { ...c, ...patch } : c);
-		markDirty();
-	}
-
-	function toggleAction(compId: string, action: 'create' | 'edit' | 'delete') {
-		const comp = components.find(c => c.id === compId);
-		if (!comp) return;
-		const current = comp.actions ?? [];
-		const next = current.includes(action)
-			? current.filter(a => a !== action)
-			: [...current, action];
-		updateComponent(compId, { actions: next });
-	}
-
-	function toggleField(compId: string, fieldKey: string, tableFields: FieldDef[]) {
-		const comp = components.find(c => c.id === compId);
-		if (!comp) return;
-		const currentFields = comp.fields ?? [];
-		if (currentFields.length === 0) {
-			// currently showing all → switch to all except this one
-			const next = tableFields.map(f => f.key).filter(k => k !== fieldKey);
-			updateComponent(compId, { fields: next.length === tableFields.length - 1 ? next : null });
-		} else if (currentFields.includes(fieldKey)) {
-			const next = currentFields.filter(k => k !== fieldKey);
-			updateComponent(compId, { fields: next.length > 0 ? next : null });
-		} else {
-			const next = [...currentFields, fieldKey];
-			const isAll = tableFields.every(f => next.includes(f.key));
-			updateComponent(compId, { fields: isAll ? null : next });
-		}
-	}
-
-	function getTableFields(tableId: string): FieldDef[] {
-		return (data.tableFields as Record<string, FieldDef[]>)[tableId] ?? [];
-	}
-
-	function isFieldShown(comp: LocalComponent, fieldKey: string): boolean {
-		if (!comp.fields?.length) return true;
-		return comp.fields.includes(fieldKey);
-	}
-
-	function getTableLabel(tableId: string): string {
-		return data.tables.find(t => t.id === tableId)?.label ?? tableId;
-	}
-
-	function getDisplaySummary(comp: LocalComponent): string {
-		const fields = comp.fields?.length
-			? `${comp.fields.length}フィールド`
-			: '全フィールド';
-		const actions = (comp.actions ?? []).map(a =>
-			a === 'create' ? '作成' : a === 'edit' ? '編集' : '削除'
-		).join('・') || 'アクションなし';
-		return `${fields} / ${actions}`;
-	}
+	const s = createPageBuildState(() => data);
 </script>
 
 <div class="build-page">
@@ -170,18 +15,18 @@
 				<input
 					class="page-label-input"
 					type="text"
-					bind:value={pageLabel}
-					oninput={markDirty}
+					bind:value={s.pageLabel}
+					oninput={s.markDirty}
 					placeholder="ページ名"
 				/>
 				<span class="page-badge">ページ設定</span>
 			</div>
 			<div class="header-actions">
-				{#if saved}<span class="saved-msg">✓ 保存しました</span>{/if}
-				<button class="btn-danger-ghost" onclick={deletePage} disabled={deleting}>削除</button>
+				{#if s.saved}<span class="saved-msg">✓ 保存しました</span>{/if}
+				<button class="btn-danger-ghost" onclick={s.deletePage} disabled={s.deleting}>削除</button>
 				<a href="/apps/{data.app.id}/pages/{data.page.id}" class="btn-secondary">プレビュー</a>
-				<button class="btn-primary" onclick={save} disabled={saving || !dirty}>
-					{saving ? '保存中…' : '保存'}
+				<button class="btn-primary" onclick={s.save} disabled={s.saving || !s.dirty}>
+					{s.saving ? '保存中…' : '保存'}
 				</button>
 			</div>
 		</div>
@@ -192,30 +37,30 @@
 			<h2 class="section-title">コンポーネント</h2>
 			<p class="section-desc">ページに表示するコンポーネントを追加・設定します。上から順に表示されます。</p>
 
-			{#if components.length === 0}
+			{#if s.components.length === 0}
 				<div class="empty-comp">
 					<p>コンポーネントがまだありません。</p>
 				</div>
 			{/if}
 
-			{#each components as comp, i (comp.id)}
-				{@const tableFields = getTableFields(comp.tableId)}
+			{#each s.components as comp, i (comp.id)}
+				{@const tableFields = s.getTableFields(comp.tableId)}
 				<div class="comp-card" class:expanded={comp.expanded}>
 					<div class="comp-card-header" role="button" tabindex="0"
-						onclick={() => toggleExpand(comp.id)}
-						onkeydown={(e) => { if (e.key === 'Enter') toggleExpand(comp.id); }}
+						onclick={() => s.toggleExpand(comp.id)}
+						onkeydown={(e) => { if (e.key === 'Enter') s.toggleExpand(comp.id); }}
 					>
 						<span class="comp-type-badge" class:form={comp.type === 'form'}>
 							{comp.type === 'list' ? '一覧' : 'フォーム'}
 						</span>
 						<span class="comp-summary">
-							<strong>{comp.title || getTableLabel(comp.tableId)}</strong>
-							<span class="comp-meta">{getDisplaySummary(comp)}</span>
+							<strong>{comp.title || s.getTableLabel(comp.tableId)}</strong>
+							<span class="comp-meta">{s.getDisplaySummary(comp)}</span>
 						</span>
 						<div class="comp-card-actions" role="presentation" onclick={(e) => e.stopPropagation()}>
-							<button class="icon-btn" onclick={() => moveUp(i)} disabled={i === 0} title="上へ">↑</button>
-							<button class="icon-btn" onclick={() => moveDown(i)} disabled={i === components.length - 1} title="下へ">↓</button>
-							<button class="icon-btn danger" onclick={() => removeComponent(comp.id)} title="削除">×</button>
+							<button class="icon-btn" onclick={() => s.moveUp(i)} disabled={i === 0} title="上へ">↑</button>
+							<button class="icon-btn" onclick={() => s.moveDown(i)} disabled={i === s.components.length - 1} title="下へ">↓</button>
+							<button class="icon-btn danger" onclick={() => s.removeComponent(comp.id)} title="削除">×</button>
 						</div>
 						<span class="expand-icon">{comp.expanded ? '▲' : '▼'}</span>
 					</div>
@@ -229,14 +74,14 @@
 									<label class="radio-label">
 										<input type="radio" name="type-{comp.id}" value="list"
 											checked={comp.type === 'list'}
-											onchange={() => updateComponent(comp.id, { type: 'list' })}
+											onchange={() => s.updateComponent(comp.id, { type: 'list' })}
 										/>
 										一覧（テーブル表示・編集可）
 									</label>
 									<label class="radio-label">
 										<input type="radio" name="type-{comp.id}" value="form"
 											checked={comp.type === 'form'}
-											onchange={() => updateComponent(comp.id, { type: 'form' })}
+											onchange={() => s.updateComponent(comp.id, { type: 'form' })}
 										/>
 										フォーム（新規登録）
 									</label>
@@ -253,7 +98,7 @@
 										id="table-{comp.id}"
 										class="field-select"
 										value={comp.tableId}
-										onchange={(e) => updateComponent(comp.id, { tableId: e.currentTarget.value, fields: null })}
+										onchange={(e) => s.updateComponent(comp.id, { tableId: e.currentTarget.value, fields: null })}
 									>
 										{#each data.tables as t}
 											<option value={t.id}>{t.label}</option>
@@ -270,7 +115,7 @@
 									class="field-input"
 									type="text"
 									value={comp.title ?? ''}
-									oninput={(e) => updateComponent(comp.id, { title: e.currentTarget.value || null })}
+									oninput={(e) => s.updateComponent(comp.id, { title: e.currentTarget.value || null })}
 									placeholder="省略するとテーブル名を使用"
 								/>
 							</div>
@@ -284,8 +129,8 @@
 											<label class="check-label">
 												<input
 													type="checkbox"
-													checked={isFieldShown(comp, f.key)}
-													onchange={() => toggleField(comp.id, f.key, tableFields)}
+													checked={s.isFieldShown(comp, f.key)}
+													onchange={() => s.toggleField(comp.id, f.key, tableFields)}
 												/>
 												{f.label}
 												<span class="field-type-tag">{f.type}</span>
@@ -307,7 +152,7 @@
 											<input
 												type="checkbox"
 												checked={(comp.actions ?? []).includes(action as 'create' | 'edit' | 'delete')}
-												onchange={() => toggleAction(comp.id, action as 'create' | 'edit' | 'delete')}
+												onchange={() => s.toggleAction(comp.id, action as 'create' | 'edit' | 'delete')}
 											/>
 											{label}
 										</label>
@@ -319,7 +164,7 @@
 				</div>
 			{/each}
 
-			<button class="btn-add" onclick={addComponent} disabled={data.tables.length === 0}>
+			<button class="btn-add" onclick={s.addComponent} disabled={data.tables.length === 0}>
 				+ コンポーネントを追加
 			</button>
 		</section>

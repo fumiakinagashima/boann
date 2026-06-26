@@ -1,157 +1,12 @@
 <script lang="ts">
-	import { invalidateAll } from '$app/navigation';
-	import { formatJstDateTime } from '$lib/datetime';
+	import { createPageViewState } from './index.svelte';
 	import ChevronLeft from '$lib/components/icon/ChevronLeft.svelte';
 	import AppIcon from '$lib/components/AppIcon.svelte';
 	import SearchSelect from '$lib/components/ui/SearchSelect.svelte';
 	import type { PageData } from './$types';
-	import type { FieldDef, RecordRow } from '$lib/server/db/table-service';
-	import type { ComponentData } from './+page.server';
 
 	let { data }: { data: PageData } = $props();
-
-	let componentData = $state(data.componentData);
-	$effect(() => { componentData = data.componentData; });
-
-	// ── Shared form drawer ────────────────────────────────────
-	type ActiveEdit = {
-		compIdx: number;
-		mode: 'new' | 'edit';
-		editingId: string | null;
-		formData: Record<string, string>;
-		saving: boolean;
-		saveError: string;
-		deleting: boolean;
-	};
-
-	let activeEdit = $state<ActiveEdit | null>(null);
-
-	function openNew(compIdx: number) {
-		const comp = componentData[compIdx];
-		const init: Record<string, string> = {};
-		for (const f of comp.fields) init[f.key] = f.defaultValue ?? '';
-		activeEdit = { compIdx, mode: 'new', editingId: null, formData: init, saving: false, saveError: '', deleting: false };
-	}
-
-	function openEdit(compIdx: number, row: RecordRow) {
-		const comp = componentData[compIdx];
-		const init: Record<string, string> = {};
-		for (const f of comp.fields) {
-			const v = row[f.key];
-			init[f.key] = v != null ? String(v) : (f.defaultValue ?? '');
-		}
-		activeEdit = { compIdx, mode: 'edit', editingId: row.id as string, formData: init, saving: false, saveError: '', deleting: false };
-	}
-
-	function closeForm() { activeEdit = null; }
-
-	async function saveRecord() {
-		if (!activeEdit) return;
-		activeEdit.saving = true;
-		activeEdit.saveError = '';
-		try {
-			const comp = componentData[activeEdit.compIdx];
-			const url = activeEdit.mode === 'new'
-				? `/api/database/${comp.tableName}/records`
-				: `/api/database/${comp.tableName}/records/${activeEdit.editingId}`;
-			const res = await fetch(url, {
-				method: activeEdit.mode === 'new' ? 'POST' : 'PATCH',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify(activeEdit.formData)
-			});
-			if (!res.ok) {
-				const body = (await res.json()) as { error?: string };
-				activeEdit.saveError = body.error ?? '保存に失敗しました';
-				return;
-			}
-			closeForm();
-			await invalidateAll();
-		} finally {
-			if (activeEdit) activeEdit.saving = false;
-		}
-	}
-
-	async function deleteRecord() {
-		if (!activeEdit?.editingId) return;
-		if (!confirm('このレコードを削除しますか？')) return;
-		activeEdit.deleting = true;
-		try {
-			const comp = componentData[activeEdit.compIdx];
-			const res = await fetch(`/api/database/${comp.tableName}/records/${activeEdit.editingId}`, { method: 'DELETE' });
-			if (res.ok || res.status === 204) {
-				closeForm();
-				await invalidateAll();
-			}
-		} finally {
-			if (activeEdit) activeEdit.deleting = false;
-		}
-	}
-
-	// ── Standalone form (for 'form' type components) ──────────
-	let formSubmitState = $state<Record<number, { submitting: boolean; done: boolean; error: string }>>({});
-
-	function getFormSubmitState(idx: number) {
-		return formSubmitState[idx] ?? { submitting: false, done: false, error: '' };
-	}
-
-	async function submitStandaloneForm(compIdx: number, formEl: HTMLFormElement) {
-		const comp = componentData[compIdx];
-		formSubmitState = { ...formSubmitState, [compIdx]: { submitting: true, done: false, error: '' } };
-		try {
-			const data: Record<string, string> = {};
-			for (const f of comp.fields) {
-				const el = formEl.elements.namedItem(f.key) as HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement | null;
-				if (el) data[f.key] = el.value;
-			}
-			const res = await fetch(`/api/database/${comp.tableName}/records`, {
-				method: 'POST',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify(data)
-			});
-			if (!res.ok) {
-				const body = (await res.json()) as { error?: string };
-				formSubmitState = { ...formSubmitState, [compIdx]: { submitting: false, done: false, error: body.error ?? '保存に失敗しました' } };
-				return;
-			}
-			formEl.reset();
-			formSubmitState = { ...formSubmitState, [compIdx]: { submitting: false, done: true, error: '' } };
-			setTimeout(() => {
-				formSubmitState = { ...formSubmitState, [compIdx]: { submitting: false, done: false, error: '' } };
-			}, 2500);
-			await invalidateAll();
-		} finally {
-			if (!formSubmitState[compIdx]?.done) {
-				formSubmitState = { ...formSubmitState, [compIdx]: { ...(formSubmitState[compIdx] ?? {}), submitting: false, done: false, error: '' } };
-			}
-		}
-	}
-
-	// ── Cell formatting ───────────────────────────────────────
-	function formatCell(row: RecordRow, field: FieldDef, comp: ComponentData): string {
-		const val = row[field.key];
-		if (val == null || val === '') return '—';
-		if (field.type === 'recordSelect') {
-			const opts = comp.recordOptions[field.key] ?? [];
-			const opt = opts.find(o => o.value === String(val));
-			return opt ? opt.label : String(val);
-		}
-		if (field.type === 'select') {
-			const opt = (field.options ?? []).find(o => o.value === String(val));
-			return opt ? opt.label : String(val);
-		}
-		if (field.type === 'date' && typeof val === 'number') {
-			return new Date(val * 1000).toLocaleDateString('ja-JP');
-		}
-		return String(val);
-	}
-
-	function formatTs(ts: number | null | undefined): string {
-		if (!ts) return '—';
-		return formatJstDateTime(new Date(ts * 1000));
-	}
-
-	const activeFields = $derived(activeEdit ? componentData[activeEdit.compIdx]?.fields ?? [] : []);
-	const activeRecordOptions = $derived(activeEdit ? componentData[activeEdit.compIdx]?.recordOptions ?? {} : {});
+	const s = createPageViewState(() => data);
 </script>
 
 <div class="page-layout">
@@ -172,21 +27,21 @@
 			</div>
 		</div>
 
-		{#each componentData as comp, i (comp.component.id)}
+		{#each s.componentData as comp, i (comp.component.id)}
 			{#if comp.component.type === 'list'}
 				<!-- List component -->
 				<section class="component-section">
-					{#if componentData.length > 1 || comp.component.title}
+					{#if s.componentData.length > 1 || comp.component.title}
 						<div class="section-header">
 							<h2 class="section-title">{comp.component.title || comp.tableLabel}</h2>
 							{#if comp.component.actions.includes('create')}
-								<button class="btn-primary" onclick={() => openNew(i)}>+ 新規追加</button>
+								<button class="btn-primary" onclick={() => s.openNew(i)}>+ 新規追加</button>
 							{/if}
 						</div>
 					{:else}
 						<div class="section-header single">
 							{#if comp.component.actions.includes('create')}
-								<button class="btn-primary" onclick={() => openNew(i)}>+ 新規追加</button>
+								<button class="btn-primary" onclick={() => s.openNew(i)}>+ 新規追加</button>
 							{/if}
 						</div>
 					{/if}
@@ -202,7 +57,7 @@
 						<div class="empty">
 							<p class="empty-title">レコードがまだありません</p>
 							{#if comp.component.actions.includes('create')}
-								<button class="btn-primary" onclick={() => openNew(i)}>+ 新規追加</button>
+								<button class="btn-primary" onclick={() => s.openNew(i)}>+ 新規追加</button>
 							{/if}
 						</div>
 					{:else}
@@ -221,16 +76,16 @@
 										{@const clickable = comp.component.actions.includes('edit')}
 										<tr
 											class:clickable
-											class:active={activeEdit?.editingId === row.id && activeEdit?.compIdx === i}
-											onclick={clickable ? () => openEdit(i, row) : undefined}
+											class:active={s.activeEdit?.editingId === row.id && s.activeEdit?.compIdx === i}
+											onclick={clickable ? () => s.openEdit(i, row) : undefined}
 											role={clickable ? 'button' : undefined}
 											tabindex={clickable ? 0 : undefined}
-											onkeydown={clickable ? (e) => { if (e.key === 'Enter') openEdit(i, row); } : undefined}
+											onkeydown={clickable ? (e) => { if (e.key === 'Enter') s.openEdit(i, row); } : undefined}
 										>
 											{#each comp.displayFields as field}
-												<td>{formatCell(row, field, comp)}</td>
+												<td>{s.formatCell(row, field, comp)}</td>
 											{/each}
-											<td class="ts">{formatTs(row.createdAt as number)}</td>
+											<td class="ts">{s.formatTs(row.createdAt as number)}</td>
 										</tr>
 									{/each}
 								</tbody>
@@ -241,9 +96,9 @@
 
 			{:else if comp.component.type === 'form'}
 				<!-- Form component -->
-				{@const submitState = getFormSubmitState(i)}
+				{@const submitState = s.getFormSubmitState(i)}
 				<section class="component-section form-section">
-					{#if componentData.length > 1 || comp.component.title}
+					{#if s.componentData.length > 1 || comp.component.title}
 						<h2 class="section-title">{comp.component.title || comp.tableLabel}</h2>
 					{/if}
 
@@ -253,7 +108,7 @@
 
 					<form
 						class="standalone-form"
-						onsubmit={(e) => { e.preventDefault(); submitStandaloneForm(i, e.currentTarget); }}
+						onsubmit={(e) => { e.preventDefault(); s.submitStandaloneForm(i, e.currentTarget); }}
 					>
 						{#each comp.displayFields as field}
 							<div class="form-row">
@@ -263,7 +118,7 @@
 								</label>
 								{#if field.type === 'recordSelect'}
 									<SearchSelect
-										bind:value={activeEdit!.formData[field.key]}
+										bind:value={s.activeEdit!.formData[field.key]}
 										options={comp.recordOptions[field.key] ?? []}
 										placeholder="選択または検索…"
 										required={field.required}
@@ -313,15 +168,15 @@
 	</div>
 
 	<!-- Shared form drawer -->
-	{#if activeEdit}
-		<div class="drawer-backdrop" onclick={closeForm} role="presentation"></div>
+	{#if s.activeEdit}
+		<div class="drawer-backdrop" onclick={s.closeForm} role="presentation"></div>
 		<div class="form-panel">
 			<div class="form-panel-header">
-				<h2>{activeEdit.mode === 'new' ? '新規レコード' : 'レコードを編集'}</h2>
-				<button class="form-close-btn" onclick={closeForm} aria-label="閉じる">×</button>
+				<h2>{s.activeEdit.mode === 'new' ? '新規レコード' : 'レコードを編集'}</h2>
+				<button class="form-close-btn" onclick={s.closeForm} aria-label="閉じる">×</button>
 			</div>
 			<div class="form-panel-body">
-				{#each activeFields as field}
+				{#each s.activeFields as field}
 					<div class="form-row">
 						<label class="form-label" for="field-{field.key}">
 							{field.label}
@@ -329,13 +184,13 @@
 						</label>
 						{#if field.type === 'recordSelect'}
 							<SearchSelect
-								bind:value={activeEdit.formData[field.key]}
-								options={activeRecordOptions[field.key] ?? []}
+								bind:value={s.activeEdit.formData[field.key]}
+								options={s.activeRecordOptions[field.key] ?? []}
 								placeholder="選択または検索…"
 								required={field.required}
 							/>
 						{:else if field.type === 'select'}
-							<select id="field-{field.key}" class="form-select" bind:value={activeEdit.formData[field.key]}>
+							<select id="field-{field.key}" class="form-select" bind:value={s.activeEdit.formData[field.key]}>
 								{#if !field.required}<option value="">— 選択してください —</option>{/if}
 								{#each (field.options ?? []) as opt}
 									<option value={opt.value}>{opt.label}</option>
@@ -345,7 +200,7 @@
 							<textarea
 								id="field-{field.key}"
 								class="form-textarea"
-								bind:value={activeEdit.formData[field.key]}
+								bind:value={s.activeEdit.formData[field.key]}
 								placeholder={field.description || ''}
 								rows="3"
 							></textarea>
@@ -354,7 +209,7 @@
 								id="field-{field.key}"
 								class="form-input"
 								type={field.type === 'number' ? 'number' : field.type === 'date' ? 'date' : field.type === 'email' ? 'email' : field.type === 'tel' ? 'tel' : 'text'}
-								bind:value={activeEdit.formData[field.key]}
+								bind:value={s.activeEdit.formData[field.key]}
 								placeholder={field.description || ''}
 							/>
 						{/if}
@@ -365,16 +220,16 @@
 				{/each}
 			</div>
 			<div class="form-panel-footer">
-				{#if activeEdit.mode === 'edit' && componentData[activeEdit.compIdx]?.component.actions.includes('delete')}
-					<button class="btn-delete" onclick={deleteRecord} disabled={activeEdit.deleting}>
-						{activeEdit.deleting ? '削除中…' : '削除'}
+				{#if s.activeEdit.mode === 'edit' && s.componentData[s.activeEdit.compIdx]?.component.actions.includes('delete')}
+					<button class="btn-delete" onclick={s.deleteRecord} disabled={s.activeEdit.deleting}>
+						{s.activeEdit.deleting ? '削除中…' : '削除'}
 					</button>
 				{/if}
 				<div class="footer-right">
-					{#if activeEdit.saveError}<span class="save-error">{activeEdit.saveError}</span>{/if}
-					<button class="btn-cancel" onclick={closeForm}>キャンセル</button>
-					<button class="btn-save" onclick={saveRecord} disabled={activeEdit.saving}>
-						{activeEdit.saving ? '保存中…' : '保存'}
+					{#if s.activeEdit.saveError}<span class="save-error">{s.activeEdit.saveError}</span>{/if}
+					<button class="btn-cancel" onclick={s.closeForm}>キャンセル</button>
+					<button class="btn-save" onclick={s.saveRecord} disabled={s.activeEdit.saving}>
+						{s.activeEdit.saving ? '保存中…' : '保存'}
 					</button>
 				</div>
 			</div>

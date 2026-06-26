@@ -1,123 +1,12 @@
 <script lang="ts">
-	import { invalidateAll } from '$app/navigation';
-	import { formatJstDateTime } from '$lib/datetime';
+	import { createTableRecordsState } from './index.svelte';
 	import ChevronLeft from '$lib/components/icon/ChevronLeft.svelte';
 	import AppIcon from '$lib/components/AppIcon.svelte';
 	import SearchSelect from '$lib/components/ui/SearchSelect.svelte';
 	import type { PageData } from './$types';
-	import type { FieldDef, RecordRow } from '$lib/server/db/table-service';
 
 	let { data }: { data: PageData } = $props();
-
-	let records = $state<RecordRow[]>(data.records);
-
-	const recordOptions = $derived(data.recordOptions as Record<string, { value: string; label: string }[]>);
-	$effect(() => { records = data.records; });
-
-	const fields = $derived(data.fields as FieldDef[]);
-	const listFields = $derived(fields.filter((f) => f.listable !== false).slice(0, 7));
-
-	// ── Form panel ────────────────────────────────────────────
-	type FormMode = 'new' | 'edit';
-	let formMode = $state<FormMode>('new');
-	let formOpen = $state(false);
-	let formData = $state<Record<string, string>>({});
-	let editingId = $state<string | null>(null);
-	let saving = $state(false);
-	let saveError = $state('');
-	let deleting = $state(false);
-
-	function openNew() {
-		formMode = 'new';
-		editingId = null;
-		saveError = '';
-		const init: Record<string, string> = {};
-		for (const f of fields) {
-			init[f.key] = f.defaultValue ?? '';
-		}
-		formData = init;
-		formOpen = true;
-	}
-
-	function openEdit(row: RecordRow) {
-		formMode = 'edit';
-		editingId = row.id as string;
-		saveError = '';
-		const init: Record<string, string> = {};
-		for (const f of fields) {
-			const v = row[f.key];
-			init[f.key] = v != null ? String(v) : (f.defaultValue ?? '');
-		}
-		formData = init;
-		formOpen = true;
-	}
-
-	function closeForm() {
-		formOpen = false;
-		editingId = null;
-	}
-
-	async function saveRecord() {
-		saving = true;
-		saveError = '';
-		try {
-			const url = formMode === 'new'
-				? `/api/database/${data.app.name}/records`
-				: `/api/database/${data.app.name}/records/${editingId}`;
-			const method = formMode === 'new' ? 'POST' : 'PATCH';
-			const res = await fetch(url, {
-				method,
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify(formData)
-			});
-			if (!res.ok) {
-				const body = (await res.json()) as { error?: string };
-				saveError = body.error ?? '保存に失敗しました';
-				return;
-			}
-			closeForm();
-			await invalidateAll();
-		} finally {
-			saving = false;
-		}
-	}
-
-	async function deleteRecord() {
-		if (!confirm('このレコードを削除しますか？')) return;
-		deleting = true;
-		try {
-			const res = await fetch(`/api/database/${data.app.name}/records/${editingId}`, { method: 'DELETE' });
-			if (res.ok || res.status === 204) {
-				closeForm();
-				await invalidateAll();
-			}
-		} finally {
-			deleting = false;
-		}
-	}
-
-	function formatCell(row: RecordRow, field: FieldDef): string {
-		const val = row[field.key];
-		if (val == null || val === '') return '—';
-		if (field.type === 'recordSelect') {
-			const opts = recordOptions[field.key] ?? [];
-			const opt = opts.find(o => o.value === String(val));
-			return opt ? opt.label : String(val);
-		}
-		if (field.type === 'select') {
-			const opt = (field.options ?? []).find(o => o.value === String(val));
-			return opt ? opt.label : String(val);
-		}
-		if (field.type === 'date' && typeof val === 'number') {
-			return new Date(val * 1000).toLocaleDateString('ja-JP');
-		}
-		return String(val);
-	}
-
-	function formatTs(ts: number | null | undefined): string {
-		if (!ts) return '—';
-		return formatJstDateTime(new Date(ts * 1000));
-	}
+	const s = createTableRecordsState(() => data);
 </script>
 
 <div class="page-layout">
@@ -139,12 +28,12 @@
 					{#if data.account?.permission === 'admin'}
 						<a href="/apps/{data.appId}/tables/{data.app.id}/build" class="btn-secondary">テーブル設定</a>
 					{/if}
-					<button class="btn-primary" onclick={openNew}>+ レコード追加</button>
+					<button class="btn-primary" onclick={s.openNew}>+ レコード追加</button>
 				</div>
 			</div>
 		</div>
 
-		{#if fields.length === 0}
+		{#if s.fields.length === 0}
 			<div class="empty">
 				<p class="empty-title">フィールドが設定されていません</p>
 				{#if data.account?.permission === 'admin'}
@@ -152,36 +41,36 @@
 					<a href="/apps/{data.appId}/tables/{data.app.id}/build" class="btn-primary">テーブル設定を開く</a>
 				{/if}
 			</div>
-		{:else if records.length === 0}
+		{:else if s.records.length === 0}
 			<div class="empty">
 				<p class="empty-title">レコードがまだありません</p>
 				<p class="empty-desc">「レコード追加」からデータを登録してください。</p>
-				<button class="btn-primary" onclick={openNew}>+ レコード追加</button>
+				<button class="btn-primary" onclick={s.openNew}>+ レコード追加</button>
 			</div>
 		{:else}
 			<div class="table-wrap">
 				<table>
 					<thead>
 						<tr>
-							{#each listFields as field}
+							{#each s.listFields as field}
 								<th>{field.label}</th>
 							{/each}
 							<th>登録日時</th>
 						</tr>
 					</thead>
 					<tbody>
-						{#each records as row (row.id)}
+						{#each s.records as row (row.id)}
 							<tr
-								onclick={() => openEdit(row)}
-								class:active={editingId === row.id}
+								onclick={() => s.openEdit(row)}
+								class:active={s.editingId === row.id}
 								role="button"
 								tabindex="0"
-								onkeydown={(e) => { if (e.key === 'Enter') openEdit(row); }}
+								onkeydown={(e) => { if (e.key === 'Enter') s.openEdit(row); }}
 							>
-								{#each listFields as field}
-									<td>{formatCell(row, field)}</td>
+								{#each s.listFields as field}
+									<td>{s.formatCell(row, field)}</td>
 								{/each}
-								<td class="ts">{formatTs(row.createdAt as number)}</td>
+								<td class="ts">{s.formatTs(row.createdAt as number)}</td>
 							</tr>
 						{/each}
 					</tbody>
@@ -191,24 +80,24 @@
 	</div>
 
 	<!-- Drawer backdrop -->
-	{#if formOpen}
+	{#if s.formOpen}
 		<div
 			class="drawer-backdrop"
-			onclick={closeForm}
+			onclick={s.closeForm}
 			role="presentation"
 		></div>
 	{/if}
 
 	<!-- Form panel -->
-	{#if formOpen}
+	{#if s.formOpen}
 		<div class="form-panel">
 			<div class="form-panel-header">
-				<h2>{formMode === 'new' ? '新規レコード' : 'レコードを編集'}</h2>
-				<button class="form-close-btn" onclick={closeForm} aria-label="閉じる">×</button>
+				<h2>{s.formMode === 'new' ? '新規レコード' : 'レコードを編集'}</h2>
+				<button class="form-close-btn" onclick={s.closeForm} aria-label="閉じる">×</button>
 			</div>
 
 			<div class="form-panel-body">
-				{#each fields as field}
+				{#each s.fields as field}
 					<div class="form-row">
 						<label class="form-label" for="field-{field.key}">
 							{field.label}
@@ -217,8 +106,8 @@
 
 						{#if field.type === 'recordSelect'}
 							<SearchSelect
-								bind:value={formData[field.key]}
-								options={recordOptions[field.key] ?? []}
+								bind:value={s.formData[field.key]}
+								options={s.recordOptions[field.key] ?? []}
 								placeholder="選択または検索…"
 								required={field.required}
 							/>
@@ -226,7 +115,7 @@
 							<select
 								id="field-{field.key}"
 								class="form-select"
-								bind:value={formData[field.key]}
+								bind:value={s.formData[field.key]}
 							>
 								{#if !field.required}<option value="">— 選択してください —</option>{/if}
 								{#each (field.options ?? []) as opt}
@@ -237,7 +126,7 @@
 							<textarea
 								id="field-{field.key}"
 								class="form-textarea"
-								bind:value={formData[field.key]}
+								bind:value={s.formData[field.key]}
 								placeholder={field.description || ''}
 								rows="3"
 							></textarea>
@@ -246,7 +135,7 @@
 								id="field-{field.key}"
 								class="form-input"
 								type={field.type === 'number' ? 'number' : field.type === 'date' ? 'date' : field.type === 'email' ? 'email' : field.type === 'tel' ? 'tel' : 'text'}
-								bind:value={formData[field.key]}
+								bind:value={s.formData[field.key]}
 								placeholder={field.description || ''}
 							/>
 						{/if}
@@ -259,16 +148,16 @@
 			</div>
 
 			<div class="form-panel-footer">
-				{#if formMode === 'edit'}
-					<button class="btn-delete" onclick={deleteRecord} disabled={deleting}>
-						{deleting ? '削除中…' : '削除'}
+				{#if s.formMode === 'edit'}
+					<button class="btn-delete" onclick={s.deleteRecord} disabled={s.deleting}>
+						{s.deleting ? '削除中…' : '削除'}
 					</button>
 				{/if}
 				<div class="footer-right">
-					{#if saveError}<span class="save-error">{saveError}</span>{/if}
-					<button class="btn-cancel" onclick={closeForm}>キャンセル</button>
-					<button class="btn-save" onclick={saveRecord} disabled={saving}>
-						{saving ? '保存中…' : '保存'}
+					{#if s.saveError}<span class="save-error">{s.saveError}</span>{/if}
+					<button class="btn-cancel" onclick={s.closeForm}>キャンセル</button>
+					<button class="btn-save" onclick={s.saveRecord} disabled={s.saving}>
+						{s.saving ? '保存中…' : '保存'}
 					</button>
 				</div>
 			</div>
