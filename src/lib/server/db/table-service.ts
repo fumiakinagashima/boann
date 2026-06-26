@@ -3,13 +3,22 @@ import type { BatchItem } from 'drizzle-orm/batch';
 import type { Db } from './index';
 import { apps, appPages, entityTypes, entityFields, entities } from './schema';
 
+export type PageComponentType = 'list' | 'form';
+
+export type PageComponent = {
+	id: string;
+	type: PageComponentType;
+	tableId: string;
+	title?: string | null;
+	fields?: string[] | null;
+	actions: ('create' | 'edit' | 'delete')[];
+};
+
 export type AppPageRow = {
 	id: string;
+	appId: string;
 	label: string;
-	tableId: string | null;
-	tableLabel: string | null;
-	tableName: string | null;
-	viewType: string;
+	components: PageComponent[];
 	sortOrder: number;
 };
 
@@ -324,7 +333,10 @@ export async function createEntityType(db: Db, input: EntityTypeInput): Promise<
 	const pageId = crypto.randomUUID();
 	await db.batch([
 		db.insert(entityTypes).values({ id, name: input.name, label: input.label, icon: input.icon, appId: input.appId }),
-		db.insert(appPages).values({ id: pageId, appId: input.appId, label: input.label, tableId: id, viewType: 'list', sortOrder: 0 }),
+		db.insert(appPages).values({
+			id: pageId, appId: input.appId, label: input.label, sortOrder: 0,
+			components: JSON.stringify([{ id: pageId + '_c1', type: 'list', tableId: id, actions: ['create', 'edit', 'delete'] }] satisfies PageComponent[])
+		}),
 		...input.fields.map((f, i) =>
 			db.insert(entityFields).values({
 				id: crypto.randomUUID(), entityTypeId: id,
@@ -369,35 +381,68 @@ export async function getTablesByAppId(db: Db, appId: string): Promise<{ id: str
 	}));
 }
 
+function parseComponents(raw: string | null | undefined): PageComponent[] {
+	if (!raw) return [];
+	try {
+		const parsed = JSON.parse(raw);
+		return Array.isArray(parsed) ? (parsed as PageComponent[]) : [];
+	} catch {
+		return [];
+	}
+}
+
 export async function getPageById(db: Db, pageId: string): Promise<AppPageRow | null> {
 	const [row] = await db.select({
 		id: appPages.id,
+		appId: appPages.appId,
 		label: appPages.label,
-		tableId: appPages.tableId,
-		viewType: appPages.viewType,
-		sortOrder: appPages.sortOrder,
-		tableLabel: entityTypes.label,
-		tableName: entityTypes.name
-	}).from(appPages)
-		.leftJoin(entityTypes, eq(appPages.tableId, entityTypes.id))
-		.where(eq(appPages.id, pageId));
-	return row ?? null;
+		components: appPages.components,
+		sortOrder: appPages.sortOrder
+	}).from(appPages).where(eq(appPages.id, pageId));
+	if (!row) return null;
+	return { ...row, components: parseComponents(row.components) };
 }
 
 export async function getPagesByAppId(db: Db, appId: string): Promise<AppPageRow[]> {
 	const rows = await db.select({
 		id: appPages.id,
+		appId: appPages.appId,
 		label: appPages.label,
-		tableId: appPages.tableId,
-		viewType: appPages.viewType,
-		sortOrder: appPages.sortOrder,
-		tableLabel: entityTypes.label,
-		tableName: entityTypes.name
-	}).from(appPages)
-		.leftJoin(entityTypes, eq(appPages.tableId, entityTypes.id))
-		.where(eq(appPages.appId, appId))
-		.orderBy(appPages.sortOrder);
-	return rows;
+		components: appPages.components,
+		sortOrder: appPages.sortOrder
+	}).from(appPages).where(eq(appPages.appId, appId)).orderBy(appPages.sortOrder);
+	return rows.map(row => ({ ...row, components: parseComponents(row.components) }));
+}
+
+export type PageInput = {
+	label: string;
+	components: PageComponent[];
+};
+
+export async function createPage(db: Db, appId: string, input: PageInput): Promise<{ id: string }> {
+	const [maxRow] = await db.select({ sortOrder: appPages.sortOrder })
+		.from(appPages).where(eq(appPages.appId, appId))
+		.orderBy(desc(appPages.sortOrder)).limit(1);
+	const sortOrder = (maxRow?.sortOrder ?? -1) + 1;
+	const id = crypto.randomUUID();
+	await db.insert(appPages).values({
+		id, appId, label: input.label,
+		components: JSON.stringify(input.components),
+		sortOrder
+	});
+	return { id };
+}
+
+export async function updatePage(db: Db, pageId: string, input: Partial<PageInput>): Promise<void> {
+	const set: Record<string, unknown> = {};
+	if (input.label !== undefined) set.label = input.label;
+	if (input.components !== undefined) set.components = JSON.stringify(input.components);
+	if (Object.keys(set).length === 0) return;
+	await db.update(appPages).set(set).where(eq(appPages.id, pageId));
+}
+
+export async function deletePage(db: Db, pageId: string): Promise<void> {
+	await db.delete(appPages).where(eq(appPages.id, pageId));
 }
 
 export async function getEntityTypeById(db: Db, id: string): Promise<{ id: string; name: string; label: string; icon: string | null } | null> {

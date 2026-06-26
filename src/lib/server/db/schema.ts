@@ -227,6 +227,7 @@ export const appPages = sqliteTable('app_pages', {
 	label: text('label').notNull(),
 	tableId: text('table_id').references(() => entityTypes.id),
 	viewType: text('view_type').notNull().default('list'),
+	components: text('components').default('[]'),
 	sortOrder: integer('sort_order').notNull().default(0),
 	createdAt: integer('created_at', { mode: 'timestamp' })
 		.notNull()

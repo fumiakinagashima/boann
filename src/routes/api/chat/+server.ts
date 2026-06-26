@@ -44,9 +44,12 @@ export const POST: RequestHandler = async ({ request, platform, locals }) => {
 		return json({ error: 'D1データベースが設定されていません。wrangler dev で起動してください。' }, { status: 500 });
 	}
 
-	const ip = request.headers.get('CF-Connecting-IP') ?? request.headers.get('X-Forwarded-For') ?? 'unknown';
-	const rl = await checkRateLimit(platform.env.KV, 'chat', ip);
-	if (!rl.allowed) return errors.tooManyRequests(rl.retryAfter ?? 60);
+	const ip = request.headers.get('CF-Connecting-IP') ?? request.headers.get('X-Forwarded-For') ?? '';
+	const isLocal = !ip || ip === '127.0.0.1' || ip === '::1';
+	if (!isLocal) {
+		const rl = await checkRateLimit(platform.env.KV, 'chat', ip);
+		if (!rl.allowed) return errors.tooManyRequests(rl.retryAfter ?? 60);
+	}
 
 	if (!mockMode) {
 		const apiKey = platform?.env?.ANTHROPIC_API_KEY ?? env.ANTHROPIC_API_KEY ?? '';

@@ -233,17 +233,21 @@
 			{:else if activeTab === 'pages'}
 				<div class="tab-content">
 					{#each data.pages as page (page.id)}
-						<a
-							href="/apps/{data.app.id}/pages/{page.id}"
-							class="item-row item-row--link"
+						<button
+							class="item-row"
+							onclick={() => goto(`/apps/${data.app.id}/pages/${page.id}`)}
 						>
 							<span class="item-label">{page.label}</span>
-							{#if page.tableLabel && page.tableLabel !== page.label}
-								<span class="item-meta">{page.tableLabel}</span>
+							<span class="item-meta">{page.components.length}コンポーネント</span>
+							{#if data.account?.permission === 'admin'}
+								<a
+									href="/apps/{data.app.id}/pages/{page.id}/build"
+									class="item-action"
+									onclick={(e) => e.stopPropagation()}
+								>設定</a>
 							{/if}
-							<span class="item-badge">{page.viewType}</span>
 							<span class="item-arrow">›</span>
-						</a>
+						</button>
 					{:else}
 						<p class="empty-hint">AIに「ページを追加して」と話しかけるか、仕様書を書いて「AIに設計・作成してもらう」ボタンを使ってください。</p>
 					{/each}

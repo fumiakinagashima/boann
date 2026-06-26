@@ -91,10 +91,10 @@
 				{/if}
 			</div>
 		{/if}
-		<a href="/workflows" class="nav-item" class:active={isUnderPath('/workflows')}>
+		<!--<a href="/workflows" class="nav-item" class:active={isUnderPath('/workflows')}>
 			<span class="nav-icon"><Workflow size={15} /></span>
 			<span>ワークフロー</span>
-		</a>
+		</a>-->
 	</nav>
 
 	<div class="sidebar-footer">

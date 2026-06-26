@@ -2,8 +2,9 @@ import { eq, desc } from 'drizzle-orm';
 import { z } from 'zod';
 import type { Tool } from '@anthropic-ai/sdk/resources/messages';
 import type { Db } from '../db';
-import { entityTypes, entityFields, entities, appPages } from '../db/schema';
-import { createApp, createEntityType, createRecord } from '../db/table-service';
+import { entityTypes, entityFields, entities } from '../db/schema';
+import { createApp, createEntityType, createRecord, createPage } from '../db/table-service';
+import type { PageComponent } from '../db/table-service';
 import { parseJson, now } from './shared';
 
 export const tools: Tool[] = [
@@ -211,23 +212,41 @@ export const tools: Tool[] = [
 	{
 		name: 'create_page',
 		description:
-			'現在編集中のアプリにページを追加する。テーブルとビュータイプを指定して表示画面を定義する。create_table 実行後に追加のビューを作りたい場合に使う。',
+			'現在編集中のアプリにページを追加する。コンポーネント（list: 一覧表示, form: 入力フォーム）を配置して画面を定義する。create_table 実行後に呼ぶ。',
 		input_schema: {
 			type: 'object',
 			properties: {
 				app_id: { type: 'string', description: 'アプリID' },
-				label: { type: 'string', description: 'ページの表示名' },
-				table_id: {
-					type: 'string',
-					description: '表示するテーブルのID（list_entity_types や create_table の結果から取得）'
-				},
-				view_type: {
-					type: 'string',
-					enum: ['list', 'kanban'],
-					description: 'ビュータイプ（list: 一覧, kanban: カンバン）'
+				label: { type: 'string', description: 'ページの表示名（例: 顧客一覧, 顧客登録）' },
+				components: {
+					type: 'array',
+					description: 'ページに配置するコンポーネント一覧',
+					items: {
+						type: 'object',
+						properties: {
+							type: {
+								type: 'string',
+								enum: ['list', 'form'],
+								description: 'list: レコード一覧表示（表・編集可）, form: 新規登録フォーム'
+							},
+							table_id: { type: 'string', description: '対象テーブルのID（create_table の結果の id）' },
+							title: { type: 'string', description: 'コンポーネントのタイトル（省略時はテーブル名）' },
+							fields: {
+								type: 'array',
+								items: { type: 'string' },
+								description: '表示するフィールドキーの一覧（省略時は全フィールド）'
+							},
+							actions: {
+								type: 'array',
+								items: { type: 'string', enum: ['create', 'edit', 'delete'] },
+								description: '使用可能なアクション（デフォルト: 全て）'
+							}
+						},
+						required: ['type', 'table_id']
+					}
 				}
 			},
-			required: ['app_id', 'label', 'view_type']
+			required: ['app_id', 'label', 'components']
 		}
 	}
 ];
@@ -289,11 +308,18 @@ const createTableSchema = z.object({
 	)
 });
 
+const pageComponentInputSchema = z.object({
+	type: z.enum(['list', 'form']),
+	table_id: z.string(),
+	title: z.string().optional(),
+	fields: z.array(z.string()).optional(),
+	actions: z.array(z.enum(['create', 'edit', 'delete'])).optional()
+});
+
 const createPageSchema = z.object({
 	app_id: z.string(),
 	label: z.string().min(1),
-	table_id: z.string().optional(),
-	view_type: z.enum(['list', 'kanban']).default('list')
+	components: z.array(pageComponentInputSchema).min(1)
 });
 
 const createAppFieldSchema = z.object({
@@ -464,21 +490,14 @@ export async function handleCreateTable(db: Db, input: unknown) {
 
 export async function handleCreatePage(db: Db, input: unknown) {
 	const data = createPageSchema.parse(input);
-	const id = crypto.randomUUID();
-	const [maxRow] = await db
-		.select({ sortOrder: appPages.sortOrder })
-		.from(appPages)
-		.where(eq(appPages.appId, data.app_id))
-		.orderBy(desc(appPages.sortOrder))
-		.limit(1);
-	const sortOrder = (maxRow?.sortOrder ?? -1) + 1;
-	await db.insert(appPages).values({
-		id,
-		appId: data.app_id,
-		label: data.label,
-		tableId: data.table_id ?? null,
-		viewType: data.view_type,
-		sortOrder
-	});
-	return { id, label: data.label, viewType: data.view_type, appId: data.app_id };
+	const components: PageComponent[] = data.components.map(c => ({
+		id: crypto.randomUUID(),
+		type: c.type,
+		tableId: c.table_id,
+		title: c.title ?? null,
+		fields: c.fields ?? null,
+		actions: c.actions ?? ['create', 'edit', 'delete']
+	}));
+	const result = await createPage(db, data.app_id, { label: data.label, components });
+	return { id: result.id, label: data.label, appId: data.app_id, componentCount: components.length };
 }
