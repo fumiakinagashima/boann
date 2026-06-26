@@ -1,4 +1,4 @@
-# Midleton
+# Boann
 
 AIファーストなチャットベースの CRM/SFA。ユーザーはチャットで業務指示を出し、Claude AI が MCP ツールを介して動的にフォームやテーブル・チャートなどを生成して操作を完結させる。
 
@@ -37,8 +37,8 @@ AIファーストなチャットベースの CRM/SFA。ユーザーはチャッ�
 ### 1. インストール
 
 ```sh
-git clone https://github.com/your-org/midleton.git
-cd midleton
+git clone https://github.com/your-org/boann.git
+cd boann
 bun install
 ```
 
@@ -64,7 +64,7 @@ MOCK_AI="false"                 # true にするとAPI不要でモックレス�
 D1 ローカルデータベースにマイグレーションを適用する（`.wrangler/state/` にSQLiteが作成される）:
 
 ```sh
-bunx wrangler d1 migrations apply midleton --local
+bunx wrangler d1 migrations apply boann --local
 ```
 
 マイグレーション完了時にテスト用アカウント5件と管理者アカウントが自動で作成される:
@@ -483,7 +483,7 @@ AI がレスポンスとして返す動的UIコンポーネント。システム
 ## ディレクトリ構成
 
 ```
-midleton/
+boann/
 ├── src/
 │   ├── routes/
 │   │   ├── +layout.svelte    # サイドバー・テーマ切り替え

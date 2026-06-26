@@ -4,7 +4,7 @@
 // src/worker.ts (which wraps the generated worker and adds a `scheduled` handler)
 // without the adapter overwriting it on every build.
 {
-	"name": "midleton",
+	"name": "boann",
 	"compatibility_date": "2025-01-01",
 	"compatibility_flags": ["nodejs_compat"],
 	"main": ".svelte-kit/cloudflare/_worker.js",

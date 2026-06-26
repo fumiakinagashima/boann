@@ -125,7 +125,7 @@ export async function sendSmtp(config: SmtpConfig, mail: Mail): Promise<void> {
 	await read();
 
 	// EHLO
-	await write('EHLO midleton.app');
+	await write('EHLO boann.app');
 	await read();
 
 	if (!isSecure) {
@@ -143,7 +143,7 @@ export async function sendSmtp(config: SmtpConfig, mail: Mail): Promise<void> {
 		writer = socket.writable.getWriter();
 		buf.value = '';
 		// Re-EHLO over TLS
-		await write('EHLO midleton.app');
+		await write('EHLO boann.app');
 		await read();
 	}
 

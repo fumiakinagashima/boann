@@ -5,7 +5,7 @@ MOCK_AI="false"
 # Email (set EMAIL_PROVIDER to use: resend | ses | smtp)
 EMAIL_PROVIDER="resend"
 EMAIL_FROM=""
-EMAIL_FROM_NAME="Midleton"
+EMAIL_FROM_NAME="Boann"
 RESEND_API_KEY=""
 # SES_REGION="ap-northeast-1"
 # SES_ACCESS_KEY_ID=""
