@@ -16,6 +16,7 @@ export const POST: RequestHandler = async ({ request, platform, locals }) => {
 			triggerHour?: number;
 			triggerMinute?: number;
 			steps?: WorkflowStep[];
+			appId?: string;
 		};
 		const name = body.name?.trim();
 		if (!name) return json({ error: 'ワークフロー名を入力してください' }, { status: 422 });
@@ -23,13 +24,15 @@ export const POST: RequestHandler = async ({ request, platform, locals }) => {
 		const triggerMinute = body.triggerMinute ?? 0;
 		const steps = body.steps ?? [];
 
-		const [entityTypes, slackIntegrations] = await Promise.all([
-			listEntityTypesForWorkflow(db),
-			listSlackIntegrationsForWorkflow(db)
-		]);
-		const validation = validateWorkflow(triggerHour, triggerMinute, steps, entityTypes, slackIntegrations);
-		if (!validation.ok) {
-			return json({ error: validation.errors.join(' / ') }, { status: 422 });
+		if (steps.length > 0) {
+			const [entityTypes, slackIntegrations] = await Promise.all([
+				listEntityTypesForWorkflow(db),
+				listSlackIntegrationsForWorkflow(db)
+			]);
+			const validation = validateWorkflow(triggerHour, triggerMinute, steps, entityTypes, slackIntegrations);
+			if (!validation.ok) {
+				return json({ error: validation.errors.join(' / ') }, { status: 422 });
+			}
 		}
 
 		const row = await createWorkflow(db, {
@@ -37,7 +40,8 @@ export const POST: RequestHandler = async ({ request, platform, locals }) => {
 			steps,
 			triggerHour,
 			triggerMinute,
-			accountId: locals.account?.id
+			accountId: locals.account?.id,
+			appId: body.appId
 		});
 		return json(row);
 	} catch (e) {

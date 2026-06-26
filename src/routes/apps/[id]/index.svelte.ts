@@ -82,6 +82,40 @@ export function createAppBuilderState(getData: () => PageData) {
 		addingTable = false;
 	}
 
+	// ── Add page ──────────────────────────────────────────────────
+	let addingPage = $state(false);
+
+	async function addPage() {
+		addingPage = true;
+		try {
+			const res = await fetch(`/api/apps/${getData().app.id}/pages`, {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ label: '新しいページ', components: [] })
+			});
+			if (res.ok) await invalidateAll();
+		} finally {
+			addingPage = false;
+		}
+	}
+
+	// ── Add workflow ─────────────────────────────────────────────
+	let addingWorkflow = $state(false);
+
+	async function addWorkflow() {
+		addingWorkflow = true;
+		try {
+			const res = await fetch('/api/workflows', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ name: '新しいワークフロー', appId: getData().app.id })
+			});
+			if (res.ok) await invalidateAll();
+		} finally {
+			addingWorkflow = false;
+		}
+	}
+
 	// ── Resizable split ──────────────────────────────────────────
 	let chatWidth = $state(340);
 	let resizing = $state(false);
@@ -112,8 +146,6 @@ export function createAppBuilderState(getData: () => PageData) {
 		tables: getData().tables.map((t) => ({ id: t.id, name: t.name, label: t.label }))
 	});
 
-	function padTime(n: number) { return String(n).padStart(2, '0'); }
-
 	return {
 		get appLabel() { return appLabel; },
 		set appLabel(v) { appLabel = v; },
@@ -129,6 +161,8 @@ export function createAppBuilderState(getData: () => PageData) {
 		get activeTab() { return activeTab; },
 		set activeTab(v) { activeTab = v; },
 		get addingTable() { return addingTable; },
+		get addingPage() { return addingPage; },
+		get addingWorkflow() { return addingWorkflow; },
 		get chatWidth() { return chatWidth; },
 		get resizing() { return resizing; },
 		get chatContext() { return chatContext; },
@@ -138,7 +172,8 @@ export function createAppBuilderState(getData: () => PageData) {
 		generateFromSpec,
 		clearTrigger,
 		addTable,
+		addPage,
+		addWorkflow,
 		onResizerMouseDown,
-		padTime,
 	};
 }

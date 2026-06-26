@@ -194,6 +194,7 @@ export const workflows = sqliteTable('workflows', {
 	triggerMinute: integer('trigger_minute').notNull(),
 	enabled: integer('enabled', { mode: 'boolean' }).notNull().default(false),
 	accountId: text('account_id'),
+	appId: text('app_id').references(() => apps.id),
 	createdAt: integer('created_at', { mode: 'timestamp' })
 		.notNull()
 		.default(sql`(unixepoch())`),

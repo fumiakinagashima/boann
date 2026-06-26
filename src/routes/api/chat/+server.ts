@@ -58,12 +58,6 @@ export const POST: RequestHandler = async ({ request, platform, locals }) => {
 		}
 	}
 
-	const db = createDb(platform.env.DB);
-	const toolEnv: ToolEnv = {
-		...platform.env,
-		accountId: locals.account?.id,
-		accountName: locals.account?.name
-	};
 	const body = await request.json() as {
 		message?: string;
 		tool?: string;
@@ -76,6 +70,13 @@ export const POST: RequestHandler = async ({ request, platform, locals }) => {
 			spec?: string | null;
 			tables: Array<{ id: string; name: string; label: string }>;
 		};
+	};
+	const db = createDb(platform.env.DB);
+	const toolEnv: ToolEnv = {
+		...platform.env,
+		accountId: locals.account?.id,
+		accountName: locals.account?.name,
+		appId: body.context?.appId
 	};
 
 	// フォーム送信（tool + data）はJSONで返す

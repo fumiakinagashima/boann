@@ -1,4 +1,4 @@
-import { desc, eq, or, isNull } from 'drizzle-orm';
+import { desc, asc, eq, or, isNull } from 'drizzle-orm';
 import { workflows } from './schema';
 import type { Db } from '.';
 import type { WorkflowStep } from '$lib/types/chat';
@@ -11,6 +11,7 @@ export type WorkflowRow = {
 	triggerMinute: number;
 	enabled: boolean;
 	accountId: string | null;
+	appId: string | null;
 	createdAt: Date;
 	updatedAt: Date;
 };
@@ -24,6 +25,7 @@ function toRow(r: typeof workflows.$inferSelect): WorkflowRow {
 		triggerMinute: r.triggerMinute,
 		enabled: r.enabled,
 		accountId: r.accountId,
+		appId: r.appId ?? null,
 		createdAt: r.createdAt,
 		updatedAt: r.updatedAt
 	};
@@ -37,6 +39,7 @@ export async function createWorkflow(
 		triggerHour: number;
 		triggerMinute: number;
 		accountId?: string;
+		appId?: string;
 	}
 ): Promise<WorkflowRow> {
 	const id = crypto.randomUUID();
@@ -49,6 +52,7 @@ export async function createWorkflow(
 		triggerMinute: input.triggerMinute,
 		enabled: false,
 		accountId: input.accountId ?? null,
+		appId: input.appId ?? null,
 		createdAt: now,
 		updatedAt: now
 	});
@@ -64,6 +68,15 @@ export async function listWorkflows(db: Db, accountId?: string): Promise<Workflo
 				.where(or(eq(workflows.accountId, accountId), isNull(workflows.accountId)))
 				.orderBy(desc(workflows.createdAt))
 		: await db.select().from(workflows).orderBy(desc(workflows.createdAt));
+	return rows.map(toRow);
+}
+
+export async function listWorkflowsByAppId(db: Db, appId: string): Promise<WorkflowRow[]> {
+	const rows = await db
+		.select()
+		.from(workflows)
+		.where(eq(workflows.appId, appId))
+		.orderBy(asc(workflows.createdAt));
 	return rows.map(toRow);
 }
 

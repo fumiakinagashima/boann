@@ -25,9 +25,7 @@
 					<h1>{data.app.label}</h1>
 				</div>
 				<div class="header-actions">
-					{#if data.account?.permission === 'admin'}
-						<a href="/apps/{data.appId}/tables/{data.app.id}/build" class="btn-secondary">テーブル設定</a>
-					{/if}
+					<a href="/apps/{data.appId}/tables/{data.app.id}/build" class="btn-secondary">テーブル設定</a>
 					<button class="btn-primary" onclick={s.openNew}>+ レコード追加</button>
 				</div>
 			</div>
@@ -36,10 +34,8 @@
 		{#if s.fields.length === 0}
 			<div class="empty">
 				<p class="empty-title">フィールドが設定されていません</p>
-				{#if data.account?.permission === 'admin'}
-					<p class="empty-desc">テーブル設定でフィールドを追加してください。</p>
-					<a href="/apps/{data.appId}/tables/{data.app.id}/build" class="btn-primary">テーブル設定を開く</a>
-				{/if}
+				<p class="empty-desc">テーブル設定でフィールドを追加してください。</p>
+				<a href="/apps/{data.appId}/tables/{data.app.id}/build" class="btn-primary">テーブル設定を開く</a>
 			</div>
 		{:else if s.records.length === 0}
 			<div class="empty">

@@ -1,10 +1,9 @@
-import { error, redirect } from '@sveltejs/kit';
+import { error } from '@sveltejs/kit';
 import type { PageServerLoad } from './$types';
 import { createDb } from '$lib/server/db';
 import { getEntityTypeById, getFieldsByEntityTypeId, listEntityTypesSimple } from '$lib/server/db/table-service';
 
-export const load: PageServerLoad = async ({ params, platform, locals }) => {
-	if (locals.account?.permission !== 'admin') redirect(303, `/apps/${params.id}/tables/${params.tableId}`);
+export const load: PageServerLoad = async ({ params, platform }) => {
 	if (!platform?.env?.DB) error(500);
 	const db = createDb(platform.env.DB);
 	const [app, allApps] = await Promise.all([

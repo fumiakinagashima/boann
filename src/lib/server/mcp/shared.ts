@@ -6,6 +6,7 @@ export type ToolEnv = EmailEnv & {
 	KV?: KVNamespace;
 	accountId?: string;
 	accountName?: string;
+	appId?: string;
 };
 
 export function parseJson(s: string | null | undefined): Record<string, unknown> {

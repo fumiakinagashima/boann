@@ -2,7 +2,7 @@ import { z } from 'zod';
 import type { Tool } from '@anthropic-ai/sdk/resources/messages';
 import type { Db } from '../db';
 import type { ToolEnv } from './shared';
-import { createWorkflow, updateWorkflow, listWorkflows, getWorkflow, type WorkflowRow } from '../db/workflow-service';
+import { createWorkflow, updateWorkflow, listWorkflows, listWorkflowsByAppId, getWorkflow, type WorkflowRow } from '../db/workflow-service';
 import { listEntityTypesForWorkflow } from '../db/table-service';
 import { listSlackIntegrationsForWorkflow } from '../slack';
 import { validateWorkflow } from '$lib/workflow-validation';
@@ -109,7 +109,8 @@ export async function handleSaveWorkflow(db: Db, input: unknown, env?: ToolEnv) 
 		steps,
 		triggerHour,
 		triggerMinute,
-		accountId: env?.accountId
+		accountId: env?.accountId,
+		appId: env?.appId
 	});
 	return {
 		id: workflow.id,
@@ -120,7 +121,9 @@ export async function handleSaveWorkflow(db: Db, input: unknown, env?: ToolEnv) 
 }
 
 export async function handleListWorkflows(db: Db, env?: ToolEnv) {
-	const rows = await listWorkflows(db, env?.accountId);
+	const rows = env?.appId
+		? await listWorkflowsByAppId(db, env.appId)
+		: await listWorkflows(db, env?.accountId);
 	if (rows.length === 0) {
 		return { workflows: [], message: '保存済みのワークフローはありません。' };
 	}

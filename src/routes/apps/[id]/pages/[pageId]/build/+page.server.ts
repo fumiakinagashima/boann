@@ -9,9 +9,8 @@ import {
 } from '$lib/server/db/table-service';
 import type { FieldDef } from '$lib/server/db/table-service';
 
-export const load: PageServerLoad = async ({ params, platform, locals }) => {
+export const load: PageServerLoad = async ({ params, platform }) => {
 	if (!platform?.env?.DB) error(500);
-	if (locals.account?.permission !== 'admin') error(403);
 	const db = createDb(platform.env.DB);
 
 	const [page, app, tables] = await Promise.all([

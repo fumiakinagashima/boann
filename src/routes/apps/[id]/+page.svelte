@@ -8,8 +8,6 @@
 
 	let { data }: { data: PageData } = $props();
 	const s = createAppBuilderState(() => data);
-
-	function padTime(n: number) { return String(n).padStart(2, '0'); }
 </script>
 
 <div class="builder-layout" style="grid-template-columns: 1fr 5px {s.chatWidth}px" class:resizing={s.resizing}>
@@ -18,45 +16,36 @@
 		<div class="panel-header">
 			<div class="header-top">
 				<a href="/" class="back-link"><ChevronLeft size={15} />アプリ一覧</a>
-				{#if data.account?.permission === 'admin'}
-					<div class="header-actions">
-						{#if s.saved}<span class="saved-msg">✓ 保存しました</span>{/if}
-						<button class="btn-danger-ghost" onclick={s.deleteApp} disabled={s.deleting}>削除</button>
-						<button class="btn-save" onclick={s.save} disabled={s.saving || !s.dirty}>
-							{s.saving ? '保存中…' : '保存'}
-						</button>
-					</div>
-				{/if}
+				<div class="header-actions">
+					{#if s.saved}<span class="saved-msg">✓ 保存しました</span>{/if}
+					<button class="btn-danger-ghost" onclick={s.deleteApp} disabled={s.deleting}>削除</button>
+					<button class="btn-save" onclick={s.save} disabled={s.saving || !s.dirty}>
+						{s.saving ? '保存中…' : '保存'}
+					</button>
+				</div>
 			</div>
-			{#if data.account?.permission === 'admin'}
-				<div class="app-meta-edit">
-					<div class="icon-grid">
-						{#each ICON_OPTIONS as opt (opt.name)}
-							<button
-								type="button"
-								class="icon-opt"
-								class:selected={s.appIcon === opt.name}
-								onclick={() => { s.appIcon = opt.name; s.markDirty(); }}
-								title={opt.name}
-							><AppIcon icon={opt.name} size={15} /></button>
-						{/each}
-					</div>
-					<div class="app-name-row">
-						<input
-							class="app-name-input"
-							type="text"
-							bind:value={s.appLabel}
-							oninput={s.markDirty}
-							placeholder="アプリ名"
-						/>
-					</div>
+			<div class="app-meta-edit">
+				<div class="icon-grid">
+					{#each ICON_OPTIONS as opt (opt.name)}
+						<button
+							type="button"
+							class="icon-opt"
+							class:selected={s.appIcon === opt.name}
+							onclick={() => { s.appIcon = opt.name; s.markDirty(); }}
+							title={opt.name}
+						><AppIcon icon={opt.name} size={15} /></button>
+					{/each}
 				</div>
-			{:else}
-				<div class="app-title-row">
-					<span class="app-icon"><AppIcon icon={data.app.icon} size={20} /></span>
-					<h1>{data.app.label}</h1>
+				<div class="app-name-row">
+					<input
+						class="app-name-input"
+						type="text"
+						bind:value={s.appLabel}
+						oninput={s.markDirty}
+						placeholder="アプリ名"
+					/>
 				</div>
-			{/if}
+			</div>
 		</div>
 
 		<div class="panel-body">
@@ -91,71 +80,71 @@
 			{#if s.activeTab === 'tables'}
 				<div class="tab-content">
 					{#each data.tables as table (table.id)}
-						<button
-							class="item-row"
-							onclick={() => goto(`/apps/${data.app.id}/tables/${table.id}`)}
-						>
-							<span class="item-label">{table.label}</span>
-							<span class="item-meta">{table.recordCount} 件</span>
-							{#if data.account?.permission === 'admin'}
-								<a
-									href="/apps/{data.app.id}/tables/{table.id}/build"
-									class="item-action"
-									onclick={(e) => e.stopPropagation()}
-								>設定</a>
-							{/if}
-							<span class="item-arrow">›</span>
-						</button>
+						<div class="item-row">
+							<p class="item-label">{table.label}</p>
+							<div class="item-footer">
+							<a
+								href="/apps/{data.app.id}/tables/{table.id}/build"
+								class="item-action"
+							>テーブル設定</a>
+							<a
+								class="item-action"
+								href={`/apps/${data.app.id}/tables/${table.id}`}
+							>データ管理</a>
+							</div>
+						</div>
 					{:else}
 						<p class="empty-hint">AIに「テーブルを追加して」と話しかけるか、手動で追加できます。</p>
 					{/each}
-					{#if data.account?.permission === 'admin'}
-						<button class="btn-add-table" onclick={s.addTable} disabled={s.addingTable}>
-							{s.addingTable ? '作成中…' : '+ テーブルを追加'}
-						</button>
-					{/if}
+					<button class="btn-add-table" onclick={s.addTable} disabled={s.addingTable}>
+						{s.addingTable ? '作成中…' : '+ テーブルを追加'}
+					</button>
 				</div>
 
 			<!-- Tab: Pages -->
 			{:else if s.activeTab === 'pages'}
 				<div class="tab-content">
 					{#each data.pages as page (page.id)}
-						<button
-							class="item-row"
-							onclick={() => goto(`/apps/${data.app.id}/pages/${page.id}`)}
-						>
-							<span class="item-label">{page.label}</span>
-							<span class="item-meta">{page.components.length}コンポーネント</span>
-							{#if data.account?.permission === 'admin'}
-								<a
-									href="/apps/{data.app.id}/pages/{page.id}/build"
-									class="item-action"
-									onclick={(e) => e.stopPropagation()}
-								>設定</a>
-							{/if}
-							<span class="item-arrow">›</span>
-						</button>
+						<div class="item-row">
+							<p class="item-label">{page.label}</p>
+							<div class="item-footer">
+							<a
+								href="/apps/{data.app.id}/pages/{page.id}/build"
+								class="item-action"
+							>ページ設定</a>
+							<a
+								class="item-action"
+								href={`/apps/${data.app.id}/pages/${page.id}`}
+							>ページ表示</a>
+							</div>
+						</div>
 					{:else}
 						<p class="empty-hint">AIに「ページを追加して」と話しかけるか、仕様書を書いて「AIに設計・作成してもらう」ボタンを使ってください。</p>
 					{/each}
+					<button class="btn-add-table" onclick={s.addPage} disabled={s.addingPage}>
+						{s.addingPage ? '作成中…' : '+ ページを追加'}
+					</button>
 				</div>
 
 			<!-- Tab: Workflows -->
 			{:else if s.activeTab === 'workflows'}
 				<div class="tab-content">
 					{#each data.workflows as wf (wf.id)}
-						<div class="item-row item-row--static">
-							<span class="item-icon">{wf.enabled ? '🟢' : '⚪'}</span>
-							<span class="item-label">{wf.name}</span>
-							<span class="item-meta">{padTime(wf.triggerHour)}:{padTime(wf.triggerMinute)}</span>
-							<span class="item-badge">{wf.steps.length} ステップ</span>
+						<div class="item-row">
+							<p class="item-label">{wf.name}</p>
+							<div class="item-footer">
+								<a
+									href="/apps/{data.app.id}/workflows/{wf.id}/build"
+									class="item-action"
+								>ワークフロー設定</a>
+							</div>
 						</div>
 					{:else}
 						<p class="empty-hint">AIに「ワークフローを作って」と話しかけてください。</p>
 					{/each}
-					{#if data.workflows.length > 0}
-						<a href="/workflows" class="link-more">ワークフロー設定を開く →</a>
-					{/if}
+					<button class="btn-add-table" onclick={s.addWorkflow} disabled={s.addingWorkflow}>
+						{s.addingWorkflow ? '作成中…' : '+ ワークフローを追加'}
+					</button>
 				</div>
 			{/if}
 		</div>
@@ -297,31 +286,6 @@
 		&:hover { color: var(--color-text); }
 	}
 
-	.app-title-row {
-		display: flex;
-		align-items: center;
-		gap: 10px;
-	}
-
-	.app-icon {
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		width: 32px;
-		height: 32px;
-		border-radius: 8px;
-		background: color-mix(in srgb, var(--color-primary) 8%, var(--color-background));
-		color: var(--color-primary);
-		flex-shrink: 0;
-	}
-
-	h1 {
-		font-size: 1.125rem;
-		font-weight: 700;
-		color: var(--color-text);
-		margin: 0;
-	}
-
 	.panel-body {
 		flex: 1;
 		overflow-y: auto;
@@ -445,15 +409,13 @@
 
 	/* ── Tab content rows ────────────────────────────────────── */
 	.tab-content {
-		display: flex;
-		flex-direction: column;
-		gap: 4px;
+		display: grid;
+		grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+		gap: 12px;
 		padding-top: 12px;
 	}
 
 	.item-row {
-		display: flex;
-		align-items: center;
 		gap: 10px;
 		padding: 10px 12px;
 		border-radius: 8px;
@@ -462,43 +424,27 @@
 		font-size: 0.875rem;
 		font-family: inherit;
 		color: var(--color-text);
-		cursor: pointer;
 		text-align: left;
 		width: 100%;
-		transition: border-color 0.15s;
 
-		&:hover { border-color: var(--color-primary); }
-
-		&--static {
-			cursor: default;
-			&:hover { border-color: var(--color-border); }
+	}
+	
+	.item-label { flex: 1; font-weight: 600; }
+	.item-footer {
+		display: flex;
+		gap: 8px;
+		margin-top: 4px;
+		& .item-action {
+			font-size: 0.8125rem;
+			color: var(--color-primary);
+			text-decoration: none;
+			font-weight: 600;
+			&:hover {
+				opacity: 0.9;
+				text-decoration: underline;
+			}
 		}
 	}
-
-	.item-label { flex: 1; font-weight: 500; }
-	.item-meta { font-size: 0.8125rem; color: var(--color-text-muted); }
-
-	.item-badge {
-		font-size: 0.75rem;
-		padding: 2px 8px;
-		border-radius: 999px;
-		background: color-mix(in srgb, var(--color-primary) 10%, transparent);
-		color: var(--color-primary);
-	}
-
-	.item-action {
-		font-size: 0.8125rem;
-		color: var(--color-primary);
-		text-decoration: none;
-		padding: 2px 6px;
-		border-radius: 4px;
-		transition: background 0.1s;
-
-		&:hover { background: color-mix(in srgb, var(--color-primary) 10%, transparent); }
-	}
-
-	.item-arrow { font-size: 1rem; color: var(--color-text-muted); }
-
 	.empty-hint {
 		font-size: 0.875rem;
 		color: var(--color-text-muted);
@@ -524,13 +470,6 @@
 		&:disabled { opacity: 0.45; cursor: not-allowed; }
 	}
 
-	.link-more {
-		font-size: 0.875rem;
-		color: var(--color-primary);
-		text-decoration: none;
-		padding: 4px 2px;
-		&:hover { text-decoration: underline; }
-	}
 
 	/* ── Right chat column ───────────────────────────────────── */
 	.chat-col {
