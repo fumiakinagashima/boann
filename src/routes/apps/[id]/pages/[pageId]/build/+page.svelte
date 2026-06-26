@@ -5,6 +5,10 @@
 
 	let { data }: { data: PageData } = $props();
 	const s = createPageBuildState(() => data);
+
+	function confirmDeletePage(e: SubmitEvent) {
+		if (!confirm('このページを削除しますか？')) e.preventDefault();
+	}
 </script>
 
 <div class="build-page">
@@ -23,7 +27,9 @@
 			</div>
 			<div class="header-actions">
 				{#if s.saved}<span class="saved-msg">✓ 保存しました</span>{/if}
-				<button class="btn-danger-ghost" onclick={s.deletePage} disabled={s.deleting}>削除</button>
+				<form method="POST" action="?/delete" onsubmit={confirmDeletePage} class="delete-form">
+					<button type="submit" class="btn-danger-ghost">削除</button>
+				</form>
 				<a href="/apps/{data.app.id}/pages/{data.page.id}" class="btn-secondary">プレビュー</a>
 				<button class="btn-primary" onclick={s.save} disabled={s.saving || !s.dirty}>
 					{s.saving ? '保存中…' : '保存'}
@@ -591,6 +597,8 @@
 		transition: background 0.15s;
 		&:hover { background: var(--color-border); }
 	}
+
+	.delete-form { display: contents; }
 
 	.btn-danger-ghost {
 		padding: 7px 14px;

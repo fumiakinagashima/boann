@@ -1,4 +1,4 @@
-import { goto, invalidateAll } from '$app/navigation';
+import { invalidateAll } from '$app/navigation';
 import { tick, untrack } from 'svelte';
 import type { PageData } from './$types';
 
@@ -60,18 +60,6 @@ export function createTableBuildState(getData: () => PageData) {
 		}
 	}
 
-	let deletingApp = $state(false);
-
-	async function deleteApp() {
-		if (!confirm(`テーブル「${getData().app.label}」を削除しますか？\n全てのレコードも削除されます。`)) return;
-		deletingApp = true;
-		const res = await fetch(`/api/database/tables/${getData().app.name}`, { method: 'DELETE' });
-		if (res.ok || res.status === 204) {
-			goto('/');
-		} else {
-			deletingApp = false;
-		}
-	}
 
 	// ── Fields ───────────────────────────────────────────────────
 	function fromServerFields(): FieldRow[] {
@@ -272,7 +260,6 @@ export function createTableBuildState(getData: () => PageData) {
 		set appLabel(v) { appLabel = v; },
 		get savingMeta() { return savingMeta; },
 		get metaSaved() { return metaSaved; },
-		get deletingApp() { return deletingApp; },
 		get rows() { return rows; },
 		get dirty() { return dirty; },
 		get saving() { return saving; },
@@ -288,7 +275,6 @@ export function createTableBuildState(getData: () => PageData) {
 		get chatWidth() { return chatWidth; },
 		get resizing() { return resizing; },
 		saveMeta,
-		deleteApp,
 		addField,
 		removeField,
 		onLabelInput,

@@ -1,11 +1,12 @@
-import { error } from '@sveltejs/kit';
-import type { PageServerLoad } from './$types';
+import { error, redirect } from '@sveltejs/kit';
+import type { PageServerLoad, Actions } from './$types';
 import { createDb } from '$lib/server/db';
 import {
 	getPageById,
 	getAppById,
 	getTablesByAppId,
-	getFieldsByEntityTypeId
+	getFieldsByEntityTypeId,
+	deletePage
 } from '$lib/server/db/table-service';
 import type { FieldDef } from '$lib/server/db/table-service';
 
@@ -27,4 +28,13 @@ export const load: PageServerLoad = async ({ params, platform }) => {
 	}));
 
 	return { page, app, tables, tableFields };
+};
+
+export const actions: Actions = {
+	delete: async ({ params, platform }) => {
+		if (!platform?.env?.DB) error(500);
+		const db = createDb(platform.env.DB);
+		await deletePage(db, params.pageId);
+		redirect(303, `/apps/${params.id}`);
+	}
 };

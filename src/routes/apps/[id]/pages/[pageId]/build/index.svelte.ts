@@ -1,4 +1,4 @@
-import { goto, invalidateAll } from '$app/navigation';
+import { invalidateAll } from '$app/navigation';
 import type { PageComponent, FieldDef } from '$lib/server/db/table-service';
 import type { PageData } from './$types';
 
@@ -12,7 +12,6 @@ export function createPageBuildState(getData: () => PageData) {
 	let dirty = $state(false);
 	let saving = $state(false);
 	let saved = $state(false);
-	let deleting = $state(false);
 	let settingIndex = $state(false);
 
 	const isIndexPage = $derived(getData().app.indexPageId === getData().page.id);
@@ -64,19 +63,6 @@ export function createPageBuildState(getData: () => PageData) {
 		}
 	}
 
-	// ── Delete page ──────────────────────────────────────────────
-	async function deletePage() {
-		if (!confirm('このページを削除しますか？')) return;
-		deleting = true;
-		try {
-			const res = await fetch(`/api/apps/${getData().app.id}/pages/${getData().page.id}`, { method: 'DELETE' });
-			if (res.ok || res.status === 204) {
-				goto(`/apps/${getData().app.id}`);
-			}
-		} finally {
-			deleting = false;
-		}
-	}
 
 	// ── Components ───────────────────────────────────────────────
 	function addComponent() {
@@ -181,13 +167,11 @@ export function createPageBuildState(getData: () => PageData) {
 		get dirty() { return dirty; },
 		get saving() { return saving; },
 		get saved() { return saved; },
-		get deleting() { return deleting; },
 		get isIndexPage() { return isIndexPage; },
 		get settingIndex() { return settingIndex; },
 		setAsIndexPage,
 		markDirty,
 		save,
-		deletePage,
 		addComponent,
 		removeComponent,
 		toggleExpand,

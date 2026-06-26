@@ -4,10 +4,16 @@
 	import ChevronLeft from '$lib/components/icon/ChevronLeft.svelte';
 	import GripVertical from '$lib/components/icon/GripVertical.svelte';
 	import ChatPanel from '$lib/components/chat/ChatPanel.svelte';
-	import type { PageData } from './$types';
+	import type { PageData, ActionData } from './$types';
 
-	let { data }: { data: PageData } = $props();
+	let { data, form }: { data: PageData; form: ActionData } = $props();
 	const s = createTableBuildState(() => data);
+
+	function confirmDeleteTable(e: SubmitEvent) {
+		if (!confirm(`テーブル「${data.app.label}」を削除しますか？\n全てのレコードも削除されます。`)) {
+			e.preventDefault();
+		}
+	}
 </script>
 
 <div class="build-layout" style="grid-template-columns: 1fr 5px {s.chatWidth}px" class:resizing={s.resizing}>
@@ -18,6 +24,15 @@
 				<ChevronLeft size={15} />
 				{data.app.label}
 			</a>
+			<div class="meta-actions">
+				<form method="POST" action="?/delete" onsubmit={confirmDeleteTable} class="delete-form">
+					<button type="submit" class="btn-danger-sm" title="テーブルを削除">削除</button>
+				</form>
+				<button class="btn-save-meta" onclick={s.saveMeta} disabled={s.savingMeta || !s.appLabel.trim()}>
+					{s.savingMeta ? '…' : '保存'}
+				</button>
+				{#if s.metaSaved}<span class="saved-msg">✓</span>{/if}				
+			</div>
 		</div>
 
 		<div class="panel-body">
@@ -34,16 +49,9 @@
 						/>
 						<span class="meta-name-hint">{data.app.name}</span>
 					</div>
-					<div class="meta-actions">
-						<button class="btn-save-meta" onclick={s.saveMeta} disabled={s.savingMeta || !s.appLabel.trim()}>
-							{s.savingMeta ? '…' : '保存'}
-						</button>
-						{#if s.metaSaved}<span class="saved-msg">✓</span>{/if}
-						<button class="btn-danger-sm" onclick={s.deleteApp} disabled={s.deletingApp} title="テーブルを削除">
-							削除
-						</button>
-					</div>
+					
 				</div>
+				{#if form?.message}<p class="delete-error">{form.message}</p>{/if}
 			</section>
 
 			<!-- Fields -->
@@ -378,6 +386,8 @@
 
 	.panel-header {
 		padding: 16px 24px 0;
+		display: flex;
+		justify-content: space-between;
 	}
 
 	.back-link {
@@ -474,6 +484,8 @@
 		color: var(--color-text-muted);
 	}
 
+	.delete-form { display: contents; }
+
 	.btn-danger-sm {
 		padding: 5px 12px;
 		border-radius: 6px;
@@ -485,6 +497,12 @@
 		transition: border-color 0.15s, color 0.15s;
 		&:hover { border-color: var(--color-danger); color: var(--color-danger); }
 		&:disabled { opacity: 0.4; cursor: not-allowed; }
+	}
+
+	.delete-error {
+		margin: 8px 0 0;
+		font-size: 0.8125rem;
+		color: var(--color-danger, var(--color-error));
 	}
 
 	/* ── Fields ─────────────────────────────── */
