@@ -9,32 +9,10 @@ import { createDb } from '$lib/server/db';
 import { dispatchTool, type ToolEnv } from '$lib/server/mcp';
 import { checkRateLimit } from '$lib/server/rate-limit';
 import { errors } from '$lib/server/errors';
-import type { Message, MessageContent, ValueItem } from '$lib/types/chat';
+import type { Message, MessageContent } from '$lib/types/chat';
 
 function sse(event: StreamEvent): string {
 	return `data: ${JSON.stringify(event)}\n\n`;
-}
-
-const CUSTOMER_VALUE_FIELDS = [
-	{ key: 'name', label: '会社名' },
-	{ key: 'email', label: 'メールアドレス' },
-	{ key: 'phone', label: '電話番号' },
-	{ key: 'address', label: '住所' },
-	{ key: 'website', label: 'ホームページ' },
-	{ key: 'notes', label: '備考' }
-];
-
-const CONTACT_VALUE_FIELDS = [
-	{ key: 'name', label: '氏名' },
-	{ key: 'nameKana', label: '氏名（カナ）' },
-	{ key: 'role', label: '役職' },
-	{ key: 'department', label: '部署' }
-];
-
-function valueItems(obj: Record<string, unknown>, fields: { key: string; label: string }[]): ValueItem[] {
-	return fields
-		.filter((f) => obj[f.key] != null && obj[f.key] !== '')
-		.map((f) => ({ label: f.label, value: obj[f.key] as string, format: 'text' as const }));
 }
 
 export const POST: RequestHandler = async ({ request, platform, locals }) => {
@@ -83,28 +61,6 @@ export const POST: RequestHandler = async ({ request, platform, locals }) => {
 	if (body.tool && body.data) {
 		try {
 			const result = await dispatchTool(db, body.tool as never, body.data, toolEnv, platform.ctx);
-
-			if (body.tool === 'create_customer_with_contact') {
-				const { customer, contact } = result as {
-					customer: Record<string, unknown>;
-					contact: Record<string, unknown>;
-				};
-				const contents: MessageContent[] = [
-					{ type: 'text', text: '顧客と担当者を登録しました。' },
-					{ type: 'values', title: '顧客情報', items: valueItems(customer, CUSTOMER_VALUE_FIELDS) },
-					{ type: 'values', title: '担当者情報', items: valueItems(contact, CONTACT_VALUE_FIELDS) }
-				];
-				return json({ contents });
-			}
-
-			if (body.tool === 'create_contact') {
-				const contact = result as Record<string, unknown>;
-				const contents: MessageContent[] = [
-					{ type: 'text', text: '担当者を登録しました。' },
-					{ type: 'values', title: '担当者情報', items: valueItems(contact, CONTACT_VALUE_FIELDS) }
-				];
-				return json({ contents });
-			}
 
 			if (body.tool === 'create_reminder') {
 				const reminder = result as { remindAt: Date; content: string; channelLabels: string[] };
