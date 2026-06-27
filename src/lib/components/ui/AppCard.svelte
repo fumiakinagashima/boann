@@ -28,8 +28,8 @@
 	</div>
 	<div class="card-footer">
 		<a href={`/apps/${app.id}`} class="settings-link">アプリ設定</a>
-		{#if app.indexPageId}
-			<a href={`/apps/${app.id}/pages/${app.indexPageId}`}>画面表示</a>
+		{#if app.firstPageId}
+			<a href={`/apps/${app.id}/pages/${app.firstPageId}`}>画面表示</a>
 		{/if}
 	</div>
 </div>

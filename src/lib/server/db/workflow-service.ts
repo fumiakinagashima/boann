@@ -1,4 +1,5 @@
-import { desc, asc, eq, or, isNull } from 'drizzle-orm';
+import { asc, eq, or, isNull, desc } from 'drizzle-orm';
+import type { BatchItem } from 'drizzle-orm/batch';
 import { workflows } from './schema';
 import type { Db } from '.';
 import type { WorkflowStep } from '$lib/types/chat';
@@ -44,6 +45,15 @@ export async function createWorkflow(
 ): Promise<WorkflowRow> {
 	const id = crypto.randomUUID();
 	const now = new Date();
+	// app 内の末尾に追加する
+	const appId = input.appId ?? null;
+	const [maxRow] = await db
+		.select({ s: workflows.sortOrder })
+		.from(workflows)
+		.where(appId === null ? isNull(workflows.appId) : eq(workflows.appId, appId))
+		.orderBy(desc(workflows.sortOrder))
+		.limit(1);
+	const sortOrder = (maxRow?.s ?? -1) + 1;
 	await db.insert(workflows).values({
 		id,
 		name: input.name,
@@ -52,7 +62,8 @@ export async function createWorkflow(
 		triggerMinute: input.triggerMinute,
 		enabled: false,
 		accountId: input.accountId ?? null,
-		appId: input.appId ?? null,
+		appId,
+		sortOrder,
 		createdAt: now,
 		updatedAt: now
 	});
@@ -76,8 +87,17 @@ export async function listWorkflowsByAppId(db: Db, appId: string): Promise<Workf
 		.select()
 		.from(workflows)
 		.where(eq(workflows.appId, appId))
-		.orderBy(asc(workflows.createdAt));
+		.orderBy(asc(workflows.sortOrder));
 	return rows.map(toRow);
+}
+
+// アプリ設定のワークフロータブ: ドラッグ&ドロップ後の並び順を sortOrder に反映する。
+export async function reorderWorkflows(db: Db, appId: string, orderedIds: string[]): Promise<void> {
+	if (orderedIds.length === 0) return;
+	const queries: BatchItem<'sqlite'>[] = orderedIds.map((id, i) =>
+		db.update(workflows).set({ sortOrder: i }).where(eq(workflows.id, id))
+	);
+	await db.batch(queries as [BatchItem<'sqlite'>, ...BatchItem<'sqlite'>[]]);
 }
 
 export async function getWorkflow(db: Db, id: string): Promise<WorkflowRow | null> {

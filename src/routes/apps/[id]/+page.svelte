@@ -79,9 +79,21 @@
 			<!-- Tab: Tables -->
 			{#if s.activeTab === 'tables'}
 				<div class="tab-content">
-					{#each data.tables as table (table.id)}
-						<div class="item-row">
-							<p class="item-label">{table.label}</p>
+					{#each s.tables as table (table.id)}
+						<div
+							class="item-row"
+							class:drag-over={s.dragOverId === table.id}
+							draggable="true"
+							role="listitem"
+							ondragstart={(e) => s.onDragStart('tables', table.id, e)}
+							ondragover={(e) => s.onDragOver('tables', table.id, e)}
+							ondrop={(e) => s.onDrop('tables', table.id, e)}
+							ondragend={s.onDragEnd}
+						>
+							<div class="item-head">
+								<span class="drag-handle" aria-hidden="true">⠿</span>
+								<p class="item-label">{table.label}</p>
+							</div>
 							<div class="item-footer">
 							<a
 								href="/apps/{data.app.id}/tables/{table.id}/build"
@@ -102,9 +114,21 @@
 			<!-- Tab: Pages -->
 			{:else if s.activeTab === 'pages'}
 				<div class="tab-content">
-					{#each data.pages as pg (pg.id)}
-						<div class="item-row">
-							<p class="item-label">{pg.label}</p>
+					{#each s.pages as pg (pg.id)}
+						<div
+							class="item-row"
+							class:drag-over={s.dragOverId === pg.id}
+							draggable="true"
+							role="listitem"
+							ondragstart={(e) => s.onDragStart('pages', pg.id, e)}
+							ondragover={(e) => s.onDragOver('pages', pg.id, e)}
+							ondrop={(e) => s.onDrop('pages', pg.id, e)}
+							ondragend={s.onDragEnd}
+						>
+							<div class="item-head">
+								<span class="drag-handle" aria-hidden="true">⠿</span>
+								<p class="item-label">{pg.label}</p>
+							</div>
 							<div class="item-footer">
 							<a
 								href="/apps/{data.app.id}/pages/{pg.id}/build"
@@ -125,9 +149,21 @@
 			<!-- Tab: Workflows -->
 			{:else if s.activeTab === 'workflows'}
 				<div class="tab-content">
-					{#each data.workflows as wf (wf.id)}
-						<div class="item-row">
-							<p class="item-label">{wf.name}</p>
+					{#each s.workflows as wf (wf.id)}
+						<div
+							class="item-row"
+							class:drag-over={s.dragOverId === wf.id}
+							draggable="true"
+							role="listitem"
+							ondragstart={(e) => s.onDragStart('workflows', wf.id, e)}
+							ondragover={(e) => s.onDragOver('workflows', wf.id, e)}
+							ondrop={(e) => s.onDrop('workflows', wf.id, e)}
+							ondragend={s.onDragEnd}
+						>
+							<div class="item-head">
+								<span class="drag-handle" aria-hidden="true">⠿</span>
+								<p class="item-label">{wf.name}</p>
+							</div>
 							<div class="item-footer">
 								<a
 									href="/apps/{data.app.id}/workflows/{wf.id}/build"
@@ -420,9 +456,30 @@
 		color: var(--color-text);
 		text-align: left;
 		width: 100%;
+		cursor: grab;
+		transition: border-color 0.12s, box-shadow 0.12s;
 
+		&:active { cursor: grabbing; }
+		&.drag-over {
+			border-color: var(--color-primary);
+			box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-primary) 30%, transparent);
+		}
 	}
-	
+
+	.item-head {
+		display: flex;
+		align-items: center;
+		gap: 8px;
+	}
+
+	.drag-handle {
+		color: var(--color-text-muted);
+		font-size: 1rem;
+		line-height: 1;
+		cursor: grab;
+		user-select: none;
+	}
+
 	.item-label { flex: 1; font-weight: 600; }
 	.item-footer {
 		display: flex;

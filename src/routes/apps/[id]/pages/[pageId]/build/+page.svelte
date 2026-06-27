@@ -174,28 +174,6 @@
 				+ コンポーネントを追加
 			</button>
 		</section>
-
-		<section class="section index-section">
-			<h2 class="section-title">indexページ設定</h2>
-			<p class="section-desc">アプリカードの「画面表示」ボタンから開くページを指定します。</p>
-			<div class="index-row">
-				<div class="index-status">
-					{#if s.isIndexPage}
-						<span class="index-badge active">このページがindexページです</span>
-					{:else}
-						<span class="index-badge">indexページ未設定</span>
-					{/if}
-				</div>
-				<button
-					class="btn-index"
-					class:active={s.isIndexPage}
-					onclick={s.setAsIndexPage}
-					disabled={s.settingIndex}
-				>
-					{s.settingIndex ? '更新中…' : s.isIndexPage ? 'indexページを解除' : 'indexページに設定'}
-				</button>
-			</div>
-		</section>
 	</div>
 </div>
 
@@ -499,73 +477,6 @@
 		transition: border-color 0.15s, color 0.15s;
 
 		&:hover:not(:disabled) { border-color: var(--color-primary); color: var(--color-primary); }
-		&:disabled { opacity: 0.4; cursor: not-allowed; }
-	}
-
-	/* ── Index page section ──────────────────────────────────── */
-	.index-section {
-		margin-top: 8px;
-		padding-top: 24px;
-		border-top: 1px solid var(--color-border);
-	}
-
-	.index-row {
-		display: flex;
-		align-items: center;
-		gap: 12px;
-		flex-wrap: wrap;
-	}
-
-	.index-status {
-		flex: 1;
-	}
-
-	.index-badge {
-		display: inline-flex;
-		align-items: center;
-		padding: 4px 10px;
-		border-radius: 999px;
-		font-size: 0.8125rem;
-		background: var(--color-border);
-		color: var(--color-text-muted);
-
-		&.active {
-			background: color-mix(in srgb, var(--color-primary) 12%, transparent);
-			color: var(--color-primary);
-			font-weight: 600;
-		}
-	}
-
-	.btn-index {
-		padding: 7px 16px;
-		border-radius: 6px;
-		font-size: 0.875rem;
-		font-weight: 500;
-		border: 1px solid var(--color-border);
-		background: none;
-		color: var(--color-text);
-		cursor: pointer;
-		font-family: inherit;
-		white-space: nowrap;
-		transition: border-color 0.15s, color 0.15s, background 0.15s;
-
-		&:hover:not(:disabled) {
-			border-color: var(--color-primary);
-			color: var(--color-primary);
-		}
-
-		&.active {
-			border-color: var(--color-primary);
-			color: var(--color-primary);
-			background: color-mix(in srgb, var(--color-primary) 6%, transparent);
-
-			&:hover:not(:disabled) {
-				background: color-mix(in srgb, var(--color-danger) 8%, transparent);
-				border-color: var(--color-danger);
-				color: var(--color-danger);
-			}
-		}
-
 		&:disabled { opacity: 0.4; cursor: not-allowed; }
 	}
 

@@ -167,7 +167,7 @@ export const tools: Tool[] = [
 	{
 		name: 'create_table',
 		description:
-			'現在編集中のアプリにテーブルを追加する。テーブル名・フィールド定義を指定して新しいデータテーブルを作成する。作成後は app_pages にもページが自動追加される。',
+			'現在編集中のアプリにテーブルを追加する。テーブル名・フィールド定義を指定して新しいデータテーブルを作成する。ページは自動生成されないため、テーブルを画面表示したい場合は別途 create_page でページを作成する。',
 		input_schema: {
 			type: 'object',
 			properties: {

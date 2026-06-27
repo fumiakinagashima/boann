@@ -7,7 +7,6 @@ export const apps = sqliteTable('apps', {
 	label: text('label').notNull(),
 	icon: text('icon'),
 	spec: text('spec'),
-	indexPageId: text('index_page_id'),
 	createdAt: integer('created_at', { mode: 'timestamp' })
 		.notNull()
 		.default(sql`(unixepoch())`),
@@ -22,6 +21,7 @@ export const entityTypes = sqliteTable('entity_types', {
 	label: text('label').notNull(),
 	icon: text('icon'),
 	appId: text('app_id').references(() => apps.id),
+	sortOrder: integer('sort_order').notNull().default(0),
 	createdAt: integer('created_at', { mode: 'timestamp' })
 		.notNull()
 		.default(sql`(unixepoch())`)
@@ -195,6 +195,7 @@ export const workflows = sqliteTable('workflows', {
 	enabled: integer('enabled', { mode: 'boolean' }).notNull().default(false),
 	accountId: text('account_id'),
 	appId: text('app_id').references(() => apps.id),
+	sortOrder: integer('sort_order').notNull().default(0),
 	createdAt: integer('created_at', { mode: 'timestamp' })
 		.notNull()
 		.default(sql`(unixepoch())`),

@@ -79,6 +79,78 @@ export function createAppBuilderState(getData: () => PageData) {
 
 	function clearTrigger() { aiTrigger = null; }
 
+	// ── List ordering (drag & drop) ──────────────────────────────
+	// data からローカルにコピーし、D&D 中は楽観的に並べ替える。保存後 invalidateAll で確定。
+	let tables = $state(getData().tables);
+	let pages = $state(getData().pages);
+	let workflows = $state(getData().workflows);
+
+	$effect(() => {
+		tables = getData().tables;
+		pages = getData().pages;
+		workflows = getData().workflows;
+	});
+
+	let dragKind = $state<AppTab | null>(null);
+	let dragId = $state<string | null>(null);
+	let dragOverId = $state<string | null>(null);
+
+	function onDragStart(kind: AppTab, id: string, e: DragEvent) {
+		dragKind = kind;
+		dragId = id;
+		e.dataTransfer!.effectAllowed = 'move';
+	}
+
+	function onDragOver(kind: AppTab, id: string, e: DragEvent) {
+		if (dragKind !== kind) return;
+		e.preventDefault();
+		e.dataTransfer!.dropEffect = 'move';
+		if (id !== dragId) dragOverId = id;
+	}
+
+	function onDragEnd() {
+		dragKind = null;
+		dragId = null;
+		dragOverId = null;
+	}
+
+	function reorderList<T extends { id: string }>(arr: T[], srcId: string, targetId: string): T[] {
+		const from = arr.findIndex((x) => x.id === srcId);
+		const to = arr.findIndex((x) => x.id === targetId);
+		if (from === -1 || to === -1) return arr;
+		const next = [...arr];
+		const [moved] = next.splice(from, 1);
+		next.splice(to, 0, moved);
+		return next;
+	}
+
+	async function onDrop(kind: AppTab, targetId: string, e: DragEvent) {
+		e.preventDefault();
+		const srcId = dragId;
+		const srcKind = dragKind;
+		onDragEnd();
+		if (srcKind !== kind || !srcId || srcId === targetId) return;
+
+		let orderedIds: string[];
+		if (kind === 'tables') {
+			tables = reorderList(tables, srcId, targetId);
+			orderedIds = tables.map((t) => t.id);
+		} else if (kind === 'pages') {
+			pages = reorderList(pages, srcId, targetId);
+			orderedIds = pages.map((p) => p.id);
+		} else {
+			workflows = reorderList(workflows, srcId, targetId);
+			orderedIds = workflows.map((w) => w.id);
+		}
+
+		await fetch(`/api/apps/${getData().app.id}/reorder`, {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({ kind, orderedIds })
+		});
+		await invalidateAll();
+	}
+
 
 	// ── Add table ─────────────────────────────────────────────────
 	let addingTable = $state(false);
@@ -181,6 +253,10 @@ export function createAppBuilderState(getData: () => PageData) {
 		get chatWidth() { return chatWidth; },
 		get resizing() { return resizing; },
 		get chatContext() { return chatContext; },
+		get tables() { return tables; },
+		get pages() { return pages; },
+		get workflows() { return workflows; },
+		get dragOverId() { return dragOverId; },
 		markDirty,
 		save,
 		deleteApp,
@@ -190,5 +266,9 @@ export function createAppBuilderState(getData: () => PageData) {
 		addPage,
 		addWorkflow,
 		onResizerMouseDown,
+		onDragStart,
+		onDragOver,
+		onDrop,
+		onDragEnd,
 	};
 }
