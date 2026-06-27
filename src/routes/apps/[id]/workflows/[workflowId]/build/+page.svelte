@@ -108,7 +108,6 @@
 			entityTypes={data.entityTypes}
 			slackIntegrations={data.slackIntegrations}
 			noChatPanel
-			externalSave
 		/>
 	</div>
 

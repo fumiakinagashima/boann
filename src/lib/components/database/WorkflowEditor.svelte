@@ -1,11 +1,10 @@
 <script lang="ts">
 	import { untrack } from 'svelte';
-	import { goto, invalidateAll } from '$app/navigation';
+	import { invalidateAll } from '$app/navigation';
 	import { toast } from '$lib/stores/toast.svelte';
 	import Workflow, { type WorkflowState } from '$lib/components/chat/Workflow.svelte';
 	import WorkflowChatPanel from './WorkflowChatPanel.svelte';
 	import Toggle from '$lib/components/ui/Toggle.svelte';
-	import { validateWorkflow } from '$lib/workflow-validation';
 	import { formatJstDateTime } from '$lib/datetime';
 	import type { WorkflowStep } from '$lib/types/chat';
 	import type { WorkflowRunRow } from '$lib/server/db/workflow-run-service';
@@ -24,9 +23,7 @@
 		runs?: WorkflowRunRow[];
 		entityTypes?: EntityTypeForWorkflow[];
 		slackIntegrations?: SlackIntegrationOption[];
-		inDialog?: boolean;
 		noChatPanel?: boolean;
-		externalSave?: boolean;
 	};
 
 	let {
@@ -39,15 +36,12 @@
 		runs = [],
 		entityTypes = [],
 		slackIntegrations = [],
-		inDialog = false,
-		noChatPanel = false,
-		externalSave = false
+		noChatPanel = false
 	}: Props = $props();
 
-	// 保存後も画面遷移しないため、新規作成時に発行されたidを保持して以降の保存をPATCH（更新）に切り替える
+	// 保存後も画面遷移しないため、新規作成時に発行されたidを保持する（今すぐ実行・有効化の切替に使用）
 	let currentId = $state(untrack(() => id));
 	let enabled = $state(untrack(() => initialEnabled));
-	let saving = $state(false);
 
 	type WorkflowInstance = { getState: () => WorkflowState; setState: (def: WorkflowState) => void };
 	let wfRef = $state<WorkflowInstance | null>(null);
@@ -58,7 +52,7 @@
 	export function setState(s: WorkflowState) {
 		wfRef?.setState(s);
 	}
-	// externalSave モード時、ホスト側の保存処理が有効化フラグを読むために公開する
+	// ホスト側（ビルドページ）の保存処理が有効化フラグを読むために公開する
 	export function getEnabled(): boolean {
 		return enabled;
 	}
@@ -122,60 +116,10 @@
 		}
 	}
 
-	async function handleSave() {
-		if (saving || !wfRef) return;
-		const state = wfRef.getState();
-		const name = state.name.trim();
-		if (!name) {
-			toast.error('ワークフロー名を入力してください');
-			return;
-		}
-		const validation = validateWorkflow(state.triggerHour, state.triggerMinute, state.steps, entityTypes, slackIntegrations);
-		if (!validation.ok) {
-			for (const msg of validation.errors) toast.error(msg);
-			return;
-		}
-		saving = true;
-		try {
-			const body = JSON.stringify({ ...state, name, enabled });
-			if (currentId) {
-				const res = await fetch(`/api/workflows/${currentId}`, {
-					method: 'PATCH',
-					headers: { 'Content-Type': 'application/json' },
-					body
-				});
-				if (!res.ok) {
-					throw new Error(((await res.json()) as { error?: string }).error ?? '更新に失敗しました');
-				}
-				toast.success(`「${name}」を更新しました`);
-			} else {
-				const res = await fetch('/api/workflows', {
-					method: 'POST',
-					headers: { 'Content-Type': 'application/json' },
-					body
-				});
-				if (!res.ok) {
-					throw new Error(((await res.json()) as { error?: string }).error ?? '保存に失敗しました');
-				}
-				const row = (await res.json()) as { id: string };
-				currentId = row.id;
-				toast.success(`「${name}」を保存しました`);
-				goto(`/workflows/${row.id}`, { replaceState: true });
-			}
-			await invalidateAll();
-		} catch (e) {
-			toast.error(e instanceof Error ? e.message : '保存に失敗しました');
-		} finally {
-			saving = false;
-		}
-	}
 </script>
 
 <div class="editor-wrap">
 	<div class="editor-row1">
-		{#if !inDialog}
-			<a href="/workflows" class="btn-back">← 一覧に戻る</a>
-		{/if}
 		<Toggle bind:checked={enabled} label="有効化（毎日指定時刻に実行）" />
 		<div class="editor-row1-actions">
 			{#if currentId}
@@ -192,11 +136,6 @@
 					✨ AIレビュー
 				{/if}
 			</button>
-			{#if !externalSave}
-				<button class="btn-save" onclick={handleSave} disabled={saving}>
-					{saving ? '保存中…' : '保存'}
-				</button>
-			{/if}
 		</div>
 	</div>
 
@@ -306,21 +245,6 @@
 		gap: 16px;
 	}
 
-	.btn-back {
-		padding: 5px 12px;
-		border-radius: 5px;
-		font-size: 0.875rem;
-		border: 1px solid var(--color-border);
-		background: none;
-		color: var(--color-text-muted);
-		cursor: pointer;
-		white-space: nowrap;
-		text-decoration: none;
-		&:hover {
-			color: var(--color-text);
-		}
-	}
-
 	.btn-run-now {
 		padding: 6px 14px;
 		background: none;
@@ -401,25 +325,6 @@
 		overflow: hidden;
 		align-self: stretch;
 		min-height: 400px;
-	}
-
-	.btn-save {
-		margin-left: 0;
-		padding: 6px 20px;
-		border-radius: 6px;
-		font-size: 0.875rem;
-		font-weight: 500;
-		background: var(--color-primary);
-		color: #fff;
-		border: none;
-		cursor: pointer;
-		&:hover:not(:disabled) {
-			opacity: 0.88;
-		}
-		&:disabled {
-			opacity: 0.5;
-			cursor: not-allowed;
-		}
 	}
 
 	.editor-canvas {

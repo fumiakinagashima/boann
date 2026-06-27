@@ -112,7 +112,7 @@ const HELP: Record<string, object> = {
 			'ワークフロー管理画面から有効化・無効化・実行ログの確認ができます'
 		],
 		relatedPages: [
-			{ label: 'ワークフロー管理', href: '/workflows', description: 'ワークフローの一覧・有効化・実行ログ確認ができます' }
+			{ label: 'アプリ一覧', href: '/', description: 'アプリごとのワークフロー一覧・有効化・実行ログ確認ができます' }
 		]
 	},
 	documents: {

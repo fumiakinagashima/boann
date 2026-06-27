@@ -41,7 +41,7 @@ export const tools: Tool[] = [
 	{
 		name: 'save_workflow',
 		description:
-			'ワークフロー定義をDBに保存する。提案した workflow コンポーネントの内容をそのまま保存する場合に使う（ユーザーがUIで編集した後の保存は「保存」ボタンで行われるため、AIがこのツールを呼ぶ必要はない）。既存ワークフローを編集した場合は、get_workflowで取得したidを必ず指定する（idを省略すると新規作成になり、重複してしまう）。保存後は /workflows で確認・管理できる（新規作成時は実行には別途有効化が必要）。',
+			'ワークフロー定義をDBに保存する。提案した workflow コンポーネントの内容をそのまま保存する場合に使う（ユーザーがUIで編集した後の保存は「保存」ボタンで行われるため、AIがこのツールを呼ぶ必要はない）。既存ワークフローを編集した場合は、get_workflowで取得したidを必ず指定する（idを省略すると新規作成になり、重複してしまう）。保存後はアプリのワークフロー一覧で確認・管理できる（新規作成時は実行には別途有効化が必要）。',
 		input_schema: {
 			type: 'object',
 			properties: {
@@ -116,7 +116,7 @@ export async function handleSaveWorkflow(db: Db, input: unknown, env?: ToolEnv) 
 		id: workflow.id,
 		name: workflow.name,
 		stepCount: workflow.steps.length,
-		message: `ワークフロー「${workflow.name}」を保存しました（ステップ${workflow.steps.length}件）。/workflows から有効化すると実行されます。`
+		message: `ワークフロー「${workflow.name}」を保存しました（ステップ${workflow.steps.length}件）。アプリのワークフロー一覧から有効化すると実行されます。`
 	};
 }
 
