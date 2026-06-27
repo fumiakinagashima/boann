@@ -1,7 +1,7 @@
-import { eq, desc, sql } from 'drizzle-orm';
+import { eq, desc, sql, inArray } from 'drizzle-orm';
 import type { BatchItem } from 'drizzle-orm/batch';
 import type { Db } from './index';
-import { apps, appPages, entityTypes, entityFields, entities } from './schema';
+import { apps, appPages, entityTypes, entityFields, entities, bookmarks, workflows, workflowRuns } from './schema';
 
 export type PageComponentType = 'list' | 'form';
 
@@ -321,13 +321,30 @@ export async function createApp(db: Db, input: AppInput): Promise<{ id: string; 
 export async function deleteApp(db: Db, id: string): Promise<void> {
 	const tables = await db.select({ id: entityTypes.id })
 		.from(entityTypes).where(eq(entityTypes.appId, id));
+	const wfRows = await db.select({ id: workflows.id })
+		.from(workflows).where(eq(workflows.appId, id));
 	const queries: BatchItem<'sqlite'>[] = [];
+	// FK 参照を成立させる順序で削除する:
+	//   apps.index_page_id → app_pages.id, app_pages.table_id → entity_types.id,
+	//   entity_types.app_id / app_pages.app_id / workflows.app_id → apps.id,
+	//   bookmarks.entity_type_id / entity_fields / entities → entity_types.id
+	// 1. apps.index_page_id を解除（app_pages を消せるように）
+	queries.push(db.update(apps).set({ indexPageId: null }).where(eq(apps.id, id)));
+	// 2. app_pages を削除（entity_types を参照しているため先に消す）
+	queries.push(db.delete(appPages).where(eq(appPages.appId, id)));
+	// 3. テーブルに紐づく子レコードを削除してから entity_types を削除
 	for (const table of tables) {
 		queries.push(db.delete(entities).where(eq(entities.entityTypeId, table.id)));
 		queries.push(db.delete(entityFields).where(eq(entityFields.entityTypeId, table.id)));
+		queries.push(db.delete(bookmarks).where(eq(bookmarks.entityTypeId, table.id)));
 		queries.push(db.delete(entityTypes).where(eq(entityTypes.id, table.id)));
 	}
-	queries.push(db.delete(appPages).where(eq(appPages.appId, id)));
+	// 4. workflow_runs（実行ログ）→ workflows を削除（apps を参照しているため apps より先に消す）
+	if (wfRows.length > 0) {
+		queries.push(db.delete(workflowRuns).where(inArray(workflowRuns.workflowId, wfRows.map((w) => w.id))));
+	}
+	queries.push(db.delete(workflows).where(eq(workflows.appId, id)));
+	// 5. apps を削除
 	queries.push(db.delete(apps).where(eq(apps.id, id)));
 	await db.batch(queries as [BatchItem<'sqlite'>, ...BatchItem<'sqlite'>[]]);
 }
@@ -454,7 +471,11 @@ export async function updatePage(db: Db, pageId: string, input: Partial<PageInpu
 }
 
 export async function deletePage(db: Db, pageId: string): Promise<void> {
-	await db.delete(appPages).where(eq(appPages.id, pageId));
+	// apps.index_page_id がこのページを参照していると FK 制約で削除に失敗するため、先に解除する
+	await db.batch([
+		db.update(apps).set({ indexPageId: null }).where(eq(apps.indexPageId, pageId)),
+		db.delete(appPages).where(eq(appPages.id, pageId))
+	]);
 }
 
 export async function getEntityTypeById(db: Db, id: string): Promise<{ id: string; name: string; label: string; icon: string | null } | null> {
