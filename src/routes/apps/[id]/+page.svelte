@@ -4,15 +4,15 @@
 	import ChevronLeft from '$lib/components/icon/ChevronLeft.svelte';
 	import AppIcon, { ICON_OPTIONS } from '$lib/components/AppIcon.svelte';
 	import ChatPanel from '$lib/components/chat/ChatPanel.svelte';
+	import BuilderLayout from '$lib/components/BuilderLayout.svelte';
 	import type { PageData } from './$types';
 
 	let { data }: { data: PageData } = $props();
 	const s = createAppBuilderState(() => data);
 </script>
 
-<div class="builder-layout" style="grid-template-columns: 1fr 5px {s.chatWidth}px" class:resizing={s.resizing}>
-	<!-- Left panel: builder -->
-	<div class="builder-panel">
+<BuilderLayout>
+	{#snippet main()}
 		<div class="panel-header">
 			<div class="header-top">
 				<a href="/" class="back-link"><ChevronLeft size={15} />アプリ一覧</a>
@@ -178,20 +178,9 @@
 				</div>
 			{/if}
 		</div>
-	</div>
+	{/snippet}
 
-	<!-- Resize handle -->
-	<div
-		class="resizer"
-		onmousedown={s.onResizerMouseDown}
-		role="separator"
-		aria-label="パネル幅を調整"
-		aria-orientation="vertical"
-	></div>
-
-	<!-- Right panel: AI chat -->
-	<div class="chat-col">
-		<div class="chat-col-header"><span>✨</span>AIアシスタント</div>
+	{#snippet chat()}
 		<ChatPanel
 			placeholder="仕様の相談・テーブル追加・修正の指示を入力…"
 			onAction={() => invalidateAll()}
@@ -199,39 +188,11 @@
 			triggerMessage={s.aiTrigger}
 			onTriggerConsumed={s.clearTrigger}
 		/>
-	</div>
-</div>
+	{/snippet}
+</BuilderLayout>
 
 <style lang="scss">
-	.builder-layout {
-		display: grid;
-		height: 100%;
-		overflow: hidden;
-
-		&.resizing {
-			cursor: col-resize;
-			user-select: none;
-		}
-	}
-
-	.resizer {
-		width: 5px;
-		cursor: col-resize;
-		background: var(--color-border);
-		transition: background 0.15s;
-		position: relative;
-
-		&::after { content: ''; position: absolute; inset: 0 -2px; }
-		&:hover { background: var(--color-primary); }
-	}
-
 	/* ── Left panel ─────────────────────────────────────────── */
-	.builder-panel {
-		display: flex;
-		flex-direction: column;
-		overflow: hidden;
-	}
-
 	.panel-header {
 		padding: 16px 24px 12px;
 		border-bottom: 1px solid var(--color-border);
@@ -522,23 +483,4 @@
 	}
 
 
-	/* ── Right chat column ───────────────────────────────────── */
-	.chat-col {
-		display: flex;
-		flex-direction: column;
-		border-left: 1px solid var(--color-border);
-		overflow: hidden;
-	}
-
-	.chat-col-header {
-		display: flex;
-		align-items: center;
-		gap: 8px;
-		padding: 14px 16px;
-		font-size: 0.875rem;
-		font-weight: 600;
-		color: var(--color-text);
-		border-bottom: 1px solid var(--color-border);
-		flex-shrink: 0;
-	}
 </style>

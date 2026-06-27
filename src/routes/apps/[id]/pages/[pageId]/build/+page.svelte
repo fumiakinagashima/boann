@@ -1,6 +1,9 @@
 <script lang="ts">
+	import { invalidateAll } from '$app/navigation';
 	import { createPageBuildState } from './index.svelte';
 	import ChevronLeft from '$lib/components/icon/ChevronLeft.svelte';
+	import ChatPanel from '$lib/components/chat/ChatPanel.svelte';
+	import BuilderLayout from '$lib/components/BuilderLayout.svelte';
 	import type { PageData } from './$types';
 
 	let { data }: { data: PageData } = $props();
@@ -11,7 +14,9 @@
 	}
 </script>
 
-<div class="build-page">
+<BuilderLayout>
+	{#snippet main()}
+		<div class="build-page">
 	<div class="panel-header">
 		<a href="/apps/{data.app.id}" class="back-link"><ChevronLeft size={15} />{data.app.label}</a>
 		<div class="meta-actions">
@@ -167,10 +172,26 @@
 		</section>
 	</div>
 </div>
+	{/snippet}
+
+	{#snippet chat()}
+		<ChatPanel
+			placeholder="ページ構成の相談・指示を入力…"
+			onAction={() => invalidateAll()}
+			context={{
+				appId: data.app.id,
+				appLabel: data.app.label,
+				appName: data.app.name,
+				tables: data.tables.map((t) => ({ id: t.id, name: t.name, label: t.label }))
+			}}
+		/>
+	{/snippet}
+</BuilderLayout>
 
 <style lang="scss">
 	.build-page {
-		height: 100%;
+		flex: 1;
+		min-height: 0;
 		display: flex;
 		flex-direction: column;
 		overflow: hidden;

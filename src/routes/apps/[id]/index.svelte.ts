@@ -1,9 +1,6 @@
 import { goto, invalidateAll, replaceState } from '$app/navigation';
 import type { PageData } from './$types';
 
-export const CHAT_MIN = 220;
-export const CHAT_MAX = 640;
-
 export type AppTab = 'tables' | 'pages' | 'workflows';
 const VALID_TABS: AppTab[] = ['tables', 'pages', 'workflows'];
 
@@ -203,28 +200,6 @@ export function createAppBuilderState(getData: () => PageData) {
 		}
 	}
 
-	// ── Resizable split ──────────────────────────────────────────
-	let chatWidth = $state(340);
-	let resizing = $state(false);
-
-	function onResizerMouseDown(e: MouseEvent) {
-		e.preventDefault();
-		resizing = true;
-		const startX = e.clientX;
-		const startWidth = chatWidth;
-		function onMove(ev: MouseEvent) {
-			const delta = startX - ev.clientX;
-			chatWidth = Math.min(CHAT_MAX, Math.max(CHAT_MIN, startWidth + delta));
-		}
-		function onUp() {
-			resizing = false;
-			window.removeEventListener('mousemove', onMove);
-			window.removeEventListener('mouseup', onUp);
-		}
-		window.addEventListener('mousemove', onMove);
-		window.addEventListener('mouseup', onUp);
-	}
-
 	const chatContext = $derived({
 		appId: getData().app.id,
 		appLabel: getData().app.label,
@@ -250,8 +225,6 @@ export function createAppBuilderState(getData: () => PageData) {
 		get addingTable() { return addingTable; },
 		get addingPage() { return addingPage; },
 		get addingWorkflow() { return addingWorkflow; },
-		get chatWidth() { return chatWidth; },
-		get resizing() { return resizing; },
 		get chatContext() { return chatContext; },
 		get tables() { return tables; },
 		get pages() { return pages; },
@@ -265,7 +238,6 @@ export function createAppBuilderState(getData: () => PageData) {
 		addTable,
 		addPage,
 		addWorkflow,
-		onResizerMouseDown,
 		onDragStart,
 		onDragOver,
 		onDrop,

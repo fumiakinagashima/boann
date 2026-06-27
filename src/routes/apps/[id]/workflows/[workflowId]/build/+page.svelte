@@ -2,6 +2,7 @@
 	import { invalidateAll } from '$app/navigation';
 	import WorkflowEditor from '$lib/components/database/WorkflowEditor.svelte';
 	import WorkflowChatPanel from '$lib/components/database/WorkflowChatPanel.svelte';
+	import BuilderLayout from '$lib/components/BuilderLayout.svelte';
 	import ChevronLeft from '$lib/components/icon/ChevronLeft.svelte';
 	import { toast } from '$lib/stores/toast.svelte';
 	import { validateWorkflow } from '$lib/workflow-validation';
@@ -58,32 +59,13 @@
 		steps: data.workflow.steps
 	};
 
-	const CHAT_MIN = 220, CHAT_MAX = 640;
-	let chatWidth = $state(340);
-	let resizing = $state(false);
-
-	function onResizerMouseDown(e: MouseEvent) {
-		e.preventDefault();
-		resizing = true;
-		const startX = e.clientX;
-		const startWidth = chatWidth;
-		function onMove(ev: MouseEvent) {
-			chatWidth = Math.min(CHAT_MAX, Math.max(CHAT_MIN, startWidth + (startX - ev.clientX)));
-		}
-		function onUp() {
-			resizing = false;
-			window.removeEventListener('mousemove', onMove);
-			window.removeEventListener('mouseup', onUp);
-		}
-		window.addEventListener('mousemove', onMove);
-		window.addEventListener('mouseup', onUp);
-	}
 </script>
 
 <svelte:head><title>{data.workflow.name} — {data.app.label}</title></svelte:head>
 
-<div class="wf-page" style="grid-template-columns: 1fr 5px {chatWidth}px" class:resizing>
-	<div class="editor-col">
+<BuilderLayout>
+	{#snippet main()}
+		<div class="editor-col">
 		<div class="editor-header">
 			<a href="/apps/{data.app.id}" class="back-link"><ChevronLeft size={15} />{data.app.label}</a>
 			<div class="header-actions">
@@ -110,36 +92,20 @@
 			noChatPanel
 		/>
 	</div>
+	{/snippet}
 
-	<div
-		class="resizer"
-		onmousedown={onResizerMouseDown}
-		role="separator"
-		aria-label="パネル幅を調整"
-		aria-orientation="vertical"
-	></div>
-
-	<div class="chat-col">
+	{#snippet chat()}
 		<WorkflowChatPanel
 			getCurrent={() => editorRef?.getState() ?? defaultState}
 			onApply={(s) => editorRef?.setState(s)}
 		/>
-	</div>
-</div>
+	{/snippet}
+</BuilderLayout>
 
 <style lang="scss">
-	.wf-page {
-		display: grid;
-		height: 100%;
-		overflow: hidden;
-
-		&.resizing {
-			cursor: col-resize;
-			user-select: none;
-		}
-	}
-
 	.editor-col {
+		flex: 1;
+		min-height: 0;
 		display: flex;
 		flex-direction: column;
 		overflow: hidden;
@@ -205,20 +171,4 @@
 		color: var(--color-danger, var(--color-error));
 	}
 
-	.resizer {
-		width: 5px;
-		cursor: col-resize;
-		background: var(--color-border);
-		transition: background 0.15s;
-		position: relative;
-		&::after { content: ''; position: absolute; inset: 0 -2px; }
-		&:hover { background: var(--color-primary); }
-	}
-
-	.chat-col {
-		display: flex;
-		flex-direction: column;
-		border-left: 1px solid var(--color-border);
-		overflow: hidden;
-	}
 </style>

@@ -13,9 +13,6 @@ export const FIELD_TYPES = [
 	{ value: 'recordSelect', label: 'リレーション' },
 ] as const;
 
-export const CHAT_MIN = 220;
-export const CHAT_MAX = 640;
-
 export type SelectOption = { label: string; value: string };
 
 export type FieldRow = {
@@ -233,28 +230,6 @@ export function createTableBuildState(getData: () => PageData) {
 		dragOverId = null;
 	}
 
-	// ── Resizable split ──────────────────────────────────────────
-	let chatWidth = $state(340);
-	let resizing = $state(false);
-
-	function onResizerMouseDown(e: MouseEvent) {
-		e.preventDefault();
-		resizing = true;
-		const startX = e.clientX;
-		const startWidth = chatWidth;
-		function onMove(ev: MouseEvent) {
-			const delta = startX - ev.clientX;
-			chatWidth = Math.min(CHAT_MAX, Math.max(CHAT_MIN, startWidth + delta));
-		}
-		function onUp() {
-			resizing = false;
-			window.removeEventListener('mousemove', onMove);
-			window.removeEventListener('mouseup', onUp);
-		}
-		window.addEventListener('mousemove', onMove);
-		window.addEventListener('mouseup', onUp);
-	}
-
 	return {
 		get appLabel() { return appLabel; },
 		set appLabel(v) { appLabel = v; },
@@ -272,8 +247,6 @@ export function createTableBuildState(getData: () => PageData) {
 		set refTableDropdownOpen(v) { refTableDropdownOpen = v; },
 		get dragSrcId() { return dragSrcId; },
 		get dragOverId() { return dragOverId; },
-		get chatWidth() { return chatWidth; },
-		get resizing() { return resizing; },
 		saveMeta,
 		addField,
 		removeField,
@@ -290,6 +263,5 @@ export function createTableBuildState(getData: () => PageData) {
 		onDragOver,
 		onDrop,
 		onDragEnd,
-		onResizerMouseDown,
 	};
 }

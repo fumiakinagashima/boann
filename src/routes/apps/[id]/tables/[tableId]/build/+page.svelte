@@ -4,6 +4,7 @@
 	import ChevronLeft from '$lib/components/icon/ChevronLeft.svelte';
 	import GripVertical from '$lib/components/icon/GripVertical.svelte';
 	import ChatPanel from '$lib/components/chat/ChatPanel.svelte';
+	import BuilderLayout from '$lib/components/BuilderLayout.svelte';
 	import type { PageData, ActionData } from './$types';
 
 	let { data, form }: { data: PageData; form: ActionData } = $props();
@@ -16,9 +17,9 @@
 	}
 </script>
 
-<div class="build-layout" style="grid-template-columns: 1fr 5px {s.chatWidth}px" class:resizing={s.resizing}>
-	<!-- Left panel -->
-	<div class="settings-panel">
+<BuilderLayout>
+	{#snippet main()}
+		<div class="settings-panel">
 		<div class="panel-header">
 			<a href="/apps/{data.appId}/tables/{data.app.id}" class="back-link">
 				<ChevronLeft size={15} />
@@ -318,22 +319,9 @@
 			</section>
 		</div>
 	</div>
+	{/snippet}
 
-	<!-- Resize handle -->
-	<div
-		class="resizer"
-		onmousedown={s.onResizerMouseDown}
-		role="separator"
-		aria-label="パネル幅を調整"
-		aria-orientation="vertical"
-	></div>
-
-	<!-- Right panel: AI chat -->
-	<div class="chat-col">
-		<div class="chat-col-header">
-			<span>✨</span>
-			AIアシスタント
-		</div>
+	{#snippet chat()}
 		<ChatPanel
 			placeholder="フィールドを追加・変更する指示を入力…"
 			onAction={() => invalidateAll()}
@@ -344,41 +332,13 @@
 				tables: [{ id: data.app.id, name: data.app.name, label: data.app.label }]
 			}}
 		/>
-	</div>
-</div>
+	{/snippet}
+</BuilderLayout>
 
 <style lang="scss">
-	.build-layout {
-		display: grid;
-		grid-template-columns: 1fr 5px 340px;
-		height: 100%;
-		overflow: hidden;
-
-		&.resizing {
-			cursor: col-resize;
-			user-select: none;
-		}
-	}
-
-	.resizer {
-		width: 5px;
-		cursor: col-resize;
-		background: var(--color-border);
-		transition: background 0.15s;
-		position: relative;
-
-		&::after {
-			content: '';
-			position: absolute;
-			inset: 0 -4px;
-		}
-
-		&:hover, .resizing & {
-			background: var(--color-primary);
-		}
-	}
-
 	.settings-panel {
+		flex: 1;
+		min-height: 0;
 		display: flex;
 		flex-direction: column;
 		overflow-y: auto;
@@ -981,24 +941,4 @@
 		margin: 0;
 	}
 
-	/* ── Chat col ───────────────────────────── */
-	.chat-col {
-		display: flex;
-		flex-direction: column;
-		height: 100%;
-		overflow: hidden;
-	}
-
-	.chat-col-header {
-		display: flex;
-		align-items: center;
-		gap: 6px;
-		padding: 12px 16px;
-		font-size: 0.8125rem;
-		font-weight: 600;
-		color: var(--color-text-muted);
-		border-bottom: 1px solid var(--color-border);
-		border-left: 1px solid var(--color-border);
-		background: var(--color-surface);
-	}
 </style>

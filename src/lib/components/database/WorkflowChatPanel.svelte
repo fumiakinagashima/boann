@@ -112,7 +112,6 @@
 </script>
 
 <div class="chat-panel">
-	<div class="chat-header">AI アシスタント</div>
 	<div class="chat-messages" bind:this={chatListEl}>
 		{#if chatMessages.length === 0}
 			<p class="chat-empty">どんな自動化フローにしたいか、話しかけてみてください。提案内容は右側に反映されます。</p>
@@ -152,15 +151,6 @@
 		height: 100%;
 		overflow: hidden;
 		background: var(--color-surface);
-	}
-
-	.chat-header {
-		padding: 12px 16px;
-		font-size: 0.8125rem;
-		font-weight: 600;
-		color: var(--color-text-muted);
-		border-bottom: 1px solid var(--color-border);
-		flex-shrink: 0;
 	}
 
 	.chat-messages {
