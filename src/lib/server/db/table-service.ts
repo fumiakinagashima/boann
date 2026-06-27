@@ -82,7 +82,7 @@ export const CORE_TABLE_NAMES: string[] = [];
 // /database/[type] ルートと衝突する予約済み名
 const RESERVED_NAMES = new Set([
 	'accounts', 'reminders', 'workflows', // 固定ルート
-	'entity_types', 'entity_fields', 'entities', 'core_custom_fields',
+	'entity_types', 'entity_fields', 'entities',
 	'integrations',
 	'new', 'schema', // サブルート名
 ]);

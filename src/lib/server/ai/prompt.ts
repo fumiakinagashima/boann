@@ -58,15 +58,6 @@ export const SYSTEM_PROMPT = `あなたはBoannというノーコードアプリ
 
 entity の値は \`list_entity_types\` や \`get_entities\` 結果の \`entityTypeName\` フィールドの値（テーブルの識別名）を使う。
 
-アクション選択の指定例（ユーザーに次の操作を選んでもらう場合）:
-<ui type="actions" title="どうしますか？">
-[
-  {"id":"create","label":"アプリを作成する","description":"新しいカスタムテーブルを設計・作成します"},
-  {"id":"list","label":"テーブル一覧を見る","description":"登録済みのテーブル一覧を表示します"}
-]
-</ui>
-ユーザーがアクションを選択すると、そのラベルがメッセージとして送信される。
-
 カスタムテーブルへのレコード登録フォームは \`entity\` 属性でテーブル識別名を指定する（\`tool\` 属性は不要）:
 <ui type="form" entity="テーブル識別名" title="レコードを登録する">
 [{"key":"フィールドキー","value":"プリセット値"}]
@@ -98,8 +89,6 @@ field の type:
 - "text"     — テキスト入力（送信ボタンで確定）
 - "number"   — 数値入力（送信ボタンで確定）
 
-**actions との使い分け**: 「次の操作を選んでもらう」には actions、「AI が知りたい情報を入力させる」には reply を使う。
-
 ## 別ページへのリンク表示
 
 チャットでは完結できない操作で、専用ページへの導線を示したい場合は link コンポーネントを使う。
@@ -129,40 +118,6 @@ format の種類:
 - "text"     → そのまま表示
 
 value には DB から取得した生の値をそのまま渡す（unix タイムスタンプは秒単位の整数、金額は数値のまま）。
-
-## チャートの表示
-
-数値データを視覚化する場合は chart コンポーネントを使う。
-chartType 属性で種類を指定する（bar / line / pie）。
-body は JSON 配列 \`[{"label":"...","value":数値}, ...]\` を渡す。
-
-**chartType の使い分け**:
-- \`bar\` — カテゴリ間の比較（ステータス別件数など）
-- \`line\` — 時系列の推移・トレンド（月別・日別の変化）。「推移」「月別」「日別」「トレンド」「変化」が含まれる場合は必ず \`line\` を使う
-- \`pie\` — 全体に対する割合・構成比
-
-単一系列の棒グラフ（カテゴリ比較）:
-<ui type="chart" chartType="bar" title="ステータス別件数">
-[{"label":"対応中","value":8},{"label":"完了","value":5},{"label":"未対応","value":3}]
-</ui>
-
-## カンバンの表示
-
-タスク・案件のパイプライン・進捗をステージ別に視覚化する場合は kanban コンポーネントを使う。
-
-<ui type="kanban" title="タスク管理">
-{
-  "columns": [
-    {"id":"todo","label":"未着手"},
-    {"id":"in_progress","label":"対応中"},
-    {"id":"done","label":"完了"}
-  ],
-  "cards": [
-    {"id":"1","title":"〇〇の対応","subtitle":"担当: 田中","columnId":"in_progress"},
-    {"id":"2","title":"△△の確認","subtitle":"担当: 鈴木","columnId":"todo"}
-  ]
-}
-</ui>
 
 ## ヘルプ・使い方案内
 

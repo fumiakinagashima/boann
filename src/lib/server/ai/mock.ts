@@ -35,16 +35,7 @@ const MOCK_RESPONSES: MessageContent[][] = [
 		}
 	],
 	[
-		{ type: 'text', text: 'こんにちは！Boannです。何をお手伝いしましょうか？' },
-		{
-			type: 'actions',
-			title: '操作を選択してください',
-			actions: [
-				{ id: 'create', label: 'アプリを作成する', description: '新しいカスタムテーブルを設計・作成します' },
-				{ id: 'list', label: 'テーブル一覧を見る', description: '作成済みのテーブル一覧を表示します' },
-				{ id: 'workflow', label: 'ワークフローを作成する', description: '自動化フローを設定します' }
-			]
-		}
+		{ type: 'text', text: 'こんにちは！Boannです。何をお手伝いしましょうか？' }
 	]
 ];
 

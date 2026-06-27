@@ -153,8 +153,6 @@ export function parseUITag(tag: string): MessageContent | null {
 	const tool = /tool="([^"]+)"/.exec(attrStr)?.[1];
 	const entity = /entity="([^"]+)"/.exec(attrStr)?.[1];
 	const submitLabel = /submitLabel="([^"]+)"/.exec(attrStr)?.[1];
-	const chartType = /chartType="([^"]+)"/.exec(attrStr)?.[1] as 'bar' | 'line' | 'pie' | undefined;
-	const chartMode = /mode="([^"]+)"/.exec(attrStr)?.[1] as 'normal' | 'stacked' | 'grouped' | undefined;
 	const href = /href="([^"]+)"/.exec(attrStr)?.[1];
 	const label = /label="([^"]+)"/.exec(attrStr)?.[1];
 	const description = /description="([^"]+)"/.exec(attrStr)?.[1];
@@ -169,16 +167,8 @@ export function parseUITag(tag: string): MessageContent | null {
 		} else if (type === 'table') {
 			const { columns, rows, entity } = JSON.parse(body);
 			return { type: 'table', columns, rows, entity };
-		} else if (type === 'actions') {
-			return { type: 'actions', title, actions: JSON.parse(body) };
 		} else if (type === 'values') {
 			return { type: 'values', title, items: JSON.parse(body) };
-		} else if (type === 'chart') {
-			// chart display is temporarily disabled
-			return null;
-		} else if (type === 'kanban') {
-			const { columns, cards } = JSON.parse(body);
-			return { type: 'kanban', title, columns, cards };
 		} else if (type === 'link' && href && label) {
 			return { type: 'link', label, href, description, newTab: newTab || undefined };
 		} else if (type === 'document_job' && jobId && label) {

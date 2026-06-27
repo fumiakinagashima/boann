@@ -51,18 +51,6 @@ export type TableContent = {
 	entity?: string;
 };
 
-export type ActionItem = {
-	id: string;
-	label: string;
-	description?: string;
-};
-
-export type ActionContent = {
-	type: 'actions';
-	title?: string;
-	actions: ActionItem[];
-};
-
 export type ValueFormat = 'currency' | 'number' | 'date' | 'datetime' | 'text';
 
 export type ValueItem = {
@@ -77,37 +65,6 @@ export type ValuesContent = {
 	items: ValueItem[];
 };
 
-export type ChartSeries = { name: string; data: { label: string; value: number }[] };
-
-export type ChartContent = {
-	type: 'chart';
-	chartType: 'bar' | 'line' | 'pie';
-	title?: string;
-	mode?: 'normal' | 'stacked' | 'grouped';
-	data?: { label: string; value: number }[];
-	series?: ChartSeries[];
-};
-
-export type KanbanColumn = {
-	id: string;
-	label: string;
-};
-
-export type KanbanCard = {
-	id: string;
-	title: string;
-	subtitle?: string;
-	amount?: number;
-	columnId: string;
-};
-
-export type KanbanContent = {
-	type: 'kanban';
-	title?: string;
-	columns: KanbanColumn[];
-	cards: KanbanCard[];
-	completed?: boolean;
-};
 
 export type LinkContent = {
 	type: 'link';
@@ -213,10 +170,7 @@ export type MessageContent =
 	| TextContent
 	| FormContent
 	| TableContent
-	| ActionContent
 	| ValuesContent
-	| ChartContent
-	| KanbanContent
 	| LinkContent
 	| DocumentJobContent
 	| DocHandoffContent

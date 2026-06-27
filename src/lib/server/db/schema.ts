@@ -63,23 +63,6 @@ export const entities = sqliteTable('entities', {
 		.default(sql`(unixepoch())`)
 });
 
-export const coreCustomFields = sqliteTable('core_custom_fields', {
-	id: text('id').primaryKey(),
-	tableName: text('table_name').notNull(),
-	key: text('key').notNull(),
-	label: text('label').notNull(),
-	type: text('type', { enum: ['text', 'number', 'select', 'date', 'email', 'tel', 'textarea', 'recordSelect'] })
-		.notNull()
-		.default('text'),
-	required: integer('required', { mode: 'boolean' }).notNull().default(false),
-	options: text('options').default('[]'),
-	refTable: text('ref_table'),
-	sortOrder: integer('sort_order').notNull().default(0),
-	createdAt: integer('created_at', { mode: 'timestamp' })
-		.notNull()
-		.default(sql`(unixepoch())`)
-});
-
 export const integrations = sqliteTable('integrations', {
 	id: text('id').primaryKey(),
 	name: text('name').notNull(),
@@ -240,7 +223,6 @@ export const appPages = sqliteTable('app_pages', {
 export type EntityType = typeof entityTypes.$inferSelect;
 export type EntityField = typeof entityFields.$inferSelect;
 export type Entity = typeof entities.$inferSelect;
-export type CoreCustomField = typeof coreCustomFields.$inferSelect;
 export type EmailProviderSettings = typeof emailProviders.$inferSelect;
 export type NewEmailProviderSettings = typeof emailProviders.$inferInsert;
 export type AiSettings = typeof aiSettings.$inferSelect;
