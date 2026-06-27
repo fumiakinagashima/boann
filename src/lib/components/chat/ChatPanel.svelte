@@ -260,6 +260,29 @@
 			margin: 0.2em 0;
 		}
 		:global(li) { margin: 0.1em 0; }
+
+		:global(table) {
+			width: 100%;
+			border-collapse: collapse;
+			margin: 0.5em 0;
+			font-size: 0.8125rem;
+			display: block;
+			overflow-x: auto;
+		}
+		:global(th), :global(td) {
+			border: 1px solid var(--color-border);
+			padding: 5px 9px;
+			text-align: left;
+			vertical-align: top;
+		}
+		:global(th) {
+			background: var(--color-background);
+			font-weight: 600;
+			white-space: nowrap;
+		}
+		:global(tr:nth-child(even) td) {
+			background: color-mix(in srgb, var(--color-border) 22%, transparent);
+		}
 	}
 
 	.chat-input {
