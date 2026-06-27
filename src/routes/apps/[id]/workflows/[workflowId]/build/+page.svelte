@@ -1,17 +1,54 @@
 <script lang="ts">
+	import { invalidateAll } from '$app/navigation';
 	import WorkflowEditor from '$lib/components/database/WorkflowEditor.svelte';
 	import WorkflowChatPanel from '$lib/components/database/WorkflowChatPanel.svelte';
 	import ChevronLeft from '$lib/components/icon/ChevronLeft.svelte';
+	import { toast } from '$lib/stores/toast.svelte';
+	import { validateWorkflow } from '$lib/workflow-validation';
 	import type { WorkflowState } from '$lib/components/chat/Workflow.svelte';
 	import type { PageData, ActionData } from './$types';
 
 	let { data, form }: { data: PageData; form: ActionData } = $props();
 
-	type EditorRef = { getState: () => WorkflowState; setState: (s: WorkflowState) => void };
+	type EditorRef = { getState: () => WorkflowState; setState: (s: WorkflowState) => void; getEnabled: () => boolean };
 	let editorRef = $state<EditorRef | null>(null);
 
 	function confirmDeleteWorkflow(e: SubmitEvent) {
 		if (!confirm(`ワークフロー「${data.workflow.name}」を削除しますか？`)) e.preventDefault();
+	}
+
+	// 保存処理（WorkflowEditor から移管）。このページは既存ワークフローの編集なので常に PATCH。
+	let saving = $state(false);
+	async function handleSave() {
+		if (saving || !editorRef) return;
+		const state = editorRef.getState();
+		const name = state.name.trim();
+		if (!name) {
+			toast.error('ワークフロー名を入力してください');
+			return;
+		}
+		const validation = validateWorkflow(state.triggerHour, state.triggerMinute, state.steps, data.entityTypes, data.slackIntegrations);
+		if (!validation.ok) {
+			for (const msg of validation.errors) toast.error(msg);
+			return;
+		}
+		saving = true;
+		try {
+			const res = await fetch(`/api/workflows/${data.workflow.id}`, {
+				method: 'PATCH',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ ...state, name, enabled: editorRef.getEnabled() })
+			});
+			if (!res.ok) {
+				throw new Error(((await res.json()) as { error?: string }).error ?? '更新に失敗しました');
+			}
+			toast.success(`「${name}」を更新しました`);
+			await invalidateAll();
+		} catch (e) {
+			toast.error(e instanceof Error ? e.message : '更新に失敗しました');
+		} finally {
+			saving = false;
+		}
 	}
 
 	const defaultState: WorkflowState = {
@@ -49,9 +86,14 @@
 	<div class="editor-col">
 		<div class="editor-header">
 			<a href="/apps/{data.app.id}" class="back-link"><ChevronLeft size={15} />{data.app.label}</a>
-			<form method="POST" action="?/delete" onsubmit={confirmDeleteWorkflow} class="delete-form">
-				<button type="submit" class="btn-danger-ghost">削除</button>
-			</form>
+			<div class="header-actions">
+				<form method="POST" action="?/delete" onsubmit={confirmDeleteWorkflow} class="delete-form">
+					<button type="submit" class="btn-danger-ghost">削除</button>
+				</form>
+				<button class="btn-save" onclick={handleSave} disabled={saving}>
+					{saving ? '保存中…' : '保存'}
+				</button>
+			</div>
 		</div>
 		{#if form?.message}<p class="delete-error">{form.message}</p>{/if}
 		<WorkflowEditor
@@ -66,6 +108,7 @@
 			entityTypes={data.entityTypes}
 			slackIntegrations={data.slackIntegrations}
 			noChatPanel
+			externalSave
 		/>
 	</div>
 
@@ -123,7 +166,27 @@
 		&:hover { color: var(--color-text); }
 	}
 
+	.header-actions {
+		display: flex;
+		align-items: center;
+		gap: 8px;
+	}
+
 	.delete-form { display: contents; }
+
+	.btn-save {
+		padding: 5px 14px;
+		border-radius: 6px;
+		font-size: 0.8125rem;
+		font-weight: 500;
+		background: var(--color-primary);
+		color: #fff;
+		border: none;
+		cursor: pointer;
+		transition: opacity 0.15s;
+		&:hover:not(:disabled) { opacity: 0.88; }
+		&:disabled { opacity: 0.45; cursor: not-allowed; }
+	}
 
 	.btn-danger-ghost {
 		padding: 5px 12px;

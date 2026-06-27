@@ -12,30 +12,21 @@
 </script>
 
 <div class="build-page">
-	<div class="build-header">
+	<div class="panel-header">
 		<a href="/apps/{data.app.id}" class="back-link"><ChevronLeft size={15} />{data.app.label}</a>
-		<div class="header-main">
-			<div class="header-title">
-				<input
-					class="page-label-input"
-					type="text"
-					bind:value={s.pageLabel}
-					oninput={s.markDirty}
-					placeholder="ページ名"
-				/>
-				<span class="page-badge">ページ設定</span>
-			</div>
-			<div class="header-actions">
-				{#if s.saved}<span class="saved-msg">✓ 保存しました</span>{/if}
-				<form method="POST" action="?/delete" onsubmit={confirmDeletePage} class="delete-form">
-					<button type="submit" class="btn-danger-ghost">削除</button>
-				</form>
-				<a href="/apps/{data.app.id}/pages/{data.page.id}" class="btn-secondary">プレビュー</a>
-				<button class="btn-primary" onclick={s.save} disabled={s.saving || !s.dirty}>
-					{s.saving ? '保存中…' : '保存'}
-				</button>
-			</div>
+		<div class="meta-actions">
+			<form method="POST" action="?/delete" onsubmit={confirmDeletePage} class="delete-form">
+				<button type="submit" class="btn-danger-ghost">削除</button>
+			</form>
+			<a href="/apps/{data.app.id}/pages/{data.page.id}" class="btn-secondary">プレビュー</a>
+			<button class="btn-primary" onclick={s.save} disabled={s.saving || !s.dirty}>
+				{s.saving ? '保存中…' : '保存'}
+			</button>
+			{#if s.saving}<span class="saved-msg">✓</span>{/if}				
 		</div>
+	</div>
+	<div class="build-header">
+		
 	</div>
 
 	<div class="build-body">
@@ -193,6 +184,12 @@
 		display: flex;
 		flex-direction: column;
 		gap: 10px;
+	}
+
+	.panel-header {
+		padding: 16px 24px 0;
+		display: flex;
+		justify-content: space-between;
 	}
 
 	.back-link {
@@ -482,7 +479,7 @@
 
 	/* ── Buttons ─────────────────────────────────────────────── */
 	.btn-primary {
-		padding: 7px 18px;
+		padding: 5px 12px;
 		border-radius: 6px;
 		font-size: 0.875rem;
 		font-weight: 500;
@@ -496,7 +493,7 @@
 	}
 
 	.btn-secondary {
-		padding: 7px 14px;
+		padding: 7px 12px;
 		border-radius: 6px;
 		font-size: 0.875rem;
 		border: 1px solid var(--color-border);
@@ -512,7 +509,7 @@
 	.delete-form { display: contents; }
 
 	.btn-danger-ghost {
-		padding: 7px 14px;
+		padding: 5px 12px;
 		border-radius: 6px;
 		font-size: 0.875rem;
 		border: 1px solid var(--color-border);

@@ -26,6 +26,7 @@
 		slackIntegrations?: SlackIntegrationOption[];
 		inDialog?: boolean;
 		noChatPanel?: boolean;
+		externalSave?: boolean;
 	};
 
 	let {
@@ -39,7 +40,8 @@
 		entityTypes = [],
 		slackIntegrations = [],
 		inDialog = false,
-		noChatPanel = false
+		noChatPanel = false,
+		externalSave = false
 	}: Props = $props();
 
 	// 保存後も画面遷移しないため、新規作成時に発行されたidを保持して以降の保存をPATCH（更新）に切り替える
@@ -55,6 +57,10 @@
 	}
 	export function setState(s: WorkflowState) {
 		wfRef?.setState(s);
+	}
+	// externalSave モード時、ホスト側の保存処理が有効化フラグを読むために公開する
+	export function getEnabled(): boolean {
+		return enabled;
 	}
 
 	let aiReview = $state<WorkflowReviewResult | null>(null);
@@ -186,9 +192,11 @@
 					✨ AIレビュー
 				{/if}
 			</button>
-			<button class="btn-save" onclick={handleSave} disabled={saving}>
-				{saving ? '保存中…' : '保存'}
-			</button>
+			{#if !externalSave}
+				<button class="btn-save" onclick={handleSave} disabled={saving}>
+					{saving ? '保存中…' : '保存'}
+				</button>
+			{/if}
 		</div>
 	</div>
 

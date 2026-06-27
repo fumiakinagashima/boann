@@ -266,6 +266,7 @@
 			transition: border-color 0.15s;
 			max-height: 100px;
 			overflow-y: auto;
+			background-color: #fff;
 
 			&:focus { border-color: var(--color-primary); }
 			&::placeholder { color: var(--color-text-muted); }
