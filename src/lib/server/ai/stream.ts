@@ -1,7 +1,7 @@
 import Anthropic from '@anthropic-ai/sdk';
 import type { MessageParam } from '@anthropic-ai/sdk/resources/messages';
 import { eq } from 'drizzle-orm';
-import { buildSystemPrompt, type AppContext } from './prompt';
+import { buildSystemBlocks, type AppContext } from './prompt';
 import { tools as allTools, dispatchTool } from '$lib/server/mcp';
 import { entityTypes } from '$lib/server/db/schema';
 
@@ -19,6 +19,17 @@ const APP_BUILDER_BLOCKED = new Set([
 	'delete_sent_reminders', 'delete_read_notifications'
 ]);
 const appBuilderTools = allTools.filter((t) => !APP_BUILDER_BLOCKED.has(t.name));
+
+// ツール定義は固定なので、配列末尾に cache_control を付けて全体をプロンプトキャッシュ対象にする。
+// 元配列は変更せず、末尾ツールだけ複製してマーカーを付与したコピーを使う。
+function withToolCache(toolList: typeof allTools): typeof allTools {
+	if (toolList.length === 0) return toolList;
+	const copy = [...toolList];
+	copy[copy.length - 1] = { ...copy[copy.length - 1], cache_control: { type: 'ephemeral' } };
+	return copy;
+}
+const mainChatToolsCached = withToolCache(mainChatTools);
+const appBuilderToolsCached = withToolCache(appBuilderTools);
 import { DEFAULT_AI_MODEL } from './settings';
 import type { Db } from '$lib/server/db';
 import type { MessageContent, WorkflowStep } from '$lib/types/chat';
@@ -218,11 +229,11 @@ export async function streamChat(
 		let currentTool: { id: string; name: string; inputJson: string } | null = null;
 		const turnEvents: StreamEvent[] = [];
 
-		const tools = appContext?.appId ? appBuilderTools : mainChatTools;
+		const tools = appContext?.appId ? appBuilderToolsCached : mainChatToolsCached;
 		const stream = anthropic.messages.stream({
 			model: model ?? DEFAULT_AI_MODEL,
 			max_tokens: 8192,
-			system: buildSystemPrompt(appContext),
+			system: buildSystemBlocks(appContext),
 			tools,
 			messages
 		});

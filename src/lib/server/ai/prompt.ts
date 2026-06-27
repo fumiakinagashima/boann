@@ -1,3 +1,4 @@
+import type { TextBlockParam } from '@anthropic-ai/sdk/resources/messages';
 import { WORKFLOW_ACTION_TOOLS, describeWorkflowActionToolForAI, getWorkflowActionTool } from '$lib/workflow-tools';
 import type { WorkflowStep } from '$lib/types/chat';
 
@@ -348,7 +349,9 @@ export type AppContext = {
 	tables: Array<{ id: string; name: string; label: string }>;
 };
 
-export function buildSystemPrompt(appContext?: AppContext): string {
+// 日時・アプリビルダー文脈など、リクエストごとに変動する末尾部分。
+// プロンプトキャッシュを効かせるため、固定の SYSTEM_PROMPT とは別ブロックに分離する。
+function buildDynamicContext(appContext?: AppContext): string {
 	const now = new Intl.DateTimeFormat('ja-JP', {
 		timeZone: 'Asia/Tokyo',
 		year: 'numeric',
@@ -358,14 +361,14 @@ export function buildSystemPrompt(appContext?: AppContext): string {
 		hour: '2-digit',
 		minute: '2-digit'
 	}).format(new Date());
-	let prompt = `${SYSTEM_PROMPT}\n\n## 現在日時\n${now}`;
+	let text = `## 現在日時\n${now}`;
 	if (appContext) {
 		const tableList =
 			appContext.tables.length > 0
 				? appContext.tables.map((t) => `- ${t.label}（name: ${t.name}, id: \`${t.id}\`）`).join('\n')
 				: '（まだテーブルがありません）';
 		const specText = appContext.spec?.trim() || '（仕様書は未入力です）';
-		prompt += `\n\n## アプリビルダーモード
+		text += `\n\n## アプリビルダーモード
 現在、アプリ「${appContext.appLabel}」（app_id: \`${appContext.appId}\`, name: ${appContext.appName}）の設計・構築中です。
 
 ### 仕様書
@@ -381,7 +384,18 @@ ${tableList}
 - レコードの登録・編集はフォームUIを通じて行う（create_entity 等は使用不可）
 - create_app は使わない（アプリはすでに存在する）`;
 	}
-	return prompt;
+	return text;
+}
+
+// system を「固定ブロック（プロンプトキャッシュ対象）」＋「動的ブロック（非キャッシュ）」に分割して返す。
+// 巨大で不変な SYSTEM_PROMPT をキャッシュすることで、エージェントループ（最大10ターン）内の再送と、
+// 5分TTL内の連続リクエストにおける入力トークンコスト・レイテンシを削減する。
+// 日時・appContext はリクエストごとに変わるためキャッシュ境界の外（末尾の別ブロック）に置く。
+export function buildSystemBlocks(appContext?: AppContext): TextBlockParam[] {
+	return [
+		{ type: 'text', text: SYSTEM_PROMPT, cache_control: { type: 'ephemeral' } },
+		{ type: 'text', text: buildDynamicContext(appContext) }
+	];
 }
 
 export const WORKFLOW_REVIEW_SYSTEM_PROMPT = `あなたはBoannというノーコードアプリプラットフォームのワークフロー（毎日決まった時刻に実行する自動化フロー）レビューAIです。
