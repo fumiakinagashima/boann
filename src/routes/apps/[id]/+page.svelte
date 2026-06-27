@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { invalidateAll } from '$app/navigation';
-	import { createAppBuilderState, type AppTab } from './index.svelte';
+	import { createAppBuilderState } from './index.svelte';
 	import ChevronLeft from '$lib/components/icon/ChevronLeft.svelte';
 	import AppIcon, { ICON_OPTIONS } from '$lib/components/AppIcon.svelte';
 	import ChatPanel from '$lib/components/chat/ChatPanel.svelte';
@@ -49,36 +49,10 @@
 		</div>
 
 		<div class="panel-body">
-			<!-- Spec editor -->
-			<section class="spec-section">
-				<h2 class="section-label">仕様書</h2>
-				<textarea
-					class="spec-textarea"
-					bind:value={s.spec}
-					oninput={s.markDirty}
-					placeholder="アプリの仕様をここに記述してください。AIが設計をサポートします。&#10;&#10;例:&#10;## 顧客商談管理&#10;&#10;### データ&#10;- 顧客マスタ（会社名, 担当者, 業種）&#10;- 商談（顧客, ステータス, 金額）&#10;- 活動履歴（商談, 種別, 日時, 内容）&#10;&#10;### ページ&#10;- 商談ボード（カンバン, ステータス別）"
-				></textarea>
-				<button class="btn-generate" onclick={s.generateFromSpec} disabled={!s.spec.trim() || s.saving}>
-					✨ AIに設計・作成してもらう
-				</button>
-			</section>
-
-			<!-- Tab bar -->
-			<div class="tab-bar" role="tablist">
-				{#each [['tables', 'テーブル'], ['pages', 'ページ'], ['workflows', 'ワークフロー']] as [tabId, label] (tabId)}
-					<button
-						class="tab-btn"
-						class:active={s.activeTab === tabId}
-						role="tab"
-						aria-selected={s.activeTab === tabId}
-						onclick={() => s.setActiveTab(tabId as AppTab)}
-					>{label}</button>
-				{/each}
-			</div>
-
-			<!-- Tab: Tables -->
-			{#if s.activeTab === 'tables'}
-				<div class="tab-content">
+			<!-- テーブル -->
+			<section class="list-section">
+				<h2 class="section-label">テーブル</h2>
+				<div class="item-list">
 					{#each s.tables as table (table.id)}
 						<div
 							class="item-row"
@@ -95,14 +69,8 @@
 								<p class="item-label">{table.label}</p>
 							</div>
 							<div class="item-footer">
-							<a
-								href="/apps/{data.app.id}/tables/{table.id}/build"
-								class="item-action"
-							>テーブル設定</a>
-							<a
-								class="item-action"
-								href={`/apps/${data.app.id}/tables/${table.id}`}
-							>データ管理</a>
+								<a href="/apps/{data.app.id}/tables/{table.id}/build" class="item-action">テーブル設定</a>
+								<a href={`/apps/${data.app.id}/tables/${table.id}`} class="item-action">データ管理</a>
 							</div>
 						</div>
 					{/each}
@@ -110,10 +78,12 @@
 						{s.addingTable ? '作成中…' : '+ テーブルを追加'}
 					</button>
 				</div>
+			</section>
 
-			<!-- Tab: Pages -->
-			{:else if s.activeTab === 'pages'}
-				<div class="tab-content">
+			<!-- ページ -->
+			<section class="list-section">
+				<h2 class="section-label">ページ</h2>
+				<div class="item-list">
 					{#each s.pages as pg (pg.id)}
 						<div
 							class="item-row"
@@ -130,14 +100,8 @@
 								<p class="item-label">{pg.label}</p>
 							</div>
 							<div class="item-footer">
-							<a
-								href="/apps/{data.app.id}/pages/{pg.id}/build"
-								class="item-action"
-							>ページ設定</a>
-							<a
-								class="item-action"
-								href={`/apps/${data.app.id}/pages/${pg.id}`}
-							>ページ表示</a>
+								<a href="/apps/{data.app.id}/pages/{pg.id}/build" class="item-action">ページ設定</a>
+								<a href={`/apps/${data.app.id}/pages/${pg.id}`} class="item-action">ページ表示</a>
 							</div>
 						</div>
 					{/each}
@@ -145,10 +109,12 @@
 						{s.addingPage ? '作成中…' : '+ ページを追加'}
 					</button>
 				</div>
+			</section>
 
-			<!-- Tab: Workflows -->
-			{:else if s.activeTab === 'workflows'}
-				<div class="tab-content">
+			<!-- ワークフロー -->
+			<section class="list-section">
+				<h2 class="section-label">ワークフロー</h2>
+				<div class="item-list">
 					{#each s.workflows as wf (wf.id)}
 						<div
 							class="item-row"
@@ -165,10 +131,7 @@
 								<p class="item-label">{wf.name}</p>
 							</div>
 							<div class="item-footer">
-								<a
-									href="/apps/{data.app.id}/workflows/{wf.id}/build"
-									class="item-action"
-								>ワークフロー設定</a>
+								<a href="/apps/{data.app.id}/workflows/{wf.id}/build" class="item-action">ワークフロー設定</a>
 							</div>
 						</div>
 					{/each}
@@ -176,17 +139,15 @@
 						{s.addingWorkflow ? '作成中…' : '+ ワークフローを追加'}
 					</button>
 				</div>
-			{/if}
+			</section>
 		</div>
 	{/snippet}
 
 	{#snippet chat()}
 		<ChatPanel
-			placeholder="仕様の相談・テーブル追加・修正の指示を入力…"
+			placeholder="テーブル追加・修正の指示を入力…"
 			onAction={() => invalidateAll()}
 			context={s.chatContext}
-			triggerMessage={s.aiTrigger}
-			onTriggerConsumed={s.clearTrigger}
 		/>
 	{/snippet}
 </BuilderLayout>
@@ -286,7 +247,7 @@
 		gap: 20px;
 	}
 
-	/* ── Spec editor ─────────────────────────────────────────── */
+	/* ── Section header ──────────────────────────────────────── */
 	.section-label {
 		font-size: 0.8125rem;
 		font-weight: 600;
@@ -329,86 +290,27 @@
 		&:disabled { opacity: 0.4; cursor: not-allowed; }
 	}
 
-	.spec-textarea {
-		width: 100%;
-		min-height: 300px;
-		padding: 12px 14px;
-		border: 1px solid var(--color-border);
-		border-radius: 8px;
-		background: var(--color-background);
-		color: var(--color-text);
-		font-size: 0.875rem;
-		font-family: ui-monospace, 'Cascadia Code', 'Source Code Pro', Menlo, monospace;
-		line-height: 1.7;
-		resize: vertical;
-		outline: none;
-		box-sizing: border-box;
-		transition: border-color 0.15s;
-
-		&:focus { border-color: var(--color-primary); }
-		&::placeholder { color: var(--color-text-muted); opacity: 0.5; }
-	}
-
-	.btn-generate {
-		width: 100%;
-		margin-top: 8px;
-		padding: 9px 14px;
-		border-radius: 8px;
-		font-size: 0.875rem;
-		font-weight: 500;
-		background: color-mix(in srgb, var(--color-primary) 10%, transparent);
-		color: var(--color-primary);
-		border: 1px solid color-mix(in srgb, var(--color-primary) 30%, transparent);
-		cursor: pointer;
-		font-family: inherit;
-		transition: background 0.15s, border-color 0.15s;
-
-		&:hover:not(:disabled) {
-			background: color-mix(in srgb, var(--color-primary) 18%, transparent);
-			border-color: var(--color-primary);
-		}
-		&:disabled { opacity: 0.4; cursor: not-allowed; }
-	}
-
-	/* ── Tabs ────────────────────────────────────────────────── */
-	.tab-bar {
+	/* ── Section lists ───────────────────────────────────────── */
+	.list-section {
 		display: flex;
-		border-bottom: 1px solid var(--color-border);
-		gap: 0;
-		margin-bottom: -4px;
-		flex-shrink: 0;
+		flex-direction: column;
 	}
 
-	.tab-btn {
-		padding: 8px 16px;
-		font-size: 0.875rem;
-		font-weight: 500;
-		color: var(--color-text-muted);
-		background: none;
-		border: none;
-		border-bottom: 2px solid transparent;
-		cursor: pointer;
-		transition: color 0.15s, border-color 0.15s;
-		white-space: nowrap;
-
-		&:hover { color: var(--color-text); }
-		&.active {
-			color: var(--color-primary);
-			border-bottom-color: var(--color-primary);
-		}
-	}
-
-	/* ── Tab content rows ────────────────────────────────────── */
-	.tab-content {
+	.item-list {
 		display: grid;
 		grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
 		gap: 12px;
-		padding-top: 12px;
+		padding-top: 4px;
 	}
 
 	.item-row {
-		gap: 10px;
-		padding: 10px 12px;
+		box-sizing: border-box;
+		height: 64px;
+		display: flex;
+		flex-direction: column;
+		justify-content: center;
+		gap: 4px;
+		padding: 0 12px;
 		border-radius: 8px;
 		border: 1px solid var(--color-border);
 		background: var(--color-surface);
@@ -445,7 +347,6 @@
 	.item-footer {
 		display: flex;
 		gap: 16px;
-		margin-top: 4px;
 		& .item-action {
 			font-size: 0.8125rem;
 			color: var(--color-primary);
@@ -465,8 +366,12 @@
 	}
 
 	.btn-add-table {
-		margin-top: 4px;
-		padding: 8px 14px;
+		box-sizing: border-box;
+		height: 64px;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		padding: 0 14px;
 		border-radius: 7px;
 		font-size: 0.875rem;
 		font-weight: 500;

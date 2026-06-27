@@ -1,40 +1,21 @@
-import { goto, invalidateAll, replaceState } from '$app/navigation';
+import { goto, invalidateAll } from '$app/navigation';
 import type { PageData } from './$types';
 
+// テーブル／ページ／ワークフローの3種別（D&D並べ替えのキーに使用）
 export type AppTab = 'tables' | 'pages' | 'workflows';
-const VALID_TABS: AppTab[] = ['tables', 'pages', 'workflows'];
 
 export function createAppBuilderState(getData: () => PageData) {
-	// ── Tab ──────────────────────────────────────────────────────
-	// SSR では load が返す data.tab、クライアントでは実際のブラウザ URL を真実とする。
-	// replaceState は load を再実行しないため data.tab が stale になる。
-	// ブラウザバック時はコンポーネントが再マウントされ、復元された URL を読み直す。
-	function readInitialTab(): AppTab {
-		if (typeof window === 'undefined') return getData().tab;
-		const t = new URLSearchParams(window.location.search).get('tab') as AppTab | null;
-		return t && VALID_TABS.includes(t) ? t : 'tables';
-	}
-
-	let activeTab = $state<AppTab>(readInitialTab());
-	function setActiveTab(tab: AppTab) {
-		activeTab = tab;
-		replaceState(`?tab=${tab}`, {});
-	}
-
-	// ── App meta + spec (unified) ────────────────────────────────
+	// ── App meta ─────────────────────────────────────────────────
 	let appLabel = $state(getData().app.label);
 	let appIcon = $state(getData().app.icon ?? 'layout-grid');
-	let spec = $state(getData().app.spec ?? '');
 	let dirty = $state(false);
 	let saving = $state(false);
 	let saved = $state(false);
 	let deleting = $state(false);
-	let aiTrigger = $state<string | null>(null);
 
 	$effect(() => {
 		appLabel = getData().app.label;
 		appIcon = getData().app.icon ?? 'layout-grid';
-		spec = getData().app.spec ?? '';
 	});
 
 	function markDirty() { dirty = true; saved = false; }
@@ -46,7 +27,7 @@ export function createAppBuilderState(getData: () => PageData) {
 			await fetch(`/api/apps/${getData().app.id}`, {
 				method: 'PATCH',
 				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ label: appLabel.trim(), icon: appIcon, spec })
+				body: JSON.stringify({ label: appLabel.trim(), icon: appIcon })
 			});
 			await invalidateAll();
 			dirty = false;
@@ -67,14 +48,6 @@ export function createAppBuilderState(getData: () => PageData) {
 			deleting = false;
 		}
 	}
-
-	async function generateFromSpec() {
-		if (!spec.trim()) return;
-		await save();
-		aiTrigger = `以下の仕様書に基づいて、このアプリのテーブルとページを設計・作成してください:\n\n${spec}`;
-	}
-
-	function clearTrigger() { aiTrigger = null; }
 
 	// ── List ordering (drag & drop) ──────────────────────────────
 	// data からローカルにコピーし、D&D 中は楽観的に並べ替える。保存後 invalidateAll で確定。
@@ -204,24 +177,18 @@ export function createAppBuilderState(getData: () => PageData) {
 		appId: getData().app.id,
 		appLabel: getData().app.label,
 		appName: getData().app.name,
-		spec: getData().app.spec,
 		tables: getData().tables.map((t) => ({ id: t.id, name: t.name, label: t.label }))
 	});
 
 	return {
-		get activeTab() { return activeTab; },
-		setActiveTab,
 		get appLabel() { return appLabel; },
 		set appLabel(v) { appLabel = v; },
 		get appIcon() { return appIcon; },
 		set appIcon(v) { appIcon = v; },
-		get spec() { return spec; },
-		set spec(v) { spec = v; },
 		get dirty() { return dirty; },
 		get saving() { return saving; },
 		get saved() { return saved; },
 		get deleting() { return deleting; },
-		get aiTrigger() { return aiTrigger; },
 		get addingTable() { return addingTable; },
 		get addingPage() { return addingPage; },
 		get addingWorkflow() { return addingWorkflow; },
@@ -233,8 +200,6 @@ export function createAppBuilderState(getData: () => PageData) {
 		markDirty,
 		save,
 		deleteApp,
-		generateFromSpec,
-		clearTrigger,
 		addTable,
 		addPage,
 		addWorkflow,

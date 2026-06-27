@@ -301,7 +301,6 @@ export type AppContext = {
 	appId: string;
 	appLabel: string;
 	appName: string;
-	spec?: string | null;
 	tables: Array<{ id: string; name: string; label: string }>;
 };
 
@@ -323,18 +322,13 @@ function buildDynamicContext(appContext?: AppContext): string {
 			appContext.tables.length > 0
 				? appContext.tables.map((t) => `- ${t.label}（name: ${t.name}, id: \`${t.id}\`）`).join('\n')
 				: '（まだテーブルがありません）';
-		const specText = appContext.spec?.trim() || '（仕様書は未入力です）';
 		text += `\n\n## アプリビルダーモード
 現在、アプリ「${appContext.appLabel}」（app_id: \`${appContext.appId}\`, name: ${appContext.appName}）の設計・構築中です。
-
-### 仕様書
-${specText}
 
 ### テーブル一覧
 ${tableList}
 
 ### 操作ルール
-- 仕様書（spec）の作成・修正を求められた場合: \`update_app_spec\` を使い \`app_id: "${appContext.appId}"\` と仕様書の全文（Markdown）を渡す。これで画面の仕様書欄に反映される。会話文で内容を述べるだけにせず、必ずこのツールで書き込むこと。提示したい内容はそのまま spec として書き込み、毎回置き換え後の完成形の全文を渡す
 - 新しいテーブルを追加する場合: \`create_table\` を使い \`app_id: "${appContext.appId}"\` を必ず指定する。ページは自動生成されないので、画面表示が必要なら続けて \`create_page\` でページを作成する
 - 既存テーブルにフィールドを追加する場合: \`add_entity_field\` を使い、上記テーブル一覧の id を指定する
 - 追加のビュー（カンバン等）を作りたい場合: \`create_page\` を使い \`app_id: "${appContext.appId}"\` を指定する

@@ -6,7 +6,6 @@ export const apps = sqliteTable('apps', {
 	name: text('name').notNull(),
 	label: text('label').notNull(),
 	icon: text('icon'),
-	spec: text('spec'),
 	createdAt: integer('created_at', { mode: 'timestamp' })
 		.notNull()
 		.default(sql`(unixepoch())`),

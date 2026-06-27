@@ -45,7 +45,6 @@ export const POST: RequestHandler = async ({ request, platform, locals }) => {
 			appId: string;
 			appLabel: string;
 			appName: string;
-			spec?: string | null;
 			tables: Array<{ id: string; name: string; label: string }>;
 		};
 	};

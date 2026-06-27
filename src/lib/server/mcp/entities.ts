@@ -3,7 +3,7 @@ import { z } from 'zod';
 import type { Tool } from '@anthropic-ai/sdk/resources/messages';
 import type { Db } from '../db';
 import { entityTypes, entityFields, entities } from '../db/schema';
-import { createApp, createEntityType, createRecord, createPage, updateAppSpec } from '../db/table-service';
+import { createApp, createEntityType, createRecord, createPage } from '../db/table-service';
 import type { PageComponent } from '../db/table-service';
 import { parseJson, now } from './shared';
 
@@ -248,22 +248,6 @@ export const tools: Tool[] = [
 			},
 			required: ['app_id', 'label', 'components']
 		}
-	},
-	{
-		name: 'update_app_spec',
-		description:
-			'現在編集中のアプリの仕様書（spec）を作成・更新し、画面の仕様書欄に反映する。ユーザーから仕様書の作成・修正を求められたら、会話で内容を述べるだけで済ませず、必ずこのツールで仕様書の全文（Markdown）を書き込むこと。部分的な追記ではなく、常に置き換え後の完成形の全文を渡す。',
-		input_schema: {
-			type: 'object',
-			properties: {
-				app_id: { type: 'string', description: '対象のアプリID' },
-				spec: {
-					type: 'string',
-					description: '仕様書の全文（Markdown形式）。既存の内容を置き換える完成形を渡す。'
-				}
-			},
-			required: ['app_id', 'spec']
-		}
 	}
 ];
 
@@ -336,11 +320,6 @@ const createPageSchema = z.object({
 	app_id: z.string(),
 	label: z.string().min(1),
 	components: z.array(pageComponentInputSchema).min(1)
-});
-
-const updateAppSpecSchema = z.object({
-	app_id: z.string(),
-	spec: z.string()
 });
 
 const createAppFieldSchema = z.object({
@@ -521,10 +500,4 @@ export async function handleCreatePage(db: Db, input: unknown) {
 	}));
 	const result = await createPage(db, data.app_id, { label: data.label, components });
 	return { id: result.id, label: data.label, appId: data.app_id, componentCount: components.length };
-}
-
-export async function handleUpdateAppSpec(db: Db, input: unknown) {
-	const data = updateAppSpecSchema.parse(input);
-	await updateAppSpec(db, data.app_id, data.spec);
-	return { ok: true, appId: data.app_id, length: data.spec.length };
 }

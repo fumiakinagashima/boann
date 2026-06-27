@@ -12,7 +12,6 @@
 		appId: string;
 		appLabel: string;
 		appName: string;
-		spec?: string | null;
 		tables: Array<{ id: string; name: string; label: string }>;
 	};
 	type Props = {

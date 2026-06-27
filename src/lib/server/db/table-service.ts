@@ -397,10 +397,6 @@ export async function createEntityType(db: Db, input: EntityTypeInput): Promise<
 	return { id, name: input.name };
 }
 
-export async function updateAppSpec(db: Db, id: string, spec: string): Promise<void> {
-	await db.update(apps).set({ spec, updatedAt: new Date() }).where(eq(apps.id, id));
-}
-
 export async function updateAppMeta(db: Db, id: string, input: { label?: string; icon?: string }): Promise<void> {
 	const set: Record<string, unknown> = { updatedAt: new Date() };
 	if (input.label !== undefined) set.label = input.label;
@@ -408,8 +404,8 @@ export async function updateAppMeta(db: Db, id: string, input: { label?: string;
 	await db.update(apps).set(set).where(eq(apps.id, id));
 }
 
-export async function getAppById(db: Db, id: string): Promise<{ id: string; name: string; label: string; icon: string | null; spec: string | null } | null> {
-	const [a] = await db.select({ id: apps.id, name: apps.name, label: apps.label, icon: apps.icon, spec: apps.spec })
+export async function getAppById(db: Db, id: string): Promise<{ id: string; name: string; label: string; icon: string | null } | null> {
+	const [a] = await db.select({ id: apps.id, name: apps.name, label: apps.label, icon: apps.icon })
 		.from(apps).where(eq(apps.id, id));
 	return a ?? null;
 }
