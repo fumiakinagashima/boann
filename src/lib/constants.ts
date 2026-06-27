@@ -6,7 +6,7 @@ export const CHAT_TITLE_MAX_LENGTH = 24;
 export const CHAT_TEXTAREA_MAX_HEIGHT_PX = 192;
 
 // ── Lists ──────────────────────────────────────────────────────────────────
-// 一覧表示の1ページあたり件数（チャットの Table・/database 一覧で共通）
+// 一覧表示の1ページあたり件数（チャットの Table・レコード一覧で共通）
 export const LIST_PAGE_SIZE = 20;
 
 // ── Deal statuses ─────────────────────────────────────────────────────────

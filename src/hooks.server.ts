@@ -9,7 +9,7 @@ const PUBLIC_API_PREFIXES = ['/api/auth/'];
 
 // 認証情報・権限変更を含むページ・APIはadmin権限のみアクセス可能
 const ADMIN_ONLY_PREFIXES = [
-	'/database/accounts',
+	'/accounts',
 	'/settings/integrations',
 	'/settings/email',
 	'/settings/ai',

@@ -43,7 +43,7 @@ const HELP: Record<string, object> = {
 			'レコードの削除は、一覧の行をクリックして詳細ダイアログを開き、右上の「削除」ボタンから行えます'
 		],
 		relatedPages: [
-			{ label: 'データ管理', href: '/database', description: '作成したアプリのテーブル・データを直接管理できます' },
+			{ label: 'アプリ一覧', href: '/', description: '作成したアプリのテーブル・データを直接管理できます' },
 			{ label: '設定', href: '/settings', description: 'アプリの各種設定を変更できます' }
 		]
 	},
@@ -62,7 +62,7 @@ const HELP: Record<string, object> = {
 			'フィールド構成の変更はデータ管理のスキーマ編集画面からも行えます'
 		],
 		relatedPages: [
-			{ label: 'データ管理', href: '/database', description: '作成したアプリのテーブル一覧・スキーマ編集ができます' }
+			{ label: 'アプリ一覧', href: '/', description: '作成したアプリのテーブル一覧・スキーマ編集ができます' }
 		]
 	},
 	tables: {
@@ -78,7 +78,7 @@ const HELP: Record<string, object> = {
 			'システム予約語（accounts, reminders, workflows 等）はテーブル名として使用できません'
 		],
 		relatedPages: [
-			{ label: 'データ管理', href: '/database', description: 'テーブル一覧・スキーマ編集ができます' }
+			{ label: 'アプリ一覧', href: '/', description: 'テーブル一覧・スキーマ編集ができます' }
 		]
 	},
 	records: {
@@ -95,7 +95,7 @@ const HELP: Record<string, object> = {
 			'行クリックで詳細ダイアログを開けます（チャットの一覧テーブルでも使えます）'
 		],
 		relatedPages: [
-			{ label: 'データ管理', href: '/database', description: '各テーブルのレコード一覧・登録・編集・削除ができます' }
+			{ label: 'アプリ一覧', href: '/', description: '各テーブルのレコード一覧・登録・編集・削除ができます' }
 		]
 	},
 	workflows: {
@@ -112,7 +112,7 @@ const HELP: Record<string, object> = {
 			'ワークフロー管理画面から有効化・無効化・実行ログの確認ができます'
 		],
 		relatedPages: [
-			{ label: 'ワークフロー管理', href: '/database/workflows', description: 'ワークフローの一覧・有効化・実行ログ確認ができます' }
+			{ label: 'ワークフロー管理', href: '/workflows', description: 'ワークフローの一覧・有効化・実行ログ確認ができます' }
 		]
 	},
 	documents: {
@@ -139,7 +139,6 @@ const HELP: Record<string, object> = {
 			'Slack通知は外部API連携画面でWebhook URLの設定が必要です'
 		],
 		relatedPages: [
-			{ label: 'リマインダー管理', href: '/database/reminders', description: '登録済みリマインダーの確認・削除ができます' },
 			{ label: '外部API連携', href: '/settings/integrations', description: 'Slack Webhook URLの設定ができます' }
 		]
 	},

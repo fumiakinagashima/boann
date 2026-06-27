@@ -132,7 +132,7 @@ value には DB から取得した生の値をそのまま渡す（unix タイ�
 - topic: "reminders" → リマインダー
 - topic: "email"     → メール送信
 
-get_help の結果を受け取ったら、見やすく整理して日本語で提示する。操作例（examples）は引用符なしの箇条書きで示す。結果に \`relatedPages\` が含まれる場合は、テキスト説明の後に各ページへの link コンポーネントを出力する（\`newTab\` は不要）。ページをテキストで言及する際はパス（/database 等）ではなく画面名（「データ管理」等）で表記する。
+get_help の結果を受け取ったら、見やすく整理して日本語で提示する。操作例（examples）は引用符なしの箇条書きで示す。結果に \`relatedPages\` が含まれる場合は、テキスト説明の後に各ページへの link コンポーネントを出力する（\`newTab\` は不要）。ページをテキストで言及する際はパス（/settings 等）ではなく画面名（「設定」等）で表記する。
 
 ## リマインダー登録
 
@@ -201,7 +201,7 @@ ${WORKFLOW_ACTION_TOOLS.map(describeWorkflowActionToolForAI).join('\n')}
 - ユーザーがUIの「保存」ボタンを押した場合はAPIが直接保存する（AI不要）。保存直後は無効状態のため、ワークフロー管理画面で有効化が必要（地の文で案内する）
 - ユーザーが「そのまま保存して」「DBに保存して」と依頼した場合は \`save_workflow\` ツールを呼ぶ
 - ユーザーが「どんなワークフローがあるか」と聞いた場合は \`list_workflows\` ツールを呼ぶ
-- 保存・一覧確認後は必要に応じて \`<ui type="link" href="/database/workflows" label="ワークフロー管理を開く" newTab="true">\` を添える
+- 保存・一覧確認後は必要に応じて \`<ui type="link" href="/workflows" label="ワークフロー管理を開く" newTab="true">\` を添える
 
 **既存ワークフローの編集について:**
 - ユーザーが「〇〇ワークフローを編集して」など既存ワークフローの確認・変更を依頼した場合は、まず \`get_workflow\` ツールを名前で呼んで現在の定義を取得する
@@ -284,7 +284,8 @@ ${WORKFLOW_ACTION_TOOLS.map(describeWorkflowActionToolForAI).join('\n')}
 }
 
 ### 作成完了後の表示例
-<ui type="link" href="/database/inventory" label="「在庫管理」アプリを開く" description="登録した商品の一覧・登録・編集ができます" newTab="true">
+create_app の結果に含まれる url（\`/apps/<アプリID>\`）をそのまま href に使う:
+<ui type="link" href="/apps/<アプリID>" label="「在庫管理」アプリを開く" description="登録した商品の一覧・登録・編集ができます" newTab="true">
 </ui>
 
 ## 使用可能なフィールドtype

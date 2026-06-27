@@ -77,7 +77,7 @@
 <div class="page">
 	<header class="page-header">
 		<div class="breadcrumb">
-			<a href="/database">データ管理</a>
+			<a href="/">ホーム</a>
 			<span class="sep">/</span>
 			<span>アカウント</span>
 		</div>

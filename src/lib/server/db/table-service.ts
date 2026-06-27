@@ -79,7 +79,7 @@ const toTs = (d: Date | null | undefined): number | null =>
 
 export const CORE_TABLE_NAMES: string[] = [];
 
-// /database/[type] ルートと衝突する予約済み名
+// 固定ルート・サブルートと衝突する予約済みテーブル名
 const RESERVED_NAMES = new Set([
 	'accounts', 'reminders', 'workflows', // 固定ルート
 	'entity_types', 'entity_fields', 'entities',

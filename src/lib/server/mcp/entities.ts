@@ -16,7 +16,7 @@ export const tools: Tool[] = [
 	{
 		name: 'create_app',
 		description:
-			'チャットで「○○管理アプリを作って」のような業務アプリ作成の依頼を受けた場合に使う。カスタムテーブル（エンティティ種別）とそのフィールド定義を一括で作成し、任意でサンプルデータも登録する。作成後は /database/{name} で即座にCRUD画面（一覧・登録・編集）が使える。既存のカスタムテーブルにフィールドを追加したいだけの場合は add_entity_field を使う。',
+			'チャットで「○○管理アプリを作って」のような業務アプリ作成の依頼を受けた場合に使う。カスタムテーブル（エンティティ種別）とそのフィールド定義を一括で作成し、任意でサンプルデータも登録する。作成後はアプリ画面（/apps/{id}）でテーブルのデータ（一覧・登録・編集）を管理できる。既存のカスタムテーブルにフィールドを追加したいだけの場合は add_entity_field を使う。',
 		input_schema: {
 			type: 'object',
 			properties: {
@@ -409,7 +409,7 @@ export async function handleCreateApp(db: Db, input: unknown) {
 		icon: data.icon,
 		fieldCount: data.fields.length,
 		seedCount: data.seed_records.length,
-		url: `/database/${data.name}`
+		url: `/apps/${app.id}`
 	};
 }
 
