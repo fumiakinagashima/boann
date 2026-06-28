@@ -1,5 +1,5 @@
 import { sql } from 'drizzle-orm';
-import { integer, sqliteTable, text } from 'drizzle-orm/sqlite-core';
+import { integer, sqliteTable, text, uniqueIndex } from 'drizzle-orm/sqlite-core';
 
 export const apps = sqliteTable('apps', {
 	id: text('id').primaryKey(),
@@ -14,17 +14,22 @@ export const apps = sqliteTable('apps', {
 		.default(sql`(unixepoch())`)
 });
 
-export const entityTypes = sqliteTable('entity_types', {
-	id: text('id').primaryKey(),
-	name: text('name').notNull().unique(),
-	label: text('label').notNull(),
-	icon: text('icon'),
-	appId: text('app_id').references(() => apps.id),
-	sortOrder: integer('sort_order').notNull().default(0),
-	createdAt: integer('created_at', { mode: 'timestamp' })
-		.notNull()
-		.default(sql`(unixepoch())`)
-});
+export const entityTypes = sqliteTable(
+	'entity_types',
+	{
+		id: text('id').primaryKey(),
+		// name はアプリ内で一意（グローバルではない）。同名テーブルを別アプリで持てる。
+		name: text('name').notNull(),
+		label: text('label').notNull(),
+		icon: text('icon'),
+		appId: text('app_id').references(() => apps.id),
+		sortOrder: integer('sort_order').notNull().default(0),
+		createdAt: integer('created_at', { mode: 'timestamp' })
+			.notNull()
+			.default(sql`(unixepoch())`)
+	},
+	(t) => [uniqueIndex('entity_types_app_id_name_unique').on(t.appId, t.name)]
+);
 
 export const entityFields = sqliteTable('entity_fields', {
 	id: text('id').primaryKey(),

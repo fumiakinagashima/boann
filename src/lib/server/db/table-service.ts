@@ -1,4 +1,4 @@
-import { eq, desc, sql, inArray, isNull } from 'drizzle-orm';
+import { eq, and, desc, sql, inArray, isNull } from 'drizzle-orm';
 import type { BatchItem } from 'drizzle-orm/batch';
 import type { SQLiteColumn, SQLiteTable } from 'drizzle-orm/sqlite-core';
 import type { Db } from './index';
@@ -370,9 +370,13 @@ export async function createEntityType(db: Db, input: EntityTypeInput): Promise<
 	if (RESERVED_NAMES.has(input.name)) {
 		throw new Error(`テーブル名 "${input.name}" はシステムで予約されています。別の名前を使用してください。`);
 	}
-	const [existing] = await db.select({ name: entityTypes.name }).from(entityTypes).where(eq(entityTypes.name, input.name));
+	// name はアプリ内で一意。同名でも別アプリなら作成できる。
+	const [existing] = await db
+		.select({ name: entityTypes.name })
+		.from(entityTypes)
+		.where(and(eq(entityTypes.name, input.name), eq(entityTypes.appId, input.appId)));
 	if (existing) {
-		throw new Error(`テーブル名 "${input.name}" はすでに使用されています。`);
+		throw new Error(`テーブル名 "${input.name}" はこのアプリ内ですでに使用されています。`);
 	}
 
 	const id = crypto.randomUUID();
