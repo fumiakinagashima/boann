@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { onMount, untrack } from 'svelte';
 	import SearchSelect from '$lib/components/ui/SearchSelect.svelte';
-	import type { FormField } from '$lib/types/chat';
+	import { isRefField, type FormField } from '$lib/types/chat';
 	import * as m from '$lib/paraglide/messages.js';
 
 	type Props = {
@@ -28,7 +28,7 @@
 
 	onMount(async () => {
 		const refTables = [...new Set(
-			fields.filter((f) => f.type === 'recordSelect' && f.refTable).map((f) => f.refTable!)
+			fields.filter((f) => isRefField(f.type) && f.refTable).map((f) => f.refTable!)
 		)];
 		for (const refTable of refTables) {
 			const res = await fetch(`/api/database/${refTable}/records`);
@@ -53,7 +53,7 @@
 					if (val.split(',').filter(Boolean).length === 0) {
 						newErrors[field.key] = m.form_error_select_required();
 					}
-				} else if (field.type === 'select' || field.type === 'recordSelect') {
+				} else if (field.type === 'select' || isRefField(field.type)) {
 					if (!val) newErrors[field.key] = m.form_error_select_required();
 				} else {
 					if (!val) newErrors[field.key] = m.form_error_required();
@@ -107,7 +107,7 @@
 	{#each fields as field}
 		{#if field.type === 'hidden'}
 			<input type="hidden" id={field.key} bind:value={values[field.key]} />
-		{:else if field.type === 'recordSelect'}
+		{:else if isRefField(field.type)}
 			<SearchSelect
 				label={field.label}
 				required={field.required}

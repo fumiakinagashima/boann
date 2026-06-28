@@ -3,6 +3,7 @@
 	import ChevronLeft from '$lib/components/icon/ChevronLeft.svelte';
 	import AppIcon from '$lib/components/AppIcon.svelte';
 	import SearchSelect from '$lib/components/ui/SearchSelect.svelte';
+	import { isRefField } from '$lib/types/chat';
 	import type { PageData } from './$types';
 
 	let { data }: { data: PageData } = $props();
@@ -116,7 +117,7 @@
 									{field.label}
 									{#if field.required}<span class="req-mark">*</span>{/if}
 								</label>
-								{#if field.type === 'recordSelect'}
+								{#if isRefField(field.type)}
 									<SearchSelect
 										bind:value={s.activeEdit!.formData[field.key]}
 										options={comp.recordOptions[field.key] ?? []}
@@ -182,7 +183,7 @@
 							{field.label}
 							{#if field.required}<span class="req-mark">*</span>{/if}
 						</label>
-						{#if field.type === 'recordSelect'}
+						{#if isRefField(field.type)}
 							<SearchSelect
 								bind:value={s.activeEdit.formData[field.key]}
 								options={s.activeRecordOptions[field.key] ?? []}

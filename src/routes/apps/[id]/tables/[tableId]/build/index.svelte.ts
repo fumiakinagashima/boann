@@ -11,6 +11,7 @@ export const FIELD_TYPES = [
 	{ value: 'email',        label: 'メールアドレス' },
 	{ value: 'tel',          label: '電話番号' },
 	{ value: 'recordSelect', label: 'リレーション' },
+	{ value: 'account',      label: 'アカウント' },
 ] as const;
 
 export type SelectOption = { label: string; value: string };
@@ -19,7 +20,7 @@ export type FieldRow = {
 	_id: string;
 	label: string;
 	key: string;
-	type: 'text' | 'textarea' | 'number' | 'date' | 'select' | 'email' | 'tel' | 'recordSelect';
+	type: 'text' | 'textarea' | 'number' | 'date' | 'select' | 'email' | 'tel' | 'recordSelect' | 'account';
 	required: boolean;
 	defaultValue: string;
 	description: string;

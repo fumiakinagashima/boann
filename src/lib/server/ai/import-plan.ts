@@ -6,7 +6,7 @@ import { z } from 'zod';
 // 推論してプラン化する。確定（DBへの反映）は import-apply.ts が決定的に行う。
 // LLM はあくまで「設計案」を出すだけで、レコードの一括投入などは決定的コードに任せる。
 
-const FIELD_TYPES = ['text', 'number', 'select', 'date', 'email', 'tel', 'textarea', 'recordSelect'] as const;
+const FIELD_TYPES = ['text', 'number', 'select', 'date', 'email', 'tel', 'textarea', 'recordSelect', 'account'] as const;
 
 const fieldSchema = z.object({
 	key: z.string().regex(/^[a-z0-9_]+$/),
@@ -86,7 +86,7 @@ const PLAN_TOOL: Tool = {
 									type: {
 										type: 'string',
 										enum: [...FIELD_TYPES],
-										description: 'フィールドの型。recordSelect は他テーブルのレコードを参照する関係フィールド'
+										description: 'フィールドの型。recordSelect は他テーブルのレコードを参照する関係フィールド。account はアカウント（ユーザー）を参照する関係フィールドで ref_table は不要（自動で accounts を参照し、表示・選択肢ではアカウント名を表示）'
 									},
 									required: { type: 'boolean' },
 									options: {

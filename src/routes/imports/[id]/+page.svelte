@@ -15,7 +15,8 @@
 		email: 'メール',
 		tel: '電話',
 		textarea: '長文',
-		recordSelect: '参照'
+		recordSelect: '参照',
+		account: 'アカウント'
 	};
 
 	let status = $state<ImportJobStatus>(data.job.status);

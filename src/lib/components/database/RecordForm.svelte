@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { onMount, untrack } from 'svelte';
 	import type { FieldDef } from '$lib/server/db/table-service';
+	import { isRefField } from '$lib/types/chat';
 	import SearchSelect from '$lib/components/ui/SearchSelect.svelte';
 
 	type Props = {
@@ -19,7 +20,7 @@
 	let recordOptions = $state<Record<string, { value: string; label: string }[]>>({});
 
 	onMount(async () => {
-		const refFields = fields.filter(f => f.type === 'recordSelect' && f.refTable);
+		const refFields = fields.filter(f => isRefField(f.type) && f.refTable);
 		const tableCache: Record<string, { info: { fields: { key: string }[] }; rows: Record<string, unknown>[] }> = {};
 		for (const field of refFields) {
 			const refTable = field.refTable!;
@@ -58,7 +59,7 @@
 <form class="form" onsubmit={handleSubmit}>
 	{#each fields as field}
 		<div class="field">
-			{#if field.type === 'recordSelect'}
+			{#if isRefField(field.type)}
 				<SearchSelect
 					label={field.label}
 					required={field.required}

@@ -11,6 +11,7 @@ import {
 	listRecords
 } from '$lib/server/db/table-service';
 import type { FieldDef, RecordRow, PageComponent } from '$lib/server/db/table-service';
+import { isRefField } from '$lib/types/chat';
 
 export type ComponentData = {
 	component: PageComponent;
@@ -46,7 +47,7 @@ export const load: PageServerLoad = async ({ params, platform }) => {
 				? await listRecordsByEntityTypeId(db, comp.tableId)
 				: [];
 
-			const refFields = fields.filter(f => f.type === 'recordSelect' && f.refTable);
+			const refFields = fields.filter(f => isRefField(f.type) && f.refTable);
 			const recordOptions: Record<string, { value: string; label: string }[]> = {};
 			await Promise.all(refFields.map(async (f) => {
 				const [info, rows] = await Promise.all([

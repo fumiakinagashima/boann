@@ -2,7 +2,7 @@ import { eq, and, desc, sql, inArray, isNull } from 'drizzle-orm';
 import type { BatchItem } from 'drizzle-orm/batch';
 import type { SQLiteColumn, SQLiteTable } from 'drizzle-orm/sqlite-core';
 import type { Db } from './index';
-import { apps, appPages, entityTypes, entityFields, entities, bookmarks, workflows, workflowRuns } from './schema';
+import { apps, appPages, entityTypes, entityFields, entities, bookmarks, workflows, workflowRuns, accounts } from './schema';
 
 // app スコープ内の末尾に追加するための次の sortOrder（最大値 + 1、無ければ 0）を返す。
 async function nextSortOrder(
@@ -52,7 +52,7 @@ export type CustomFieldType = 'text' | 'number' | 'select' | 'date' | 'email' | 
 export type FieldDef = {
 	key: string;
 	label: string;
-	type: CustomFieldType | 'recordSelect' | 'datetime-local';
+	type: CustomFieldType | 'recordSelect' | 'account' | 'datetime-local';
 	required?: boolean;
 	options?: { label: string; value: string }[];
 	formOptions?: { label: string; value: string }[];
@@ -89,7 +89,27 @@ const RESERVED_NAMES = new Set([
 
 const SYSTEM_KEYS = new Set(['id', 'createdAt', 'updatedAt', 'entityTypeId']);
 
+// account 型フィールドが参照する仮想テーブル。accounts はコアテーブルなので entity_types には存在せず、
+// id→name の解決のために getTableInfo / listRecords が専用ブランチで擬似的に提供する。
+export const ACCOUNT_REF_TABLE = 'accounts';
+export const ACCOUNT_LABEL_KEY = 'name';
+
+function accountTableInfo(): TableInfo {
+	return {
+		id: ACCOUNT_REF_TABLE, label: 'アカウント', icon: 'user', isCore: true,
+		fields: [{ key: ACCOUNT_LABEL_KEY, label: '名前', type: 'text', required: true, options: [], listable: true }]
+	};
+}
+
+// 保存する ref 列を決める。account 型は accounts テーブル固定参照なので常に補完する。
+export function refColumns(f: { type: string; refTable?: string | null; refLabelKey?: string | null }): { refTable: string | null; refLabelKey: string | null } {
+	if (f.type === 'account') return { refTable: ACCOUNT_REF_TABLE, refLabelKey: ACCOUNT_LABEL_KEY };
+	return { refTable: f.refTable ?? null, refLabelKey: f.refLabelKey ?? null };
+}
+
 export async function getTableInfo(db: Db, type: string): Promise<TableInfo | null> {
+	if (type === ACCOUNT_REF_TABLE) return accountTableInfo();
+
 	const [et] = await db.select().from(entityTypes).where(eq(entityTypes.name, type));
 	if (!et) return null;
 
@@ -235,6 +255,13 @@ export async function listEntityTypesForWorkflow(db: Db): Promise<EntityTypeForW
 }
 
 export async function listRecords(db: Db, type: string, limit = 200): Promise<RecordRow[]> {
+	// accounts は account 型フィールドの選択肢・ラベル解決にのみ使うため、id と name だけを返す（機密情報を露出しない）。
+	if (type === ACCOUNT_REF_TABLE) {
+		return (await db.select({ id: accounts.id, name: accounts.name })
+			.from(accounts).orderBy(accounts.name).limit(limit))
+			.map(a => ({ id: a.id, name: a.name }));
+	}
+
 	const [et] = await db.select().from(entityTypes).where(eq(entityTypes.name, type));
 	if (!et) return [];
 
@@ -392,8 +419,7 @@ export async function createEntityType(db: Db, input: EntityTypeInput): Promise<
 				options: JSON.stringify(f.options ?? []),
 				defaultValue: f.defaultValue ?? null,
 				description: f.description ?? null,
-				refTable: f.refTable ?? null,
-				refLabelKey: f.refLabelKey ?? null,
+				...refColumns(f),
 				sortOrder: i
 			})
 		)
@@ -538,8 +564,7 @@ export async function updateEntityType(db: Db, name: string, input: Partial<Enti
 					options: JSON.stringify(f.options ?? []),
 					defaultValue: f.defaultValue ?? null,
 					description: f.description ?? null,
-					refTable: f.refTable ?? null,
-					refLabelKey: f.refLabelKey ?? null,
+					...refColumns(f),
 					sortOrder: i
 				})
 			);

@@ -37,6 +37,9 @@ export const SYSTEM_PROMPT = `あなたはBoannというノーコードアプリ
 - 関係フィールドは \`options\` を設計する必要はない（登録画面では既存レコードから検索選択するUIになる）
 - 例: 「注文テーブルを商品テーブルと紐付けたい」→ 「商品」フィールドを \`{"key":"product_id","label":"商品","type":"recordSelect","ref_table":"products"}\` とする
 
+アカウント（システムの利用者・担当者）と紐付けたい場合は、\`type\` を \`account\` にする。\`ref_table\` は不要（自動で \`accounts\` を参照する）。アカウントIDを保存し、登録画面では既存アカウントから検索選択、表示・一覧ではアカウント名を表示する。
+- 例: 「タスクに担当者を持たせたい」→ 「担当者」フィールドを \`{"key":"assignee","label":"担当者","type":"account"}\` とする
+
 ## UIコンポーネントの指定
 
 **【重要】DBへの書き込みはAIが直接行わない。登録・編集・削除はすべてユーザーがダイアログを操作して確定する。**
@@ -247,9 +250,9 @@ ${WORKFLOW_ACTION_TOOLS.map(describeWorkflowActionToolForAI).join('\n')}
 ユーザーが「○○管理アプリを作って」「簡単な△△アプリが欲しい」のように、業務アプリ・カスタムテーブルそのものの新規作成を依頼してきた場合は、以下の手順で対応する。
 
 1. 依頼内容から、テーブルの識別名（name。英小文字・数字・アンダースコアのみ）・表示名（label）・アイコン（icon。絵文字）・フィールド定義（key/label/type/required/options）を設計する
-   - 他テーブルのレコードと紐付けたい項目は、type を recordSelect にして ref_table を指定する（前述「関係（リレーション）フィールド」参照）
+   - 他テーブルのレコードと紐付けたい項目は、type を recordSelect にして ref_table を指定する。アカウント（担当者・利用者）と紐付けたい項目は type を account にする（ref_table 不要）。前述「関係（リレーション）フィールド」参照
 2. 設計したフィールド構成を table コンポーネントで提示し、地の文で「この内容で作成してよいか、変更したい点があれば教えてほしい」と確認する
-   - table の rows は「フィールド名」「型」「必須/任意」の3列。型は分かりやすい日本語（文字/数値/選択/日付/メール/電話番号/長文/関係）で表示してよい（create_app に渡す際は元のtype値に戻す）
+   - table の rows は「フィールド名」「型」「必須/任意」の3列。型は分かりやすい日本語（文字/数値/選択/日付/メール/電話番号/長文/関係/アカウント）で表示してよい（create_app に渡す際は元のtype値に戻す）
 3. ユーザーの確認・修正を受けたら、内容を反映して create_app を呼び出す。デモでの即時運用感のため、seed_records に2〜3件のサンプルデータを含める
 4. 作成後は地の文で完了を伝え、生成されたアプリへの link コンポーネント（newTab="true"）を表示する。フィールド構成を直したい場合は データ管理のスキーマ編集画面で編集できる旨を一言添える
 5. name が既存テーブル名と重複している場合はエラーになるので、別の name で再試行する
@@ -289,7 +292,7 @@ create_app の結果に含まれる url（\`/apps/<アプリID>\`）をそのま
 </ui>
 
 ## 使用可能なフィールドtype
-text / email / tel / number / textarea / select / date / datetime-local / hidden / recordSelect / multiselect
+text / email / tel / number / textarea / select / date / datetime-local / hidden / recordSelect / account / multiselect
 
 **hidden フィールドの使い方**: ユーザーに入力させずにIDなどを送信したい場合に使う。value にセットした値がそのまま送信される。
 

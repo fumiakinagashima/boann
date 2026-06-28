@@ -2,6 +2,7 @@ import { error } from '@sveltejs/kit';
 import type { PageServerLoad } from './$types';
 import { createDb } from '$lib/server/db';
 import { getEntityTypeById, getFieldsByEntityTypeId, listRecordsByEntityTypeId, getTableInfo, listRecords } from '$lib/server/db/table-service';
+import { isRefField } from '$lib/types/chat';
 
 export const load: PageServerLoad = async ({ params, platform }) => {
 	if (!platform?.env?.DB) error(500);
@@ -13,7 +14,7 @@ export const load: PageServerLoad = async ({ params, platform }) => {
 		listRecordsByEntityTypeId(db, params.tableId)
 	]);
 
-	const refFields = fields.filter(f => f.type === 'recordSelect' && f.refTable);
+	const refFields = fields.filter(f => isRefField(f.type) && f.refTable);
 	const tableCache: Record<string, { fields: { key: string }[]; rows: Record<string, unknown>[] }> = {};
 	await Promise.all(
 		[...new Set(refFields.map(f => f.refTable!))].map(async (refTable) => {

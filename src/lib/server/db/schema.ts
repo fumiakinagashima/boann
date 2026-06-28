@@ -38,7 +38,7 @@ export const entityFields = sqliteTable('entity_fields', {
 		.references(() => entityTypes.id),
 	key: text('key').notNull(),
 	label: text('label').notNull(),
-	type: text('type', { enum: ['text', 'number', 'select', 'date', 'email', 'tel', 'textarea', 'recordSelect'] })
+	type: text('type', { enum: ['text', 'number', 'select', 'date', 'email', 'tel', 'textarea', 'recordSelect', 'account'] })
 		.notNull()
 		.default('text'),
 	required: integer('required', { mode: 'boolean' }).notNull().default(false),

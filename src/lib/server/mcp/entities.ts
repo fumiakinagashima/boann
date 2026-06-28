@@ -3,7 +3,7 @@ import { z } from 'zod';
 import type { Tool } from '@anthropic-ai/sdk/resources/messages';
 import type { Db } from '../db';
 import { entityTypes, entityFields, entities } from '../db/schema';
-import { createApp, createEntityType, createRecord, createPage } from '../db/table-service';
+import { createApp, createEntityType, createRecord, createPage, refColumns } from '../db/table-service';
 import type { PageComponent } from '../db/table-service';
 import { parseJson, now } from './shared';
 
@@ -39,9 +39,9 @@ export const tools: Tool[] = [
 							label: { type: 'string', description: 'フィールドの表示名' },
 							type: {
 								type: 'string',
-								enum: ['text', 'number', 'select', 'date', 'email', 'tel', 'textarea', 'recordSelect'],
+								enum: ['text', 'number', 'select', 'date', 'email', 'tel', 'textarea', 'recordSelect', 'account'],
 								description:
-									'フィールドの型。recordSelect は他テーブルのレコードを参照する関係フィールド'
+									'フィールドの型。recordSelect は他テーブルのレコードを参照する関係フィールド。account はアカウント（ユーザー）を参照する関係フィールドで、ref_table は不要（自動で accounts を参照し、表示・選択肢ではアカウント名を表示）'
 							},
 							required: { type: 'boolean', description: '必須フィールドかどうか' },
 							options: {
@@ -106,9 +106,9 @@ export const tools: Tool[] = [
 				label: { type: 'string', description: 'フィールドの表示名' },
 				type: {
 					type: 'string',
-					enum: ['text', 'number', 'select', 'date', 'email', 'tel', 'textarea', 'recordSelect'],
+					enum: ['text', 'number', 'select', 'date', 'email', 'tel', 'textarea', 'recordSelect', 'account'],
 					description:
-						'フィールドの型。recordSelect は他テーブルのレコードを参照する関係フィールド'
+						'フィールドの型。recordSelect は他テーブルのレコードを参照する関係フィールド。account はアカウント（ユーザー）を参照する関係フィールドで、ref_table は不要（自動で accounts を参照し、表示・選択肢ではアカウント名を表示）'
 				},
 				required: { type: 'boolean', description: '必須フィールドかどうか' },
 				options: {
@@ -188,8 +188,8 @@ export const tools: Tool[] = [
 							label: { type: 'string', description: 'フィールドの表示名' },
 							type: {
 								type: 'string',
-								enum: ['text', 'number', 'select', 'date', 'email', 'tel', 'textarea', 'recordSelect'],
-								description: 'フィールドの型'
+								enum: ['text', 'number', 'select', 'date', 'email', 'tel', 'textarea', 'recordSelect', 'account'],
+								description: 'フィールドの型。account はアカウント（ユーザー）を参照する関係フィールド（ref_table 不要）'
 							},
 							required: { type: 'boolean', description: '必須フィールドかどうか' },
 							options: {
@@ -264,7 +264,7 @@ const addEntityFieldSchema = z.object({
 	key: z.string().min(1).regex(/^[a-z0-9_]+$/),
 	label: z.string().min(1),
 	type: z
-		.enum(['text', 'number', 'select', 'date', 'email', 'tel', 'textarea', 'recordSelect'])
+		.enum(['text', 'number', 'select', 'date', 'email', 'tel', 'textarea', 'recordSelect', 'account'])
 		.default('text'),
 	required: z.boolean().default(false),
 	options: z
@@ -299,7 +299,7 @@ const createTableSchema = z.object({
 			key: z.string().min(1).regex(/^[a-z0-9_]+$/),
 			label: z.string().min(1),
 			type: z
-				.enum(['text', 'number', 'select', 'date', 'email', 'tel', 'textarea', 'recordSelect'])
+				.enum(['text', 'number', 'select', 'date', 'email', 'tel', 'textarea', 'recordSelect', 'account'])
 				.default('text'),
 			required: z.boolean().default(false),
 			options: z.array(z.object({ value: z.string(), label: z.string() })).optional().default([]),
@@ -326,7 +326,7 @@ const createAppFieldSchema = z.object({
 	key: z.string().min(1).regex(/^[a-z0-9_]+$/, '英小文字・数字・アンダースコアのみ使用可'),
 	label: z.string().min(1),
 	type: z
-		.enum(['text', 'number', 'select', 'date', 'email', 'tel', 'textarea', 'recordSelect'])
+		.enum(['text', 'number', 'select', 'date', 'email', 'tel', 'textarea', 'recordSelect', 'account'])
 		.default('text'),
 	required: z.boolean().default(false),
 	options: z
@@ -425,7 +425,7 @@ export async function handleAddEntityField(db: Db, input: unknown) {
 		type: data.type,
 		required: data.required,
 		options: JSON.stringify(data.options),
-		refTable: data.ref_table ?? null,
+		...refColumns({ type: data.type, refTable: data.ref_table }),
 		sortOrder
 	});
 	const [row] = await db.select().from(entityFields).where(eq(entityFields.id, id));

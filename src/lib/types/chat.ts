@@ -9,7 +9,17 @@ export type FieldType =
 	| 'datetime-local'
 	| 'hidden'
 	| 'recordSelect'
+	| 'account'
 	| 'multiselect';
+
+/**
+ * 他レコードを id で参照し、表示・選択肢ではラベル（名前）を見せるリレーション系フィールドか判定する。
+ * - recordSelect: 任意のユーザー定義テーブルを参照
+ * - account: アカウントテーブル（accounts）を参照する専用型。refTable='accounts' / refLabelKey='name' 固定
+ */
+export function isRefField(type: string): boolean {
+	return type === 'recordSelect' || type === 'account';
+}
 
 export type FormField = {
 	key: string;

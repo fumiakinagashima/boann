@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import type { FieldDef } from '$lib/server/db/table-service';
+	import { isRefField } from '$lib/types/chat';
 
 	type Props = {
 		fields: FieldDef[];
@@ -15,7 +16,7 @@
 	let refLabels = $state<Record<string, Record<string, string>>>({});
 
 	onMount(async () => {
-		const refTables = [...new Set(fields.filter((f) => f.type === 'recordSelect' && f.refTable).map((f) => f.refTable!))];
+		const refTables = [...new Set(fields.filter((f) => isRefField(f.type) && f.refTable).map((f) => f.refTable!))];
 		for (const refTable of refTables) {
 			try {
 				const res = await fetch(`/api/database/${refTable}/records`);
@@ -51,7 +52,7 @@
 
 	function displayValue(field: FieldDef): string {
 		const val = record[field.key] as unknown;
-		if (field.type === 'recordSelect' && field.refTable) {
+		if (isRefField(field.type) && field.refTable) {
 			const id = val == null ? '' : String(val);
 			return refLabels[field.refTable]?.[id] ?? (id || '—');
 		}

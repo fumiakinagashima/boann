@@ -223,6 +223,12 @@
 										{/if}
 									{/if}
 
+									{#if row.type === 'account'}
+										<div class="form-row">
+											<p class="form-hint">アカウントを参照します。アカウントIDを保存し、選択肢・一覧では名前を表示します。</p>
+										</div>
+									{/if}
+
 									{#if row.type === 'select'}
 										<div class="form-row">
 											<label class="form-label">選択肢</label>

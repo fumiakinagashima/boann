@@ -12,7 +12,7 @@
 
 	let { fields = $bindable([]), availableTables = [] }: Props = $props();
 
-	const FIELD_TYPES: { value: CustomFieldType | 'recordSelect'; label: string }[] = [
+	const FIELD_TYPES: { value: CustomFieldType | 'recordSelect' | 'account'; label: string }[] = [
 		{ value: 'text', label: 'テキスト' },
 		{ value: 'number', label: '数値' },
 		{ value: 'select', label: '選択' },
@@ -20,7 +20,8 @@
 		{ value: 'email', label: 'メール' },
 		{ value: 'tel', label: '電話番号' },
 		{ value: 'textarea', label: '長文テキスト' },
-		{ value: 'recordSelect', label: '関係' }
+		{ value: 'recordSelect', label: '関係' },
+		{ value: 'account', label: 'アカウント' }
 	];
 
 	function addField() {
@@ -79,7 +80,7 @@
 						/>
 						<select
 							value={field.type}
-							onchange={(e) => updateField(field._id, { type: (e.target as HTMLSelectElement).value as CustomFieldType | 'recordSelect' })}
+							onchange={(e) => updateField(field._id, { type: (e.target as HTMLSelectElement).value as CustomFieldType | 'recordSelect' | 'account' })}
 						>
 							{#each FIELD_TYPES as t}
 								<option value={t.value}>{t.label}</option>

@@ -1,6 +1,7 @@
 import { invalidateAll } from '$app/navigation';
 import { formatJstDateTime } from '$lib/datetime';
 import type { FieldDef, RecordRow } from '$lib/server/db/table-service';
+import { isRefField } from '$lib/types/chat';
 import type { PageData } from './$types';
 import type { ComponentData } from './+page.server';
 
@@ -127,7 +128,7 @@ export function createPageViewState(getData: () => PageData) {
 	function formatCell(row: RecordRow, field: FieldDef, comp: ComponentData): string {
 		const val = row[field.key];
 		if (val == null || val === '') return '—';
-		if (field.type === 'recordSelect') {
+		if (isRefField(field.type)) {
 			const opts = comp.recordOptions[field.key] ?? [];
 			const opt = opts.find(o => o.value === String(val));
 			return opt ? opt.label : String(val);
