@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
+	import { onDestroy } from 'svelte';
 	import FileUpload from '$lib/components/ui/FileUpload.svelte';
 	import X from '$lib/components/icon/X.svelte';
 	import type { ImportPlan } from '$lib/server/ai/import-plan';
@@ -81,28 +82,66 @@
 		}
 	}
 
+	let pollTimer: ReturnType<typeof setTimeout> | null = null;
+
+	function stopPolling() {
+		if (pollTimer) {
+			clearTimeout(pollTimer);
+			pollTimer = null;
+		}
+	}
+
 	async function applyPlan() {
 		if (!plan) return;
 		error = '';
 		step = 'applying';
 		try {
+			// apply は非同期。Queue にジョブを投入し、結果はポーリングで取得する。
 			const res = await fetch('/api/imports/apply', {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
 				body: JSON.stringify({ plan })
 			});
-			const data = (await res.json()) as { appId: string } | { error: string };
-			if (!res.ok || !('appId' in data)) {
-				error = 'error' in data ? data.error : 'アプリ作成に失敗しました';
+			const data = (await res.json()) as { jobId: string } | { error: string };
+			if (!res.ok || !('jobId' in data)) {
+				error = 'error' in data ? data.error : 'アプリ作成の受付に失敗しました';
 				step = 'review';
 				return;
 			}
-			await goto(`/apps/${data.appId}`);
+			pollJob(data.jobId);
 		} catch {
 			error = 'ネットワークエラーが発生しました';
 			step = 'review';
 		}
 	}
+
+	function pollJob(jobId: string) {
+		stopPolling();
+		pollTimer = setTimeout(async () => {
+			try {
+				const res = await fetch(`/api/imports/jobs/${jobId}`);
+				const data = (await res.json()) as {
+					status: 'queued' | 'processing' | 'done' | 'error';
+					appId: string | null;
+					error: string | null;
+				};
+				if (res.ok && data.status === 'done' && data.appId) {
+					await goto(`/apps/${data.appId}`);
+					return;
+				}
+				if (res.ok && data.status === 'error') {
+					error = data.error ?? 'アプリ作成に失敗しました';
+					step = 'review';
+					return;
+				}
+				pollJob(jobId); // queued / processing → 継続
+			} catch {
+				pollJob(jobId); // 一時的なエラーは継続
+			}
+		}, 1500);
+	}
+
+	onDestroy(stopPolling);
 
 	function handleKeydown(e: KeyboardEvent) {
 		if (e.key === 'Escape') onclose();
@@ -210,6 +249,7 @@
 			<div class="loading">
 				<div class="spinner"></div>
 				<p>アプリを作成中…</p>
+				<p class="sub">このまま閉じても、完了したら通知でお知らせします。</p>
 			</div>
 		{/if}
 	</div>
@@ -222,7 +262,7 @@
 			<button class="btn-ghost" onclick={() => (step = 'upload')}>戻る</button>
 			<button class="btn-primary" onclick={applyPlan}>この内容でアプリを作成</button>
 		{:else}
-			<button class="btn-ghost" disabled>閉じる</button>
+			<button class="btn-ghost" onclick={onclose}>閉じる</button>
 		{/if}
 	</div>
 </div>
@@ -369,6 +409,11 @@
 		border-top-color: var(--color-primary);
 		border-radius: 50%;
 		animation: spin 0.8s linear infinite;
+	}
+
+	.loading .sub {
+		font-size: 0.75rem;
+		color: var(--color-text-muted);
 	}
 
 	/* Review */

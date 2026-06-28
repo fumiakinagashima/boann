@@ -26,6 +26,17 @@ id = "dummy"
 binding = "R2"
 bucket_name = "boann"
 
+# Queues: ファイル取り込みによるアプリ生成を非同期実行する。
+# 本番デプロイ前に `wrangler queues create boann-imports` を実行すること。
+[[queues.producers]]
+binding = "QUEUE"
+queue = "boann-imports"
+
+[[queues.consumers]]
+queue = "boann-imports"
+max_batch_size = 10
+max_retries = 3
+
 [vars]
 # ANTHROPIC_API_KEY は `wrangler secret put ANTHROPIC_API_KEY` で管理する（[vars] に書くと deploy 時にシークレットを空文字で上書きしてしまうため定義しない）
 # ローカル開発時のモックモード（.dev.vars で上書き可能）

@@ -137,6 +137,21 @@ export const notifications = sqliteTable('notifications', {
 		.default(sql`(unixepoch())`)
 });
 
+export const importJobs = sqliteTable('import_jobs', {
+	id: text('id').primaryKey(),
+	accountId: text('account_id').notNull(),
+	// 'queued' | 'processing' | 'done' | 'error'
+	status: text('status').notNull().default('queued'),
+	appId: text('app_id'),
+	error: text('error'),
+	createdAt: integer('created_at', { mode: 'timestamp' })
+		.notNull()
+		.default(sql`(unixepoch())`),
+	updatedAt: integer('updated_at', { mode: 'timestamp' })
+		.notNull()
+		.default(sql`(unixepoch())`)
+});
+
 export const reminders = sqliteTable('reminders', {
 	id: text('id').primaryKey(),
 	remindAt: integer('remind_at', { mode: 'timestamp' }).notNull(),
