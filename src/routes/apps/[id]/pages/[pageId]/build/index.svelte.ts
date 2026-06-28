@@ -1,5 +1,6 @@
 import { invalidateAll } from '$app/navigation';
 import type { FieldDef, PageConfig } from '$lib/server/db/table-service';
+import { SYSTEM_DISPLAY_FIELDS } from '$lib/system-fields';
 import type { PageData } from './$types';
 
 export function createPageBuildState(getData: () => PageData) {
@@ -41,7 +42,7 @@ export function createPageBuildState(getData: () => PageData) {
 	}
 
 	const tableFields = $derived<FieldDef[]>(
-		tableId ? ((getData().tableFields as Record<string, FieldDef[]>)[tableId] ?? []) : []
+		tableId ? [...((getData().tableFields as Record<string, FieldDef[]>)[tableId] ?? []), ...SYSTEM_DISPLAY_FIELDS] : []
 	);
 
 	// ── Fields ────────────────────────────────────────────────────

@@ -13,6 +13,7 @@ import {
 	listRecords
 } from '$lib/server/db/table-service';
 import type { FieldDef, RecordRow, DetailRelatedTable } from '$lib/server/db/table-service';
+import { SYSTEM_DISPLAY_FIELDS } from '$lib/system-fields';
 import { isRefField } from '$lib/types/chat';
 
 export type RelatedSection = {
@@ -65,10 +66,11 @@ export const load: PageServerLoad = async ({ params, url, platform }) => {
 	]);
 	if (!et) error(404, 'テーブルが見つかりません');
 
-	const recordOptions = await loadRecordOptions(db, fields);
 	const displayFields = page.config.fields?.length
-		? fields.filter(f => page.config.fields!.includes(f.key))
+		? [...fields, ...SYSTEM_DISPLAY_FIELDS].filter(f => page.config.fields!.includes(f.key))
 		: fields;
+	const sysInDisplay = SYSTEM_DISPLAY_FIELDS.filter(sf => displayFields.some(df => df.key === sf.key));
+	const recordOptions = await loadRecordOptions(db, [...fields, ...sysInDisplay]);
 
 	if (recordId) {
 		// ── 詳細ビュー ──────────────────────────────────────────

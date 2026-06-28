@@ -5,6 +5,7 @@
 	import { isRefField } from '$lib/types/chat';
 	import type { PageData } from './$types';
 	import type { FieldDef } from '$lib/server/db/table-service';
+	import { page } from '$app/state';
 
 	let { data }: { data: PageData } = $props();
 	const s = createPageViewState(() => data);
@@ -26,6 +27,9 @@
 				<AppIcon icon={data.app.icon} size={20} />
 				<span class="app-name">{data.app.label}</span>
 			</a>
+			{#if data.account?.permission === 'admin'}
+				<a href="/apps/{data.app.id}/pages/{data.page.id}/build" class="btn-settings">設定</a>
+			{/if}
 		</div>
 		<nav class="page-nav">
 			{#each data.allPages as pg (pg.id)}
@@ -36,11 +40,6 @@
 				>{pg.label}</a>
 			{/each}
 		</nav>
-		<div class="header-right">
-			{#if data.account?.permission === 'admin'}
-				<a href="/apps/{data.app.id}/pages/{data.page.id}/build" class="btn-settings">設定</a>
-			{/if}
-		</div>
 	</header>
 
 	<!-- ── メインコンテンツ ────────────────────────────────────── -->
@@ -57,7 +56,7 @@
 			<!-- ── 詳細ビュー ────────────────────────────────────── -->
 			<div class="detail-view">
 				<div class="detail-header">
-					<button class="back-btn" onclick={s.closeDetail}>← 一覧に戻る</button>
+					<button class="back-btn" onclick={s.closeDetail}>← 前の画面に戻る</button>
 					<div class="detail-actions">
 						{#if data.page.config.actions.includes('edit')}
 							<button class="btn-secondary" onclick={() => s.openEdit(
@@ -82,12 +81,6 @@
 								<dd>{s.displayValue(data.record[field.key], field, data.recordOptions)}</dd>
 							</div>
 						{/each}
-						{#if data.record.createdAt}
-							<div class="field-row">
-								<dt>作成日時</dt>
-								<dd>{s.formatTs(data.record.createdAt as number)}</dd>
-							</div>
-						{/if}
 					</dl>
 				</section>
 
@@ -124,9 +117,14 @@
 												{#if section.config.actions.includes('edit') || section.config.actions.includes('delete') || section.config.actions.includes('detail')}
 													<td class="row-actions">
 														{#if section.config.actions.includes('detail')}
-															<button class="action-btn" onclick={() => s.openEdit(
-																section.config.tableId, section.tableName, section.fields, section.recordOptions, row
-															)}>詳細</button>
+															{@const detailPage = data.allPages.find(p => p.tableId === section.config.tableId)}
+															{#if detailPage}
+																<a class="action-btn" href="/apps/{data.app.id}/pages/{detailPage.id}?recordId={row.id}&from={encodeURIComponent(page.url.href)}">詳細</a>
+															{:else}
+																<button class="action-btn" onclick={() => s.openEdit(
+																	section.config.tableId, section.tableName, section.fields, section.recordOptions, row
+																)}>詳細</button>
+															{/if}
 														{/if}
 														{#if section.config.actions.includes('edit')}
 															<button class="action-btn" onclick={() => s.openEdit(
@@ -186,7 +184,6 @@
 							<thead>
 								<tr>
 									{#each data.displayFields as field}<th>{field.label}</th>{/each}
-									<th class="ts-col">登録日時</th>
 									<th class="actions-col">操作</th>
 								</tr>
 							</thead>
@@ -196,7 +193,6 @@
 										{#each data.displayFields as field}
 											<td>{s.formatCell(row, field, data.recordOptions)}</td>
 										{/each}
-										<td class="ts">{s.formatTs(row.createdAt as number)}</td>
 										<td class="row-actions">
 											{#if data.page.config.actions.includes('detail')}
 												<button class="action-btn" onclick={() => s.openDetail(row.id as string)}>詳細</button>
@@ -301,7 +297,7 @@
 	flex-shrink: 0;
 }
 
-.header-left { display: flex; align-items: center; }
+.header-left { display: flex; align-items: center; gap: 12px; flex-shrink: 0; }
 
 .app-brand {
 	display: flex;
@@ -323,7 +319,7 @@
 	display: flex;
 	align-items: center;
 	gap: 2px;
-	flex: 1;
+	margin-left: auto;
 	overflow-x: auto;
 }
 
@@ -344,7 +340,6 @@
 	}
 }
 
-.header-right { display: flex; align-items: center; gap: 8px; margin-left: auto; }
 
 .btn-settings {
 	padding: 5px 12px;
@@ -436,7 +431,7 @@ table {
 }
 
 /* ── 詳細ビュー ─────────────────────────────────────────── */
-.detail-view { display: flex; flex-direction: column; gap: 24px; max-width: 720px; }
+.detail-view { display: flex; flex-direction: column; gap: 24px; }
 
 .detail-header {
 	display: flex;
@@ -463,6 +458,7 @@ table {
 	border: 1px solid var(--color-border);
 	border-radius: 10px;
 	padding: 20px 24px;
+	max-width: 720px;
 }
 
 .field-list { display: flex; flex-direction: column; gap: 12px; }

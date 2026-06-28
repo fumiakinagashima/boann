@@ -95,9 +95,14 @@ export function createPageViewState(getData: () => PageData) {
 	}
 
 	function closeDetail() {
-		const u = new URL(page.url);
-		u.searchParams.delete('recordId');
-		goto(u.toString());
+		const fromUrl = page.url.searchParams.get('from');
+		if (fromUrl) {
+			goto(fromUrl);
+		} else {
+			const u = new URL(page.url);
+			u.searchParams.delete('recordId');
+			goto(u.toString());
+		}
 	}
 
 	// ── セル表示 ─────────────────────────────────────────────────
@@ -115,6 +120,9 @@ export function createPageViewState(getData: () => PageData) {
 		}
 		if (field.type === 'date' && typeof val === 'number') {
 			return new Date(val * 1000).toLocaleDateString('ja-JP');
+		}
+		if (field.type === 'timestamp' && typeof val === 'number') {
+			return formatJstDateTime(new Date(val * 1000));
 		}
 		return String(val);
 	}
@@ -138,6 +146,9 @@ export function createPageViewState(getData: () => PageData) {
 		}
 		if (field.type === 'date' && typeof val === 'number') {
 			return new Date(val * 1000).toLocaleDateString('ja-JP', { year: 'numeric', month: 'long', day: 'numeric' });
+		}
+		if (field.type === 'timestamp' && typeof val === 'number') {
+			return formatJstDateTime(new Date(val * 1000));
 		}
 		return String(val);
 	}

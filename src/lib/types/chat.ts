@@ -7,6 +7,7 @@ export type FieldType =
 	| 'select'
 	| 'date'
 	| 'datetime-local'
+	| 'timestamp'
 	| 'hidden'
 	| 'recordSelect'
 	| 'account'

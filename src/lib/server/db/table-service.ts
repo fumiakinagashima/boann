@@ -108,7 +108,7 @@ export type CustomFieldType = 'text' | 'number' | 'select' | 'date' | 'email' | 
 export type FieldDef = {
 	key: string;
 	label: string;
-	type: CustomFieldType | 'recordSelect' | 'account' | 'datetime-local';
+	type: CustomFieldType | 'recordSelect' | 'account' | 'datetime-local' | 'timestamp';
 	required?: boolean;
 	options?: { label: string; value: string }[];
 	formOptions?: { label: string; value: string }[];
@@ -149,6 +149,8 @@ const SYSTEM_KEYS = new Set(['id', 'createdAt', 'updatedAt', 'createdBy', 'updat
 // id→name の解決のために getTableInfo / listRecords が専用ブランチで擬似的に提供する。
 export const ACCOUNT_REF_TABLE = 'accounts';
 export const ACCOUNT_LABEL_KEY = 'name';
+
+export { SYSTEM_DISPLAY_FIELDS } from '$lib/system-fields';
 
 function accountTableInfo(): TableInfo {
 	return {
