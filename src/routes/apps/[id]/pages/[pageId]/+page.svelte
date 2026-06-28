@@ -1,236 +1,276 @@
 <script lang="ts">
 	import { createPageViewState } from './index.svelte';
-	import ChevronLeft from '$lib/components/icon/ChevronLeft.svelte';
 	import AppIcon from '$lib/components/AppIcon.svelte';
 	import SearchSelect from '$lib/components/ui/SearchSelect.svelte';
 	import { isRefField } from '$lib/types/chat';
 	import type { PageData } from './$types';
+	import type { FieldDef } from '$lib/server/db/table-service';
 
 	let { data }: { data: PageData } = $props();
 	const s = createPageViewState(() => data);
+
+	function inputType(field: FieldDef): string {
+		if (field.type === 'number') return 'number';
+		if (field.type === 'date') return 'date';
+		if (field.type === 'email') return 'email';
+		if (field.type === 'tel') return 'tel';
+		return 'text';
+	}
 </script>
 
-<div class="page-layout">
-	<div class="main-col">
-		<div class="page-header">
-			<a href="/apps/{data.app.id}" class="back-link">
-				<ChevronLeft size={16} />
-				{data.app.label}
+<div class="app-page">
+	<!-- ── ヘッダー ──────────────────────────────────────────────── -->
+	<header class="app-header">
+		<div class="header-left">
+			<a href="/apps/{data.app.id}" class="app-brand">
+				<AppIcon icon={data.app.icon} size={20} />
+				<span class="app-name">{data.app.label}</span>
 			</a>
-			<div class="header-main">
-				<div class="header-title">
-					<span class="app-icon"><AppIcon icon={data.app.icon} size={24} /></span>
-					<h1>{data.page.label}</h1>
-				</div>
-				{#if data.account?.permission === 'admin'}
-					<a href="/apps/{data.app.id}/pages/{data.page.id}/build" class="btn-secondary">ページ設定</a>
-				{/if}
-			</div>
 		</div>
-
-		{#each s.componentData as comp, i (comp.component.id)}
-			{#if comp.component.type === 'list'}
-				<!-- List component -->
-				<section class="component-section">
-					{#if s.componentData.length > 1 || comp.component.title}
-						<div class="section-header">
-							<h2 class="section-title">{comp.component.title || comp.tableLabel}</h2>
-							{#if comp.component.actions.includes('create')}
-								<button class="btn-primary" onclick={() => s.openNew(i)}>+ 新規追加</button>
-							{/if}
-						</div>
-					{:else}
-						<div class="section-header single">
-							{#if comp.component.actions.includes('create')}
-								<button class="btn-primary" onclick={() => s.openNew(i)}>+ 新規追加</button>
-							{/if}
-						</div>
-					{/if}
-
-					{#if comp.displayFields.length === 0}
-						<div class="empty">
-							<p class="empty-title">フィールドが設定されていません</p>
-							{#if data.account?.permission === 'admin'}
-								<a href="/apps/{data.app.id}/tables/{comp.tableId}/build" class="btn-primary">テーブル設定を開く</a>
-							{/if}
-						</div>
-					{:else if comp.records.length === 0}
-						<div class="empty">
-							<p class="empty-title">レコードがまだありません</p>
-							{#if comp.component.actions.includes('create')}
-								<button class="btn-primary" onclick={() => s.openNew(i)}>+ 新規追加</button>
-							{/if}
-						</div>
-					{:else}
-						<div class="table-wrap">
-							<table>
-								<thead>
-									<tr>
-										{#each comp.displayFields as field}
-											<th>{field.label}</th>
-										{/each}
-										<th>登録日時</th>
-									</tr>
-								</thead>
-								<tbody>
-									{#each comp.records as row (row.id)}
-										{@const clickable = comp.component.actions.includes('edit')}
-										<tr
-											class:clickable
-											class:active={s.activeEdit?.editingId === row.id && s.activeEdit?.compIdx === i}
-											onclick={clickable ? () => s.openEdit(i, row) : undefined}
-											role={clickable ? 'button' : undefined}
-											tabindex={clickable ? 0 : undefined}
-											onkeydown={clickable ? (e) => { if (e.key === 'Enter') s.openEdit(i, row); } : undefined}
-										>
-											{#each comp.displayFields as field}
-												<td>{s.formatCell(row, field, comp)}</td>
-											{/each}
-											<td class="ts">{s.formatTs(row.createdAt as number)}</td>
-										</tr>
-									{/each}
-								</tbody>
-							</table>
-						</div>
-					{/if}
-				</section>
-
-			{:else if comp.component.type === 'form'}
-				<!-- Form component -->
-				{@const submitState = s.getFormSubmitState(i)}
-				<section class="component-section form-section">
-					{#if s.componentData.length > 1 || comp.component.title}
-						<h2 class="section-title">{comp.component.title || comp.tableLabel}</h2>
-					{/if}
-
-					{#if submitState.done}
-						<div class="form-success">✓ 登録しました</div>
-					{/if}
-
-					<form
-						class="standalone-form"
-						onsubmit={(e) => { e.preventDefault(); s.submitStandaloneForm(i, e.currentTarget); }}
-					>
-						{#each comp.displayFields as field}
-							<div class="form-row">
-								<label class="form-label" for="sf-{i}-{field.key}">
-									{field.label}
-									{#if field.required}<span class="req-mark">*</span>{/if}
-								</label>
-								{#if isRefField(field.type)}
-									<SearchSelect
-										bind:value={s.activeEdit!.formData[field.key]}
-										options={comp.recordOptions[field.key] ?? []}
-										placeholder="選択または検索…"
-										required={field.required}
-									/>
-								{:else if field.type === 'select'}
-									<select id="sf-{i}-{field.key}" name={field.key} class="form-select">
-										{#if !field.required}<option value="">— 選択してください —</option>{/if}
-										{#each (field.options ?? []) as opt}
-											<option value={opt.value}>{opt.label}</option>
-										{/each}
-									</select>
-								{:else if field.type === 'textarea'}
-									<textarea id="sf-{i}-{field.key}" name={field.key} class="form-textarea" rows="3" placeholder={field.description || ''}></textarea>
-								{:else}
-									<input
-										id="sf-{i}-{field.key}"
-										name={field.key}
-										class="form-input"
-										type={field.type === 'number' ? 'number' : field.type === 'date' ? 'date' : field.type === 'email' ? 'email' : field.type === 'tel' ? 'tel' : 'text'}
-										placeholder={field.description || ''}
-										required={field.required}
-									/>
-								{/if}
-								{#if field.description}
-									<p class="form-hint">{field.description}</p>
-								{/if}
-							</div>
-						{/each}
-
-						<div class="form-footer">
-							{#if submitState.error}<span class="save-error">{submitState.error}</span>{/if}
-							<button class="btn-primary" type="submit" disabled={submitState.submitting}>
-								{submitState.submitting ? '登録中…' : '登録する'}
-							</button>
-						</div>
-					</form>
-				</section>
+		<nav class="page-nav">
+			{#each data.allPages as pg (pg.id)}
+				<a
+					href="/apps/{data.app.id}/pages/{pg.id}"
+					class="nav-link"
+					class:active={pg.id === data.page.id}
+				>{pg.label}</a>
+			{/each}
+		</nav>
+		<div class="header-right">
+			{#if data.account?.permission === 'admin'}
+				<a href="/apps/{data.app.id}/pages/{data.page.id}/build" class="btn-settings">設定</a>
 			{/if}
-		{:else}
-			<div class="empty">
-				<p class="empty-title">コンポーネントが設定されていません</p>
+		</div>
+	</header>
+
+	<!-- ── メインコンテンツ ────────────────────────────────────── -->
+	<main class="app-body">
+		{#if !data.et}
+			<div class="unconfigured">
+				<p>テーブルが設定されていません。</p>
 				{#if data.account?.permission === 'admin'}
 					<a href="/apps/{data.app.id}/pages/{data.page.id}/build" class="btn-primary">ページ設定を開く</a>
 				{/if}
 			</div>
-		{/each}
-	</div>
 
-	<!-- Shared form drawer -->
-	{#if s.activeEdit}
-		<div class="drawer-backdrop" onclick={s.closeForm} role="presentation"></div>
-		<div class="form-panel">
-			<div class="form-panel-header">
-				<h2>{s.activeEdit.mode === 'new' ? '新規レコード' : 'レコードを編集'}</h2>
-				<button class="form-close-btn" onclick={s.closeForm} aria-label="閉じる">×</button>
+		{:else if s.isDetail && data.record}
+			<!-- ── 詳細ビュー ────────────────────────────────────── -->
+			<div class="detail-view">
+				<div class="detail-header">
+					<button class="back-btn" onclick={s.closeDetail}>← 一覧に戻る</button>
+					<div class="detail-actions">
+						{#if data.page.config.actions.includes('edit')}
+							<button class="btn-secondary" onclick={() => s.openEdit(
+								data.et!.id, data.et!.name, data.fields, data.recordOptions, data.record!
+							)}>編集</button>
+						{/if}
+						{#if data.page.config.actions.includes('delete')}
+							<button class="btn-danger" onclick={async () => {
+								if (!confirm('このレコードを削除しますか？')) return;
+								const res = await fetch(`/api/database/${data.et!.name}/records/${data.record!.id}`, { method: 'DELETE' });
+								if (res.ok || res.status === 204) s.closeDetail();
+							}}>削除</button>
+						{/if}
+					</div>
+				</div>
+
+				<section class="detail-card">
+					<dl class="field-list">
+						{#each data.displayFields as field}
+							<div class="field-row">
+								<dt>{field.label}</dt>
+								<dd>{s.displayValue(data.record[field.key], field, data.recordOptions)}</dd>
+							</div>
+						{/each}
+						{#if data.record.createdAt}
+							<div class="field-row">
+								<dt>作成日時</dt>
+								<dd>{s.formatTs(data.record.createdAt as number)}</dd>
+							</div>
+						{/if}
+					</dl>
+				</section>
+
+				{#each data.relatedSections as section (section.config.tableId + section.config.refFieldKey)}
+					<section class="related-section">
+						<div class="related-section-header">
+							<h2 class="related-title">{section.tableLabel}</h2>
+							{#if section.config.actions.includes('create')}
+								<button class="btn-primary btn-sm" onclick={() => s.openNew(
+									section.config.tableId, section.tableName, section.fields, section.recordOptions,
+									{ [section.config.refFieldKey]: String(data.record!.id) }
+								)}>+ 登録</button>
+							{/if}
+						</div>
+						{#if section.records.length === 0}
+							<p class="empty-msg">データがありません</p>
+						{:else}
+							<div class="table-wrap">
+								<table>
+									<thead>
+										<tr>
+											{#each section.displayFields as f}<th>{f.label}</th>{/each}
+											{#if section.config.actions.includes('edit') || section.config.actions.includes('delete') || section.config.actions.includes('detail')}
+												<th class="actions-col">操作</th>
+											{/if}
+										</tr>
+									</thead>
+									<tbody>
+										{#each section.records as row (row.id)}
+											<tr>
+												{#each section.displayFields as f}
+													<td>{s.formatCell(row, f, section.recordOptions)}</td>
+												{/each}
+												{#if section.config.actions.includes('edit') || section.config.actions.includes('delete') || section.config.actions.includes('detail')}
+													<td class="row-actions">
+														{#if section.config.actions.includes('detail')}
+															<button class="action-btn" onclick={() => s.openEdit(
+																section.config.tableId, section.tableName, section.fields, section.recordOptions, row
+															)}>詳細</button>
+														{/if}
+														{#if section.config.actions.includes('edit')}
+															<button class="action-btn" onclick={() => s.openEdit(
+																section.config.tableId, section.tableName, section.fields, section.recordOptions, row
+															)}>編集</button>
+														{/if}
+														{#if section.config.actions.includes('delete')}
+															<button class="action-btn danger" onclick={async () => {
+																if (!confirm('削除しますか？')) return;
+																const res = await fetch(`/api/database/${section.tableName}/records/${row.id}`, { method: 'DELETE' });
+																if (res.ok || res.status === 204) { const { invalidateAll } = await import('$app/navigation'); await invalidateAll(); }
+															}}>削除</button>
+														{/if}
+													</td>
+												{/if}
+											</tr>
+										{/each}
+									</tbody>
+								</table>
+							</div>
+						{/if}
+					</section>
+				{/each}
 			</div>
-			<div class="form-panel-body">
-				{#each s.activeFields as field}
+
+		{:else}
+			<!-- ── 一覧ビュー ────────────────────────────────────── -->
+			<div class="list-view">
+				<div class="list-header">
+					<h1 class="list-title">{data.page.label}</h1>
+					{#if data.page.config.actions.includes('create')}
+						<button class="btn-primary" onclick={() => s.openNew(data.et!.id, data.et!.name, data.fields, data.recordOptions)}>
+							+ 新規追加
+						</button>
+					{/if}
+				</div>
+
+				{#if data.displayFields.length === 0}
+					<div class="unconfigured">
+						<p>表示フィールドが設定されていません。</p>
+						{#if data.account?.permission === 'admin'}
+							<a href="/apps/{data.app.id}/tables/{data.et.id}/build" class="btn-primary">テーブル設定を開く</a>
+						{/if}
+					</div>
+				{:else if data.records.length === 0}
+					<div class="empty">
+						<p class="empty-title">データがまだありません</p>
+						{#if data.page.config.actions.includes('create')}
+							<button class="btn-primary" onclick={() => s.openNew(data.et!.id, data.et!.name, data.fields, data.recordOptions)}>
+								最初のデータを追加
+							</button>
+						{/if}
+					</div>
+				{:else}
+					<div class="table-wrap">
+						<table>
+							<thead>
+								<tr>
+									{#each data.displayFields as field}<th>{field.label}</th>{/each}
+									<th class="ts-col">登録日時</th>
+									<th class="actions-col">操作</th>
+								</tr>
+							</thead>
+							<tbody>
+								{#each data.records as row (row.id)}
+									<tr>
+										{#each data.displayFields as field}
+											<td>{s.formatCell(row, field, data.recordOptions)}</td>
+										{/each}
+										<td class="ts">{s.formatTs(row.createdAt as number)}</td>
+										<td class="row-actions">
+											{#if data.page.config.actions.includes('detail')}
+												<button class="action-btn" onclick={() => s.openDetail(row.id as string)}>詳細</button>
+											{/if}
+											{#if data.page.config.actions.includes('edit')}
+												<button class="action-btn" onclick={() => s.openEdit(data.et!.id, data.et!.name, data.fields, data.recordOptions, row)}>編集</button>
+											{/if}
+											{#if data.page.config.actions.includes('delete')}
+												<button class="action-btn danger" onclick={async () => {
+													if (!confirm('削除しますか？')) return;
+													const res = await fetch(`/api/database/${data.et!.name}/records/${row.id}`, { method: 'DELETE' });
+													if (res.ok || res.status === 204) { const { invalidateAll } = await import('$app/navigation'); await invalidateAll(); }
+												}}>削除</button>
+											{/if}
+										</td>
+									</tr>
+								{/each}
+							</tbody>
+						</table>
+					</div>
+				{/if}
+			</div>
+		{/if}
+	</main>
+
+	<!-- ── 編集ドロワー ───────────────────────────────────────── -->
+	{#if s.drawer}
+		<div class="drawer-overlay" role="presentation" onclick={s.closeDrawer}></div>
+		<div class="drawer">
+			<div class="drawer-header">
+				<h2 class="drawer-title">{s.drawer.mode === 'new' ? '新規追加' : '編集'}</h2>
+				<button class="drawer-close" onclick={s.closeDrawer} aria-label="閉じる">✕</button>
+			</div>
+			<div class="drawer-body">
+				{#if s.drawer.saveError}
+					<p class="save-error">{s.drawer.saveError}</p>
+				{/if}
+				{#each s.drawer.fields as field}
 					<div class="form-row">
-						<label class="form-label" for="field-{field.key}">
-							{field.label}
-							{#if field.required}<span class="req-mark">*</span>{/if}
+						<label class="form-label" for="d-{field.key}">
+							{field.label}{#if field.required}<span class="req">*</span>{/if}
 						</label>
 						{#if isRefField(field.type)}
 							<SearchSelect
-								bind:value={s.activeEdit.formData[field.key]}
-								options={s.activeRecordOptions[field.key] ?? []}
+								bind:value={s.drawer.formData[field.key]}
+								options={s.drawer.recordOptions[field.key] ?? []}
 								placeholder="選択または検索…"
 								required={field.required}
 							/>
 						{:else if field.type === 'select'}
-							<select id="field-{field.key}" class="form-select" bind:value={s.activeEdit.formData[field.key]}>
+							<select id="d-{field.key}" class="form-input" bind:value={s.drawer.formData[field.key]}>
 								{#if !field.required}<option value="">— 選択してください —</option>{/if}
 								{#each (field.options ?? []) as opt}
 									<option value={opt.value}>{opt.label}</option>
 								{/each}
 							</select>
 						{:else if field.type === 'textarea'}
-							<textarea
-								id="field-{field.key}"
-								class="form-textarea"
-								bind:value={s.activeEdit.formData[field.key]}
-								placeholder={field.description || ''}
-								rows="3"
-							></textarea>
+							<textarea id="d-{field.key}" class="form-textarea" bind:value={s.drawer.formData[field.key]} rows="4"></textarea>
 						{:else}
-							<input
-								id="field-{field.key}"
-								class="form-input"
-								type={field.type === 'number' ? 'number' : field.type === 'date' ? 'date' : field.type === 'email' ? 'email' : field.type === 'tel' ? 'tel' : 'text'}
-								bind:value={s.activeEdit.formData[field.key]}
-								placeholder={field.description || ''}
-							/>
-						{/if}
-						{#if field.description}
-							<p class="form-hint">{field.description}</p>
+							<input id="d-{field.key}" class="form-input" type={inputType(field)} bind:value={s.drawer.formData[field.key]} required={field.required} />
 						{/if}
 					</div>
 				{/each}
 			</div>
-			<div class="form-panel-footer">
-				{#if s.activeEdit.mode === 'edit' && s.componentData[s.activeEdit.compIdx]?.component.actions.includes('delete')}
-					<button class="btn-delete" onclick={s.deleteRecord} disabled={s.activeEdit.deleting}>
-						{s.activeEdit.deleting ? '削除中…' : '削除'}
+			<div class="drawer-footer">
+				{#if s.drawer.mode === 'edit'}
+					<button class="btn-danger-ghost" onclick={s.deleteRecord} disabled={s.drawer.deleting}>
+						{s.drawer.deleting ? '削除中…' : '削除'}
 					</button>
 				{/if}
 				<div class="footer-right">
-					{#if s.activeEdit.saveError}<span class="save-error">{s.activeEdit.saveError}</span>{/if}
-					<button class="btn-cancel" onclick={s.closeForm}>キャンセル</button>
-					<button class="btn-save" onclick={s.saveRecord} disabled={s.activeEdit.saving}>
-						{s.activeEdit.saving ? '保存中…' : '保存'}
+					<button class="btn-secondary" onclick={s.closeDrawer}>キャンセル</button>
+					<button class="btn-primary" onclick={s.saveRecord} disabled={s.drawer.saving}>
+						{s.drawer.saving ? '保存中…' : '保存'}
 					</button>
 				</div>
 			</div>
@@ -239,291 +279,381 @@
 </div>
 
 <style lang="scss">
-	.page-layout { height: 100%; overflow: hidden; position: relative; }
+/* ── レイアウト ─────────────────────────────────────────── */
+.app-page {
+	display: flex;
+	flex-direction: column;
+	height: 100vh;
+	overflow: hidden;
+	background: var(--color-background);
+	color: var(--color-text);
+}
 
-	.main-col {
-		padding: 28px 32px;
-		height: 100%;
-		overflow-y: auto;
-		box-sizing: border-box;
-		display: flex;
-		flex-direction: column;
-		gap: 32px;
-	}
+/* ── ヘッダー ───────────────────────────────────────────── */
+.app-header {
+	display: flex;
+	align-items: center;
+	gap: 24px;
+	padding: 0 24px;
+	height: 52px;
+	border-bottom: 1px solid var(--color-border);
+	background: var(--color-surface);
+	flex-shrink: 0;
+}
 
-	.drawer-backdrop {
-		position: fixed;
-		inset: 0;
-		background: rgba(0, 0, 0, 0.3);
-		z-index: 40;
-	}
+.header-left { display: flex; align-items: center; }
 
-	/* ── Page header ─────────────────────────────────── */
-	.page-header { flex-shrink: 0; }
+.app-brand {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	text-decoration: none;
+	color: var(--color-text);
 
-	.back-link {
-		display: inline-flex;
-		align-items: center;
-		gap: 4px;
-		font-size: 0.8125rem;
-		color: var(--color-text-muted);
-		text-decoration: none;
-		margin-bottom: 12px;
-		&:hover { color: var(--color-text); }
-	}
+	&:hover .app-name { color: var(--color-primary); }
+}
 
-	.header-main {
-		display: flex;
-		align-items: center;
-		justify-content: space-between;
-		gap: 16px;
-	}
+.app-name {
+	font-weight: 600;
+	font-size: 0.9375rem;
+	transition: color 0.15s;
+}
 
-	.header-title {
-		display: flex;
-		align-items: center;
-		gap: 12px;
-	}
+.page-nav {
+	display: flex;
+	align-items: center;
+	gap: 2px;
+	flex: 1;
+	overflow-x: auto;
+}
 
-	.app-icon {
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		width: 40px;
-		height: 40px;
-		border-radius: 10px;
-		background: color-mix(in srgb, var(--color-primary) 8%, var(--color-background));
+.nav-link {
+	padding: 5px 12px;
+	border-radius: 6px;
+	text-decoration: none;
+	color: var(--color-text-muted);
+	font-size: 0.875rem;
+	white-space: nowrap;
+	transition: background 0.15s, color 0.15s;
+
+	&:hover { background: var(--color-border); color: var(--color-text); }
+	&.active {
+		background: color-mix(in srgb, var(--color-primary) 12%, transparent);
 		color: var(--color-primary);
-		flex-shrink: 0;
+		font-weight: 500;
 	}
+}
 
-	h1 {
-		font-size: 1.375rem;
-		font-weight: 700;
-		color: var(--color-text);
-		margin: 0;
-	}
+.header-right { display: flex; align-items: center; gap: 8px; margin-left: auto; }
 
-	/* ── Component sections ──────────────────────────── */
-	.component-section {
-		display: flex;
-		flex-direction: column;
-		gap: 12px;
-	}
+.btn-settings {
+	padding: 5px 12px;
+	border: 1px solid var(--color-border);
+	border-radius: 6px;
+	font-size: 0.8125rem;
+	color: var(--color-text-muted);
+	text-decoration: none;
+	background: transparent;
+	transition: border-color 0.15s, color 0.15s;
+	white-space: nowrap;
 
-	.section-header {
-		display: flex;
-		align-items: center;
-		justify-content: space-between;
-		gap: 12px;
+	&:hover { border-color: var(--color-primary); color: var(--color-primary); }
+}
 
-		&.single {
-			justify-content: flex-end;
-		}
-	}
+/* ── ボディ ─────────────────────────────────────────────── */
+.app-body {
+	flex: 1;
+	overflow-y: auto;
+	padding: 24px 32px;
+}
 
-	.section-title {
-		font-size: 1rem;
-		font-weight: 600;
-		color: var(--color-text);
-		margin: 0;
-	}
+/* ── 一覧ビュー ─────────────────────────────────────────── */
+.list-view { display: flex; flex-direction: column; gap: 16px; }
 
-	/* ── Table ───────────────────────────────────────── */
-	.table-wrap {
-		overflow-x: auto;
-		border: 1px solid var(--color-border);
-		border-radius: 10px;
-	}
+.list-header {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 16px;
+}
 
-	table { width: 100%; border-collapse: collapse; font-size: 0.875rem; }
-	thead { background: var(--color-surface); border-bottom: 1px solid var(--color-border); }
-	th {
-		padding: 10px 14px;
+.list-title { font-size: 1.125rem; font-weight: 600; margin: 0; }
+
+.table-wrap { overflow-x: auto; }
+
+table {
+	width: 100%;
+	border-collapse: collapse;
+	font-size: 0.875rem;
+
+	th, td {
+		padding: 10px 12px;
 		text-align: left;
-		font-weight: 600;
+		border-bottom: 1px solid var(--color-border);
+	}
+
+	th {
+		font-weight: 500;
 		color: var(--color-text-muted);
-		white-space: nowrap;
-		font-size: 0.8125rem;
-	}
-	tbody tr {
-		border-bottom: 1px solid var(--color-border);
-		transition: background 0.1s;
-		&:last-child { border-bottom: none; }
-		&.clickable {
-			cursor: pointer;
-			&:hover { background: var(--color-surface); }
-		}
-		&.active { background: color-mix(in srgb, var(--color-primary) 6%, var(--color-surface)); }
-	}
-	td { padding: 10px 14px; color: var(--color-text); max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-	.ts { font-size: 0.8125rem; color: var(--color-text-muted); }
-
-	/* ── Standalone form ─────────────────────────────── */
-	.form-section {
-		max-width: 520px;
-	}
-
-	.standalone-form {
-		display: flex;
-		flex-direction: column;
-		gap: 16px;
-		padding: 24px;
-		border: 1px solid var(--color-border);
-		border-radius: 10px;
 		background: var(--color-surface);
-	}
-
-	.form-footer {
-		display: flex;
-		align-items: center;
-		justify-content: flex-end;
-		gap: 10px;
-		padding-top: 8px;
-	}
-
-	.form-success {
-		padding: 10px 14px;
-		border-radius: 8px;
-		background: color-mix(in srgb, var(--color-success, #16a34a) 10%, transparent);
-		color: var(--color-success, #16a34a);
-		font-size: 0.875rem;
-		font-weight: 500;
-	}
-
-	/* ── Empty state ─────────────────────────────────── */
-	.empty {
-		display: flex;
-		flex-direction: column;
-		align-items: center;
-		gap: 10px;
-		padding: 60px 0;
-		text-align: center;
-	}
-	.empty-title { font-size: 1rem; font-weight: 600; color: var(--color-text); margin: 0; }
-
-	/* ── Form fields (shared) ────────────────────────── */
-	.form-row { display: flex; flex-direction: column; gap: 5px; }
-	.form-label { font-size: 0.8125rem; font-weight: 500; color: var(--color-text); }
-	.req-mark { color: var(--color-danger); margin-left: 2px; }
-	.form-hint { font-size: 0.75rem; color: var(--color-text-muted); margin: 0; line-height: 1.5; }
-	.save-error { font-size: 0.8125rem; color: var(--color-danger); }
-
-	.form-input, .form-select, .form-textarea {
-		padding: 8px 10px;
-		border: 1px solid var(--color-border);
-		border-radius: 6px;
-		background: var(--color-background);
-		color: var(--color-text);
-		font-size: 0.875rem;
-		font-family: inherit;
-		outline: none;
-		width: 100%;
-		box-sizing: border-box;
-		transition: border-color 0.15s;
-		&:focus { border-color: var(--color-primary); }
-		&::placeholder { color: var(--color-text-muted); opacity: 0.6; }
-	}
-	.form-textarea { resize: vertical; }
-
-	/* ── Buttons ─────────────────────────────────────── */
-	.btn-primary {
-		padding: 7px 16px;
-		border-radius: 6px;
-		font-size: 0.875rem;
-		font-weight: 500;
-		background: var(--color-primary);
-		color: #fff;
-		border: none;
-		cursor: pointer;
-		text-decoration: none;
 		white-space: nowrap;
-		transition: opacity 0.15s;
-		&:hover { opacity: 0.88; }
-		&:disabled { opacity: 0.45; cursor: not-allowed; }
 	}
 
-	.btn-secondary {
-		padding: 7px 14px;
-		border-radius: 6px;
-		font-size: 0.875rem;
-		border: 1px solid var(--color-border);
-		background: none;
-		color: var(--color-text);
-		cursor: pointer;
-		text-decoration: none;
-		white-space: nowrap;
-		transition: background 0.15s;
-		&:hover { background: var(--color-border); }
+	td { color: var(--color-text); vertical-align: middle; }
+
+	tbody tr:hover { background: color-mix(in srgb, var(--color-primary) 4%, transparent); }
+}
+
+.ts-col, .ts { color: var(--color-text-muted); white-space: nowrap; font-size: 0.8125rem; }
+.actions-col { width: 1px; white-space: nowrap; }
+
+.row-actions {
+	display: flex;
+	gap: 4px;
+	align-items: center;
+	white-space: nowrap;
+}
+
+.action-btn {
+	padding: 3px 10px;
+	border: 1px solid var(--color-border);
+	border-radius: 5px;
+	background: transparent;
+	color: var(--color-text-muted);
+	font-size: 0.75rem;
+	cursor: pointer;
+	transition: border-color 0.15s, color 0.15s, background 0.15s;
+
+	&:hover {
+		border-color: var(--color-primary);
+		color: var(--color-primary);
 	}
 
-	/* ── Form panel (drawer) ─────────────────────────── */
-	.form-panel {
-		position: fixed;
-		top: 0; right: 0; bottom: 0;
-		width: 520px;
-		max-width: 100vw;
-		display: flex;
-		flex-direction: column;
-		border-left: 1px solid var(--color-border);
-		background: var(--color-surface);
-		box-shadow: -4px 0 24px rgba(0, 0, 0, 0.12);
-		z-index: 50;
-		animation: drawer-in 0.22s ease;
+	&.danger:hover {
+		border-color: var(--color-error);
+		color: var(--color-error);
 	}
-	@keyframes drawer-in { from { transform: translateX(100%); } to { transform: translateX(0); } }
+}
 
-	.form-panel-header {
-		display: flex;
-		align-items: center;
-		justify-content: space-between;
-		padding: 16px 24px;
-		border-bottom: 1px solid var(--color-border);
-		flex-shrink: 0;
-		h2 { font-size: 0.9375rem; font-weight: 600; color: var(--color-text); margin: 0; }
-	}
-	.form-close-btn {
-		width: 28px; height: 28px;
-		border: none; background: none;
-		color: var(--color-text-muted); font-size: 1.125rem;
-		cursor: pointer; border-radius: 5px;
-		display: flex; align-items: center; justify-content: center;
-		transition: background 0.1s, color 0.1s;
-		&:hover { background: var(--color-border); color: var(--color-text); }
-	}
+/* ── 詳細ビュー ─────────────────────────────────────────── */
+.detail-view { display: flex; flex-direction: column; gap: 24px; max-width: 720px; }
 
-	.form-panel-body { flex: 1; overflow-y: auto; padding: 24px; display: flex; flex-direction: column; gap: 16px; }
+.detail-header {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 16px;
+}
 
-	.form-panel-footer {
-		display: flex;
-		align-items: center;
-		justify-content: space-between;
-		gap: 10px;
-		padding: 14px 20px;
-		border-top: 1px solid var(--color-border);
-		flex-shrink: 0;
-		background: var(--color-surface);
-	}
-	.footer-right { display: flex; align-items: center; gap: 8px; margin-left: auto; }
+.back-btn {
+	background: none;
+	border: none;
+	color: var(--color-text-muted);
+	font-size: 0.875rem;
+	cursor: pointer;
+	padding: 0;
+	transition: color 0.15s;
+	&:hover { color: var(--color-primary); }
+}
 
-	.btn-save {
-		padding: 7px 18px; border-radius: 6px; font-size: 0.875rem; font-weight: 500;
-		background: var(--color-primary); color: #fff; border: none; cursor: pointer;
-		transition: opacity 0.15s;
-		&:hover { opacity: 0.88; }
-		&:disabled { opacity: 0.45; cursor: not-allowed; }
-	}
-	.btn-cancel {
-		padding: 7px 14px; border-radius: 6px; font-size: 0.875rem;
-		border: 1px solid var(--color-border); background: none; color: var(--color-text);
-		cursor: pointer; transition: background 0.15s;
-		&:hover { background: var(--color-border); }
-	}
-	.btn-delete {
-		padding: 7px 14px; border-radius: 6px; font-size: 0.875rem;
-		border: 1px solid var(--color-border); background: none; color: var(--color-text-muted);
-		cursor: pointer; transition: border-color 0.15s, color 0.15s;
-		&:hover { border-color: var(--color-danger); color: var(--color-danger); }
-		&:disabled { opacity: 0.45; cursor: not-allowed; }
-	}
+.detail-actions { display: flex; gap: 8px; }
+
+.detail-card {
+	background: var(--color-surface);
+	border: 1px solid var(--color-border);
+	border-radius: 10px;
+	padding: 20px 24px;
+}
+
+.field-list { display: flex; flex-direction: column; gap: 12px; }
+
+.field-row {
+	display: grid;
+	grid-template-columns: 140px 1fr;
+	gap: 12px;
+	align-items: baseline;
+
+	dt { color: var(--color-text-muted); font-size: 0.875rem; }
+	dd { margin: 0; color: var(--color-text); font-size: 0.9375rem; word-break: break-word; }
+}
+
+.related-section { display: flex; flex-direction: column; gap: 12px; }
+.related-section-header {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 8px;
+}
+.related-title { font-size: 1rem; font-weight: 600; margin: 0; }
+.empty-msg { color: var(--color-text-muted); font-size: 0.875rem; }
+
+/* ── 空・未設定 ─────────────────────────────────────────── */
+.unconfigured, .empty {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	justify-content: center;
+	gap: 16px;
+	padding: 64px 24px;
+	text-align: center;
+	color: var(--color-text-muted);
+}
+
+.empty-title { font-size: 1rem; margin: 0; }
+
+/* ── ドロワー ────────────────────────────────────────────── */
+.drawer-overlay {
+	position: fixed;
+	inset: 0;
+	background: rgba(0, 0, 0, 0.2);
+	z-index: 100;
+}
+
+.drawer {
+	position: fixed;
+	top: 0;
+	right: 0;
+	bottom: 0;
+	width: min(480px, 92vw);
+	background: var(--color-surface);
+	border-left: 1px solid var(--color-border);
+	z-index: 101;
+	display: flex;
+	flex-direction: column;
+	box-shadow: -4px 0 24px rgba(0, 0, 0, 0.08);
+}
+
+.drawer-header {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	padding: 16px 20px;
+	border-bottom: 1px solid var(--color-border);
+	flex-shrink: 0;
+}
+
+.drawer-title { margin: 0; font-size: 1rem; font-weight: 600; }
+
+.drawer-close {
+	background: none;
+	border: none;
+	color: var(--color-text-muted);
+	font-size: 1rem;
+	cursor: pointer;
+	padding: 4px 8px;
+	border-radius: 4px;
+	transition: background 0.15s;
+	&:hover { background: var(--color-border); }
+}
+
+.drawer-body {
+	flex: 1;
+	overflow-y: auto;
+	padding: 20px;
+	display: flex;
+	flex-direction: column;
+	gap: 16px;
+}
+
+.drawer-footer {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	padding: 14px 20px;
+	border-top: 1px solid var(--color-border);
+	flex-shrink: 0;
+}
+
+.footer-right { display: flex; gap: 8px; }
+
+/* ── フォーム ────────────────────────────────────────────── */
+.form-row { display: flex; flex-direction: column; gap: 6px; }
+.form-label {
+	font-size: 0.875rem;
+	font-weight: 500;
+	color: var(--color-text-muted);
+}
+.req { color: var(--color-error); margin-left: 2px; }
+
+.form-input, .form-textarea {
+	padding: 8px 12px;
+	border: 1px solid var(--color-border);
+	border-radius: 6px;
+	background: var(--color-background);
+	color: var(--color-text);
+	font-size: 0.9375rem;
+	font-family: inherit;
+	outline: none;
+	width: 100%;
+	box-sizing: border-box;
+	&:focus { border-color: var(--color-primary); }
+}
+
+.form-textarea { min-height: 100px; resize: vertical; }
+
+.save-error {
+	padding: 10px 14px;
+	background: color-mix(in srgb, var(--color-error) 10%, transparent);
+	border: 1px solid var(--color-error);
+	border-radius: 6px;
+	color: var(--color-error);
+	font-size: 0.875rem;
+	margin: 0;
+}
+
+/* ── ボタン ─────────────────────────────────────────────── */
+.btn-primary {
+	padding: 8px 18px;
+	background: var(--color-primary);
+	color: #fff;
+	border: none;
+	border-radius: 6px;
+	font-size: 0.875rem;
+	cursor: pointer;
+	text-decoration: none;
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	transition: opacity 0.15s;
+	&:hover { opacity: 0.88; }
+	&:disabled { opacity: 0.5; cursor: not-allowed; }
+	&.btn-sm { padding: 4px 10px; font-size: 0.8125rem; }
+}
+
+.btn-secondary {
+	padding: 7px 16px;
+	border: 1px solid var(--color-border);
+	border-radius: 6px;
+	background: transparent;
+	color: var(--color-text-muted);
+	font-size: 0.875rem;
+	cursor: pointer;
+	text-decoration: none;
+	transition: border-color 0.15s, color 0.15s;
+	&:hover { border-color: var(--color-primary); color: var(--color-primary); }
+}
+
+.btn-danger {
+	padding: 7px 16px;
+	border: 1px solid var(--color-error);
+	border-radius: 6px;
+	background: transparent;
+	color: var(--color-error);
+	font-size: 0.875rem;
+	cursor: pointer;
+	transition: background 0.15s;
+	&:hover { background: color-mix(in srgb, var(--color-error) 10%, transparent); }
+}
+
+.btn-danger-ghost {
+	background: none;
+	border: none;
+	color: var(--color-error);
+	font-size: 0.875rem;
+	cursor: pointer;
+	padding: 7px 0;
+	transition: opacity 0.15s;
+	&:hover { opacity: 0.75; }
+	&:disabled { opacity: 0.5; cursor: not-allowed; }
+}
 </style>

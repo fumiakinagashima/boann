@@ -12,166 +12,172 @@
 	function confirmDeletePage(e: SubmitEvent) {
 		if (!confirm('このページを削除しますか？')) e.preventDefault();
 	}
+
+	const ACTION_LABELS: Record<string, string> = {
+		detail: '詳細',
+		create: '登録',
+		edit: '編集',
+		delete: '削除'
+	};
+	const ALL_ACTIONS = ['detail', 'create', 'edit', 'delete'] as const;
 </script>
 
 <BuilderLayout>
 	{#snippet main()}
 		<div class="build-page">
-	<div class="panel-header">
-		<a href="/apps/{data.app.id}" class="back-link"><ChevronLeft size={15} />{data.app.label}</a>
-		<div class="meta-actions">
-			<form method="POST" action="?/delete" onsubmit={confirmDeletePage} class="delete-form">
-				<button type="submit" class="btn-danger-ghost">削除</button>
-			</form>
-			<a href="/apps/{data.app.id}/pages/{data.page.id}" class="btn-secondary">プレビュー</a>
-			<button class="btn-primary" onclick={s.save} disabled={s.saving || !s.dirty}>
-				{s.saving ? '保存中…' : '保存'}
-			</button>
-			{#if s.saving}<span class="saved-msg">✓</span>{/if}				
-		</div>
-	</div>
-	<div class="build-header">
-		
-	</div>
-
-	<div class="build-body">
-		<section class="section">
-			<h2 class="section-title">コンポーネント</h2>
-			<p class="section-desc">ページに表示するコンポーネントを追加・設定します。上から順に表示されます。</p>
-
-			{#if s.components.length === 0}
-				<div class="empty-comp">
-					<p>コンポーネントがまだありません。</p>
+			<div class="panel-header">
+				<a href="/apps/{data.app.id}" class="back-link"><ChevronLeft size={15} />{data.app.label}</a>
+				<div class="meta-actions">
+					<form method="POST" action="?/delete" onsubmit={confirmDeletePage} class="delete-form">
+						<button type="submit" class="btn-danger-ghost">削除</button>
+					</form>
+					<a href="/apps/{data.app.id}/pages/{data.page.id}" class="btn-secondary">プレビュー</a>
+					<button class="btn-primary" onclick={s.save} disabled={s.saving || !s.dirty}>
+						{s.saving ? '保存中…' : '保存'}
+					</button>
+					{#if s.saved}<span class="saved-msg">✓ 保存しました</span>{/if}
 				</div>
-			{/if}
+			</div>
 
-			{#each s.components as comp, i (comp.id)}
-				{@const tableFields = s.getTableFields(comp.tableId)}
-				<div class="comp-card" class:expanded={comp.expanded}>
-					<div class="comp-card-header" role="button" tabindex="0"
-						onclick={() => s.toggleExpand(comp.id)}
-						onkeydown={(e) => { if (e.key === 'Enter') s.toggleExpand(comp.id); }}
-					>
-						<span class="comp-type-badge" class:form={comp.type === 'form'}>
-							{comp.type === 'list' ? '一覧' : 'フォーム'}
-						</span>
-						<span class="comp-summary">
-							<strong>{comp.title || s.getTableLabel(comp.tableId)}</strong>
-							<span class="comp-meta">{s.getDisplaySummary(comp)}</span>
-						</span>
-						<div class="comp-card-actions" role="presentation" onclick={(e) => e.stopPropagation()}>
-							<button class="icon-btn" onclick={() => s.moveUp(i)} disabled={i === 0} title="上へ">↑</button>
-							<button class="icon-btn" onclick={() => s.moveDown(i)} disabled={i === s.components.length - 1} title="下へ">↓</button>
-							<button class="icon-btn danger" onclick={() => s.removeComponent(comp.id)} title="削除">×</button>
+			<div class="build-body">
+				<!-- ── ページ名 ──────────────────────────────────────── -->
+				<section class="section">
+					<h2 class="section-title">ページ名</h2>
+					<input
+						class="label-input"
+						type="text"
+						value={s.pageLabel}
+						oninput={(e) => (s.pageLabel = e.currentTarget.value)}
+						placeholder="ページの表示名"
+					/>
+				</section>
+
+				<!-- ── テーブル選択 ─────────────────────────────────── -->
+				<section class="section">
+					<h2 class="section-title">テーブル</h2>
+					<p class="section-desc">このページで表示するテーブルを選択します。</p>
+					{#if data.tables.length === 0}
+						<p class="hint">このアプリにテーブルがありません。先にテーブルを作成してください。</p>
+					{:else}
+						<select
+							class="field-select"
+							value={s.tableId ?? ''}
+							onchange={(e) => s.setTableId(e.currentTarget.value || null)}
+						>
+							<option value="">— 選択してください —</option>
+							{#each data.tables as t}
+								<option value={t.id}>{t.label}</option>
+							{/each}
+						</select>
+					{/if}
+				</section>
+
+				{#if s.tableId}
+					<!-- ── 表示フィールド ───────────────────────────── -->
+					<section class="section">
+						<h2 class="section-title">一覧に表示するフィールド</h2>
+						<p class="section-desc">チェックを外すと一覧から非表示になります。</p>
+						{#if s.tableFields.length === 0}
+							<p class="hint">このテーブルにフィールドがありません。</p>
+						{:else}
+							<div class="check-grid">
+								{#each s.tableFields as f}
+									<label class="check-label">
+										<input
+											type="checkbox"
+											checked={s.isFieldShown(f.key)}
+											onchange={() => s.toggleField(f.key)}
+										/>
+										{f.label}
+										<span class="type-tag">{f.type}</span>
+									</label>
+								{/each}
+							</div>
+							{#if !s.config.fields?.length}
+								<p class="hint">全フィールドを表示中</p>
+							{/if}
+						{/if}
+					</section>
+
+					<!-- ── アクション ────────────────────────────────── -->
+					<section class="section">
+						<h2 class="section-title">使用するアクション</h2>
+						<p class="section-desc">一覧・詳細で使える操作を選択します。</p>
+						<div class="check-row">
+							{#each ALL_ACTIONS as action}
+								<label class="check-label">
+									<input
+										type="checkbox"
+										checked={s.config.actions.includes(action)}
+										onchange={() => s.toggleAction(action)}
+									/>
+									{ACTION_LABELS[action]}
+								</label>
+							{/each}
 						</div>
-						<span class="expand-icon">{comp.expanded ? '▲' : '▼'}</span>
-					</div>
+					</section>
 
-					{#if comp.expanded}
-						<div class="comp-card-body">
-							<!-- Type -->
-							<div class="field-group">
-								<label class="field-label">種類</label>
-								<div class="radio-group">
-									<label class="radio-label">
-										<input type="radio" name="type-{comp.id}" value="list"
-											checked={comp.type === 'list'}
-											onchange={() => s.updateComponent(comp.id, { type: 'list' })}
-										/>
-										一覧（テーブル表示・編集可）
-									</label>
-									<label class="radio-label">
-										<input type="radio" name="type-{comp.id}" value="form"
-											checked={comp.type === 'form'}
-											onchange={() => s.updateComponent(comp.id, { type: 'form' })}
-										/>
-										フォーム（新規登録）
-									</label>
-								</div>
-							</div>
-
-							<!-- Table -->
-							<div class="field-group">
-								<label class="field-label" for="table-{comp.id}">テーブル</label>
-								{#if data.tables.length === 0}
-									<p class="field-hint">このアプリにテーブルがありません。</p>
-								{:else}
-									<select
-										id="table-{comp.id}"
-										class="field-select"
-										value={comp.tableId}
-										onchange={(e) => s.updateComponent(comp.id, { tableId: e.currentTarget.value, fields: null })}
-									>
-										{#each data.tables as t}
-											<option value={t.id}>{t.label}</option>
-										{/each}
-									</select>
-								{/if}
-							</div>
-
-							<!-- Title -->
-							<div class="field-group">
-								<label class="field-label" for="title-{comp.id}">タイトル（省略可）</label>
-								<input
-									id="title-{comp.id}"
-									class="field-input"
-									type="text"
-									value={comp.title ?? ''}
-									oninput={(e) => s.updateComponent(comp.id, { title: e.currentTarget.value || null })}
-									placeholder="省略するとテーブル名を使用"
-								/>
-							</div>
-
-							<!-- Fields -->
-							{#if tableFields.length > 0}
-								<div class="field-group">
-									<label class="field-label">表示フィールド</label>
-									<div class="check-grid">
-										{#each tableFields as f}
-											<label class="check-label">
+					<!-- ── 詳細画面: 関連データ ─────────────────────── -->
+					{#if s.config.actions.includes('detail')}
+						<section class="section">
+							<h2 class="section-title">詳細画面の関連データ</h2>
+							<p class="section-desc">
+								このテーブルのレコードを参照している他のテーブルを、詳細画面に表示できます。
+							</p>
+							{#if data.referencingTables.length === 0}
+								<p class="hint">このテーブルを参照しているテーブルはありません。</p>
+							{:else}
+								<div class="related-list">
+									{#each data.referencingTables as rt}
+										<div class="related-entry">
+											<label class="check-label related-item">
 												<input
 													type="checkbox"
-													checked={s.isFieldShown(comp, f.key)}
-													onchange={() => s.toggleField(comp.id, f.key, tableFields)}
+													checked={s.isRelatedTableEnabled(rt.tableId, rt.refFieldKey)}
+													onchange={() => s.toggleRelatedTable(rt.tableId, rt.refFieldKey, rt.tableLabel)}
 												/>
-												{f.label}
-												<span class="field-type-tag">{f.type}</span>
+												<span class="related-name">{rt.tableLabel}</span>
+												<span class="related-via">← {rt.refFieldLabel}</span>
 											</label>
-										{/each}
-									</div>
-									{#if !comp.fields?.length}
-										<p class="field-hint">全フィールドを表示中</p>
-									{/if}
-								</div>
-							{/if}
-
-							<!-- Actions -->
-							<div class="field-group">
-								<label class="field-label">使用可能なアクション</label>
-								<div class="check-row">
-									{#each [['create', '作成'], ['edit', '編集'], ['delete', '削除']] as [action, label]}
-										<label class="check-label">
-											<input
-												type="checkbox"
-												checked={(comp.actions ?? []).includes(action as 'create' | 'edit' | 'delete')}
-												onchange={() => s.toggleAction(comp.id, action as 'create' | 'edit' | 'delete')}
-											/>
-											{label}
-										</label>
+											{#if s.isRelatedTableEnabled(rt.tableId, rt.refFieldKey)}
+												{@const rtFields = s.getRelatedTableFields(rt.tableId)}
+												<div class="related-actions-row">
+													{#each ALL_ACTIONS as action}
+														<label class="check-label check-label-sm">
+															<input
+																type="checkbox"
+																checked={s.isRelatedTableActionEnabled(rt.tableId, rt.refFieldKey, action)}
+																onchange={() => s.toggleRelatedTableAction(rt.tableId, rt.refFieldKey, action)}
+															/>
+															{ACTION_LABELS[action]}
+														</label>
+													{/each}
+												</div>
+												{#if rtFields.length > 0}
+													<div class="related-fields-row">
+														<span class="related-fields-label">表示フィールド:</span>
+														{#each rtFields as rf}
+															<label class="check-label check-label-sm">
+																<input
+																	type="checkbox"
+																	checked={s.isRelatedTableFieldShown(rt.tableId, rt.refFieldKey, rf.key)}
+																	onchange={() => s.toggleRelatedTableField(rt.tableId, rt.refFieldKey, rf.key)}
+																/>
+																{rf.label}
+															</label>
+														{/each}
+													</div>
+												{/if}
+											{/if}
+										</div>
 									{/each}
 								</div>
-							</div>
-						</div>
+							{/if}
+						</section>
 					{/if}
-				</div>
-			{/each}
-
-			<button class="btn-add" onclick={s.addComponent} disabled={data.tables.length === 0}>
-				+ コンポーネントを追加
-			</button>
-		</section>
-	</div>
-</div>
+				{/if}
+			</div>
+		</div>
 	{/snippet}
 
 	{#snippet chat()}
@@ -189,356 +195,229 @@
 </BuilderLayout>
 
 <style lang="scss">
-	.build-page {
-		flex: 1;
-		min-height: 0;
-		display: flex;
-		flex-direction: column;
-		overflow: hidden;
-	}
+.build-page {
+	flex: 1;
+	display: flex;
+	flex-direction: column;
+	overflow: hidden;
+}
 
-	/* ── Header ──────────────────────────────────────────────── */
-	.build-header {
-		padding: 16px 32px 12px;
-		border-bottom: 1px solid var(--color-border);
-		flex-shrink: 0;
-		display: flex;
-		flex-direction: column;
-		gap: 10px;
-	}
+/* ── Header ──────────────────────────────────────────────── */
+.panel-header {
+	padding: 16px 24px;
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+	border-bottom: 1px solid var(--color-border);
+	flex-shrink: 0;
+}
 
-	.panel-header {
-		padding: 16px 24px 0;
-		display: flex;
-		justify-content: space-between;
-	}
+.back-link {
+	display: inline-flex;
+	align-items: center;
+	gap: 4px;
+	font-size: 0.8125rem;
+	color: var(--color-text-muted);
+	text-decoration: none;
+	&:hover { color: var(--color-text); }
+}
 
-	.back-link {
-		display: inline-flex;
-		align-items: center;
-		gap: 4px;
-		font-size: 0.8125rem;
-		color: var(--color-text-muted);
-		text-decoration: none;
-		&:hover { color: var(--color-text); }
-	}
+.meta-actions {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+}
 
-	.header-main {
-		display: flex;
-		align-items: center;
-		justify-content: space-between;
-		gap: 16px;
-	}
+.saved-msg {
+	font-size: 0.8125rem;
+	color: var(--color-success, #16a34a);
+}
 
-	.header-title {
-		display: flex;
-		align-items: center;
-		gap: 10px;
-	}
+/* ── Body ────────────────────────────────────────────────── */
+.build-body {
+	flex: 1;
+	overflow-y: auto;
+	padding: 28px 32px;
+	display: flex;
+	flex-direction: column;
+	gap: 28px;
+}
 
-	.page-label-input {
-		font-size: 1.125rem;
-		font-weight: 700;
-		color: var(--color-text);
-		background: none;
-		border: none;
-		border-bottom: 2px solid transparent;
-		outline: none;
-		padding: 2px 4px;
-		font-family: inherit;
-		transition: border-color 0.15s;
-		&:focus { border-bottom-color: var(--color-primary); }
-	}
+/* ── Section ─────────────────────────────────────────────── */
+.section {
+	max-width: 640px;
+	display: flex;
+	flex-direction: column;
+	gap: 10px;
+}
 
-	.page-badge {
-		font-size: 0.75rem;
-		padding: 2px 8px;
-		border-radius: 999px;
-		background: color-mix(in srgb, var(--color-primary) 10%, transparent);
-		color: var(--color-primary);
-		white-space: nowrap;
-	}
+.section-title {
+	font-size: 0.9375rem;
+	font-weight: 600;
+	color: var(--color-text);
+	margin: 0;
+}
 
-	.header-actions {
-		display: flex;
-		align-items: center;
-		gap: 10px;
-	}
+.section-desc {
+	font-size: 0.875rem;
+	color: var(--color-text-muted);
+	margin: 0;
+}
 
-	.saved-msg {
-		font-size: 0.8125rem;
-		color: var(--color-success, #16a34a);
-	}
+.hint {
+	font-size: 0.875rem;
+	color: var(--color-text-muted);
+	margin: 0;
+}
 
-	/* ── Body ────────────────────────────────────────────────── */
-	.build-body {
-		flex: 1;
-		overflow-y: auto;
-		padding: 28px 32px;
-	}
+/* ── Inputs ──────────────────────────────────────────────── */
+.label-input {
+	padding: 8px 12px;
+	border: 1px solid var(--color-border);
+	border-radius: 6px;
+	background: var(--color-background);
+	color: var(--color-text);
+	font-size: 0.9375rem;
+	font-family: inherit;
+	outline: none;
+	width: 100%;
+	box-sizing: border-box;
+	&:focus { border-color: var(--color-primary); }
+}
 
-	.section {
-		max-width: 720px;
-		display: flex;
-		flex-direction: column;
-		gap: 12px;
-	}
+.field-select {
+	padding: 8px 10px;
+	border: 1px solid var(--color-border);
+	border-radius: 6px;
+	background: var(--color-background);
+	color: var(--color-text);
+	font-size: 0.875rem;
+	font-family: inherit;
+	outline: none;
+	width: 100%;
+	box-sizing: border-box;
+	&:focus { border-color: var(--color-primary); }
+}
 
-	.section-title {
-		font-size: 1rem;
-		font-weight: 700;
-		color: var(--color-text);
-		margin: 0;
-	}
+/* ── Checkboxes ──────────────────────────────────────────── */
+.check-grid {
+	display: grid;
+	grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+	gap: 8px;
+}
 
-	.section-desc {
-		font-size: 0.875rem;
-		color: var(--color-text-muted);
-		margin: 0 0 4px;
-	}
+.check-row {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 16px;
+}
 
-	.empty-comp {
-		padding: 24px;
-		border: 1px dashed var(--color-border);
-		border-radius: 8px;
-		text-align: center;
-		font-size: 0.875rem;
-		color: var(--color-text-muted);
-	}
+.check-label {
+	display: flex;
+	align-items: center;
+	gap: 7px;
+	font-size: 0.875rem;
+	color: var(--color-text);
+	cursor: pointer;
+	user-select: none;
+}
 
-	/* ── Component card ──────────────────────────────────────── */
-	.comp-card {
-		border: 1px solid var(--color-border);
-		border-radius: 10px;
-		background: var(--color-surface);
-		overflow: hidden;
-		transition: border-color 0.15s;
+.type-tag {
+	font-size: 0.7rem;
+	color: var(--color-text-muted);
+	background: var(--color-border);
+	padding: 1px 5px;
+	border-radius: 3px;
+}
 
-		&.expanded { border-color: var(--color-primary); }
-	}
+/* ── Related tables ──────────────────────────────────────── */
+.related-list {
+	display: flex;
+	flex-direction: column;
+	gap: 12px;
+}
 
-	.comp-card-header {
-		display: flex;
-		align-items: center;
-		gap: 10px;
-		padding: 12px 16px;
-		cursor: pointer;
-		user-select: none;
+.related-entry {
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+}
 
-		&:hover { background: color-mix(in srgb, var(--color-primary) 4%, transparent); }
-	}
+.related-item { align-items: center; }
 
-	.comp-type-badge {
-		font-size: 0.75rem;
-		font-weight: 600;
-		padding: 2px 8px;
-		border-radius: 999px;
-		background: color-mix(in srgb, var(--color-primary) 12%, transparent);
-		color: var(--color-primary);
-		white-space: nowrap;
-		flex-shrink: 0;
+.related-name { font-weight: 500; }
 
-		&.form {
-			background: color-mix(in srgb, #8b5cf6 12%, transparent);
-			color: #7c3aed;
-		}
-	}
+.related-via {
+	font-size: 0.8125rem;
+	color: var(--color-text-muted);
+}
 
-	.comp-summary {
-		flex: 1;
-		display: flex;
-		flex-direction: column;
-		gap: 2px;
+.related-actions-row {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 12px;
+	padding-left: 22px;
+}
 
-		strong {
-			font-size: 0.9375rem;
-			color: var(--color-text);
-		}
-	}
+.related-fields-row {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 10px;
+	padding-left: 22px;
+}
 
-	.comp-meta {
-		font-size: 0.8125rem;
-		color: var(--color-text-muted);
-	}
+.related-fields-label {
+	font-size: 0.8125rem;
+	color: var(--color-text-muted);
+	white-space: nowrap;
+}
 
-	.comp-card-actions {
-		display: flex;
-		align-items: center;
-		gap: 2px;
-	}
+.check-label-sm {
+	font-size: 0.8125rem;
+	color: var(--color-text-muted);
+}
 
-	.icon-btn {
-		width: 28px;
-		height: 28px;
-		border: none;
-		background: none;
-		cursor: pointer;
-		border-radius: 5px;
-		color: var(--color-text-muted);
-		font-size: 0.875rem;
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		transition: background 0.1s, color 0.1s;
+/* ── Buttons ─────────────────────────────────────────────── */
+.btn-primary {
+	padding: 6px 14px;
+	border-radius: 6px;
+	font-size: 0.875rem;
+	font-weight: 500;
+	background: var(--color-primary);
+	color: #fff;
+	border: none;
+	cursor: pointer;
+	transition: opacity 0.15s;
+	&:hover:not(:disabled) { opacity: 0.88; }
+	&:disabled { opacity: 0.4; cursor: not-allowed; }
+}
 
-		&:hover:not(:disabled) { background: var(--color-border); color: var(--color-text); }
-		&:disabled { opacity: 0.3; cursor: not-allowed; }
-		&.danger:hover:not(:disabled) { color: var(--color-danger); }
-	}
+.btn-secondary {
+	padding: 6px 12px;
+	border-radius: 6px;
+	font-size: 0.875rem;
+	border: 1px solid var(--color-border);
+	background: none;
+	color: var(--color-text);
+	cursor: pointer;
+	text-decoration: none;
+	white-space: nowrap;
+	transition: background 0.15s;
+	&:hover { background: var(--color-border); }
+}
 
-	.expand-icon {
-		font-size: 0.75rem;
-		color: var(--color-text-muted);
-		flex-shrink: 0;
-	}
+.delete-form { display: contents; }
 
-	.comp-card-body {
-		padding: 16px 20px;
-		border-top: 1px solid var(--color-border);
-		display: flex;
-		flex-direction: column;
-		gap: 16px;
-	}
-
-	/* ── Field groups inside card ────────────────────────────── */
-	.field-group {
-		display: flex;
-		flex-direction: column;
-		gap: 6px;
-	}
-
-	.field-label {
-		font-size: 0.8125rem;
-		font-weight: 600;
-		color: var(--color-text-muted);
-		text-transform: uppercase;
-		letter-spacing: 0.04em;
-	}
-
-	.field-hint {
-		font-size: 0.8125rem;
-		color: var(--color-text-muted);
-		margin: 0;
-	}
-
-	.field-input, .field-select {
-		padding: 7px 10px;
-		border: 1px solid var(--color-border);
-		border-radius: 6px;
-		background: var(--color-background);
-		color: var(--color-text);
-		font-size: 0.875rem;
-		font-family: inherit;
-		outline: none;
-		width: 100%;
-		box-sizing: border-box;
-		transition: border-color 0.15s;
-		&:focus { border-color: var(--color-primary); }
-	}
-
-	.radio-group {
-		display: flex;
-		flex-direction: column;
-		gap: 6px;
-	}
-
-	.radio-label {
-		display: flex;
-		align-items: center;
-		gap: 6px;
-		font-size: 0.875rem;
-		color: var(--color-text);
-		cursor: pointer;
-	}
-
-	.check-grid {
-		display: grid;
-		grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-		gap: 6px;
-	}
-
-	.check-row {
-		display: flex;
-		flex-wrap: wrap;
-		gap: 12px;
-	}
-
-	.check-label {
-		display: flex;
-		align-items: center;
-		gap: 6px;
-		font-size: 0.875rem;
-		color: var(--color-text);
-		cursor: pointer;
-	}
-
-	.field-type-tag {
-		font-size: 0.7rem;
-		color: var(--color-text-muted);
-		background: var(--color-border);
-		padding: 1px 5px;
-		border-radius: 3px;
-	}
-
-	/* ── Add component button ────────────────────────────────── */
-	.btn-add {
-		padding: 10px 16px;
-		border-radius: 8px;
-		font-size: 0.875rem;
-		font-weight: 500;
-		border: 1px dashed var(--color-border);
-		background: none;
-		color: var(--color-text-muted);
-		cursor: pointer;
-		width: 100%;
-		font-family: inherit;
-		transition: border-color 0.15s, color 0.15s;
-
-		&:hover:not(:disabled) { border-color: var(--color-primary); color: var(--color-primary); }
-		&:disabled { opacity: 0.4; cursor: not-allowed; }
-	}
-
-	/* ── Buttons ─────────────────────────────────────────────── */
-	.btn-primary {
-		padding: 5px 12px;
-		border-radius: 6px;
-		font-size: 0.875rem;
-		font-weight: 500;
-		background: var(--color-primary);
-		color: #fff;
-		border: none;
-		cursor: pointer;
-		transition: opacity 0.15s;
-		&:hover:not(:disabled) { opacity: 0.88; }
-		&:disabled { opacity: 0.4; cursor: not-allowed; }
-	}
-
-	.btn-secondary {
-		padding: 7px 12px;
-		border-radius: 6px;
-		font-size: 0.875rem;
-		border: 1px solid var(--color-border);
-		background: none;
-		color: var(--color-text);
-		cursor: pointer;
-		text-decoration: none;
-		white-space: nowrap;
-		transition: background 0.15s;
-		&:hover { background: var(--color-border); }
-	}
-
-	.delete-form { display: contents; }
-
-	.btn-danger-ghost {
-		padding: 5px 12px;
-		border-radius: 6px;
-		font-size: 0.875rem;
-		border: 1px solid var(--color-border);
-		background: none;
-		color: var(--color-text-muted);
-		cursor: pointer;
-		transition: border-color 0.15s, color 0.15s;
-		&:hover:not(:disabled) { border-color: var(--color-danger); color: var(--color-danger); }
-		&:disabled { opacity: 0.4; cursor: not-allowed; }
-	}
+.btn-danger-ghost {
+	padding: 6px 12px;
+	border-radius: 6px;
+	font-size: 0.875rem;
+	border: 1px solid var(--color-border);
+	background: none;
+	color: var(--color-text-muted);
+	cursor: pointer;
+	transition: border-color 0.15s, color 0.15s;
+	&:hover:not(:disabled) { border-color: var(--color-error); color: var(--color-error); }
+}
 </style>

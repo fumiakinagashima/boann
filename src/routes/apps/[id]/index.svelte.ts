@@ -148,7 +148,7 @@ export function createAppBuilderState(getData: () => PageData) {
 			const res = await fetch(`/api/apps/${getData().app.id}/pages`, {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ label: '新しいページ', components: [] })
+				body: JSON.stringify({ label: '新しいページ' })
 			});
 			if (res.ok) await invalidateAll();
 		} finally {

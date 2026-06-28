@@ -1,11 +1,9 @@
 import type { Db } from './index';
 import { createApp, createEntityType, createPage, deleteApp } from './table-service';
-import type { PageComponent } from './table-service';
 import type { ImportPlan } from '$lib/server/ai/import-plan';
 
 // プランを決定的にDBへ反映する。LLMは介在しない。
-// ページコンポーネントはプラン内ではテーブルを name で参照しているため、
-// 生成済みテーブルの id に解決してから保存する。
+// ページは先頭コンポーネントのテーブルを tableId として保存する。
 // 途中で失敗した場合は作成済みの app ごとロールバックして孤立を防ぐ。
 export async function applyImportPlan(
 	db: Db,
@@ -40,23 +38,9 @@ export async function applyImportPlan(
 
 		let firstPageId: string | null = null;
 		for (const page of plan.pages) {
-			const components: PageComponent[] = page.components.map((c) => {
-				const tableId = nameToId.get(c.table_name);
-				if (!tableId) {
-					throw new Error(
-						`ページ「${page.label}」が参照するテーブル「${c.table_name}」がプランに存在しません。`
-					);
-				}
-				return {
-					id: crypto.randomUUID(),
-					type: c.type,
-					tableId,
-					title: c.title ?? null,
-					fields: c.fields ?? null,
-					actions: c.actions ?? ['create', 'edit', 'delete']
-				};
-			});
-			const res = await createPage(db, app.id, { label: page.label, components });
+			const firstTableName = page.components[0]?.table_name;
+			const tableId = firstTableName ? (nameToId.get(firstTableName) ?? null) : null;
+			const res = await createPage(db, app.id, { label: page.label, tableId });
 			if (!firstPageId) firstPageId = res.id;
 		}
 

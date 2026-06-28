@@ -6,9 +6,10 @@ import {
 	getAppById,
 	getTablesByAppId,
 	getFieldsByEntityTypeId,
-	deletePage
+	deletePage,
+	findTablesReferencingTable
 } from '$lib/server/db/table-service';
-import type { FieldDef } from '$lib/server/db/table-service';
+import type { FieldDef, ReferencingTable } from '$lib/server/db/table-service';
 
 export const load: PageServerLoad = async ({ params, platform }) => {
 	if (!platform?.env?.DB) error(500);
@@ -27,7 +28,15 @@ export const load: PageServerLoad = async ({ params, platform }) => {
 		tableFields[t.id] = await getFieldsByEntityTypeId(db, t.id);
 	}));
 
-	return { page, app, tables, tableFields };
+	let referencingTables: ReferencingTable[] = [];
+	if (page.tableId) {
+		const currentTable = tables.find(t => t.id === page.tableId);
+		if (currentTable) {
+			referencingTables = await findTablesReferencingTable(db, currentTable.name);
+		}
+	}
+
+	return { page, app, tables, tableFields, referencingTables };
 };
 
 export const actions: Actions = {

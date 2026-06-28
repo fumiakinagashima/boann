@@ -62,8 +62,8 @@ export async function dispatchTool(
 		case 'create_entity_type':             return entities.handleCreateEntityType(db, input);
 		case 'add_entity_field':               return entities.handleAddEntityField(db, input);
 		case 'get_entities':                   return entities.handleGetEntities(db, input);
-		case 'create_entity':                  return entities.handleCreateEntity(db, input);
-		case 'update_entity':                  return entities.handleUpdateEntity(db, input);
+		case 'create_entity':                  return entities.handleCreateEntity(db, input, env?.accountId);
+		case 'update_entity':                  return entities.handleUpdateEntity(db, input, env?.accountId);
 		case 'get_help':                       return help.handleGetHelp(input);
 		case 'save_workflow':                  return workflows.handleSaveWorkflow(db, input, env);
 		case 'list_workflows':                 return workflows.handleListWorkflows(db, env);

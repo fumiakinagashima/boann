@@ -1,13 +1,19 @@
-import { invalidateAll } from '$app/navigation';
+import { invalidateAll, goto } from '$app/navigation';
+import { page } from '$app/state';
 import { formatJstDateTime } from '$lib/datetime';
 import type { FieldDef, RecordRow } from '$lib/server/db/table-service';
 import { isRefField } from '$lib/types/chat';
 import type { PageData } from './$types';
-import type { ComponentData } from './+page.server';
+import type { RelatedSection } from './+page.server';
 
-export type ActiveEdit = {
-	compIdx: number;
-	mode: 'new' | 'edit';
+export type DrawerMode = 'new' | 'edit';
+
+export type Drawer = {
+	mode: DrawerMode;
+	tableId: string;
+	tableName: string;
+	fields: FieldDef[];
+	recordOptions: Record<string, { value: string; label: string }[]>;
 	editingId: string | null;
 	formData: Record<string, string>;
 	saving: boolean;
@@ -15,121 +21,91 @@ export type ActiveEdit = {
 	deleting: boolean;
 };
 
-export type FormSubmitState = { submitting: boolean; done: boolean; error: string };
-
 export function createPageViewState(getData: () => PageData) {
-	let componentData = $state(getData().componentData);
-	$effect(() => { componentData = getData().componentData; });
+	let drawer = $state<Drawer | null>(null);
 
-	// ── Shared form drawer ───────────────────────────────────────
-	let activeEdit = $state<ActiveEdit | null>(null);
+	// 一覧ビュー か 詳細ビュー か
+	const recordId = $derived(page.url.searchParams.get('recordId'));
+	const isDetail = $derived(!!recordId);
 
-	function openNew(compIdx: number) {
-		const comp = componentData[compIdx];
+	// ── ドロワー（登録・編集）────────────────────────────────────
+	function openNew(tableId: string, tableName: string, fields: FieldDef[], recordOptions: Record<string, { value: string; label: string }[]>, overrides: Record<string, string> = {}) {
 		const init: Record<string, string> = {};
-		for (const f of comp.fields) init[f.key] = f.defaultValue ?? '';
-		activeEdit = { compIdx, mode: 'new', editingId: null, formData: init, saving: false, saveError: '', deleting: false };
+		for (const f of fields) init[f.key] = f.defaultValue ?? '';
+		Object.assign(init, overrides);
+		drawer = { mode: 'new', tableId, tableName, fields, recordOptions, editingId: null, formData: init, saving: false, saveError: '', deleting: false };
 	}
 
-	function openEdit(compIdx: number, row: RecordRow) {
-		const comp = componentData[compIdx];
+	function openEdit(tableId: string, tableName: string, fields: FieldDef[], recordOptions: Record<string, { value: string; label: string }[]>, row: RecordRow) {
 		const init: Record<string, string> = {};
-		for (const f of comp.fields) {
+		for (const f of fields) {
 			const v = row[f.key];
 			init[f.key] = v != null ? String(v) : (f.defaultValue ?? '');
 		}
-		activeEdit = { compIdx, mode: 'edit', editingId: row.id as string, formData: init, saving: false, saveError: '', deleting: false };
+		drawer = { mode: 'edit', tableId, tableName, fields, recordOptions, editingId: row.id as string, formData: init, saving: false, saveError: '', deleting: false };
 	}
 
-	function closeForm() { activeEdit = null; }
+	function closeDrawer() { drawer = null; }
 
 	async function saveRecord() {
-		if (!activeEdit) return;
-		activeEdit.saving = true;
-		activeEdit.saveError = '';
+		if (!drawer) return;
+		drawer.saving = true;
+		drawer.saveError = '';
 		try {
-			const comp = componentData[activeEdit.compIdx];
-			const url = activeEdit.mode === 'new'
-				? `/api/database/${comp.tableName}/records`
-				: `/api/database/${comp.tableName}/records/${activeEdit.editingId}`;
+			const url = drawer.mode === 'new'
+				? `/api/database/${drawer.tableName}/records`
+				: `/api/database/${drawer.tableName}/records/${drawer.editingId}`;
 			const res = await fetch(url, {
-				method: activeEdit.mode === 'new' ? 'POST' : 'PATCH',
+				method: drawer.mode === 'new' ? 'POST' : 'PATCH',
 				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify(activeEdit.formData)
+				body: JSON.stringify(drawer.formData)
 			});
 			if (!res.ok) {
 				const body = (await res.json()) as { error?: string };
-				activeEdit.saveError = body.error ?? '保存に失敗しました';
+				drawer.saveError = body.error ?? '保存に失敗しました';
 				return;
 			}
-			closeForm();
+			closeDrawer();
 			await invalidateAll();
 		} finally {
-			if (activeEdit) activeEdit.saving = false;
+			if (drawer) drawer.saving = false;
 		}
 	}
 
 	async function deleteRecord() {
-		if (!activeEdit?.editingId) return;
+		if (!drawer?.editingId) return;
 		if (!confirm('このレコードを削除しますか？')) return;
-		activeEdit.deleting = true;
+		drawer.deleting = true;
 		try {
-			const comp = componentData[activeEdit.compIdx];
-			const res = await fetch(`/api/database/${comp.tableName}/records/${activeEdit.editingId}`, { method: 'DELETE' });
+			const res = await fetch(`/api/database/${drawer.tableName}/records/${drawer.editingId}`, { method: 'DELETE' });
 			if (res.ok || res.status === 204) {
-				closeForm();
+				closeDrawer();
 				await invalidateAll();
 			}
 		} finally {
-			if (activeEdit) activeEdit.deleting = false;
+			if (drawer) drawer.deleting = false;
 		}
 	}
 
-	// ── Standalone form ──────────────────────────────────────────
-	let formSubmitState = $state<Record<number, FormSubmitState>>({});
-
-	function getFormSubmitState(idx: number): FormSubmitState {
-		return formSubmitState[idx] ?? { submitting: false, done: false, error: '' };
+	// ── 詳細ビューナビゲーション ─────────────────────────────────
+	function openDetail(id: string) {
+		const u = new URL(page.url);
+		u.searchParams.set('recordId', id);
+		goto(u.toString());
 	}
 
-	async function submitStandaloneForm(compIdx: number, formEl: HTMLFormElement) {
-		const comp = componentData[compIdx];
-		formSubmitState = { ...formSubmitState, [compIdx]: { submitting: true, done: false, error: '' } };
-		try {
-			const data: Record<string, string> = {};
-			for (const f of comp.fields) {
-				const el = formEl.elements.namedItem(f.key) as HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement | null;
-				if (el) data[f.key] = el.value;
-			}
-			const res = await fetch(`/api/database/${comp.tableName}/records`, {
-				method: 'POST',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify(data)
-			});
-			if (!res.ok) {
-				const body = (await res.json()) as { error?: string };
-				formSubmitState = { ...formSubmitState, [compIdx]: { submitting: false, done: false, error: body.error ?? '保存に失敗しました' } };
-				return;
-			}
-			formEl.reset();
-			formSubmitState = { ...formSubmitState, [compIdx]: { submitting: false, done: true, error: '' } };
-			setTimeout(() => {
-				formSubmitState = { ...formSubmitState, [compIdx]: { submitting: false, done: false, error: '' } };
-			}, 2500);
-			await invalidateAll();
-		} finally {
-			if (!formSubmitState[compIdx]?.done) {
-				formSubmitState = { ...formSubmitState, [compIdx]: { ...(formSubmitState[compIdx] ?? {}), submitting: false, done: false, error: '' } };
-			}
-		}
+	function closeDetail() {
+		const u = new URL(page.url);
+		u.searchParams.delete('recordId');
+		goto(u.toString());
 	}
 
-	// ── Cell formatting ──────────────────────────────────────────
-	function formatCell(row: RecordRow, field: FieldDef, comp: ComponentData): string {
+	// ── セル表示 ─────────────────────────────────────────────────
+	function formatCell(row: RecordRow, field: FieldDef, recordOptions: Record<string, { value: string; label: string }[]>): string {
 		const val = row[field.key];
 		if (val == null || val === '') return '—';
 		if (isRefField(field.type)) {
-			const opts = comp.recordOptions[field.key] ?? [];
+			const opts = recordOptions[field.key] ?? [];
 			const opt = opts.find(o => o.value === String(val));
 			return opt ? opt.label : String(val);
 		}
@@ -148,22 +124,37 @@ export function createPageViewState(getData: () => PageData) {
 		return formatJstDateTime(new Date(ts * 1000));
 	}
 
-	const activeFields = $derived(activeEdit ? componentData[activeEdit.compIdx]?.fields ?? [] : []);
-	const activeRecordOptions = $derived(activeEdit ? componentData[activeEdit.compIdx]?.recordOptions ?? {} : {});
+	// 詳細ビュー: フィールド表示値
+	function displayValue(val: unknown, field: FieldDef, recordOptions: Record<string, { value: string; label: string }[]>): string {
+		if (val == null || val === '') return '—';
+		if (isRefField(field.type)) {
+			const opts = recordOptions[field.key] ?? [];
+			const opt = opts.find(o => o.value === String(val));
+			return opt ? opt.label : String(val);
+		}
+		if (field.type === 'select') {
+			const opt = (field.options ?? []).find(o => o.value === String(val));
+			return opt ? opt.label : String(val);
+		}
+		if (field.type === 'date' && typeof val === 'number') {
+			return new Date(val * 1000).toLocaleDateString('ja-JP', { year: 'numeric', month: 'long', day: 'numeric' });
+		}
+		return String(val);
+	}
 
 	return {
-		get componentData() { return componentData; },
-		get activeEdit() { return activeEdit; },
-		get activeFields() { return activeFields; },
-		get activeRecordOptions() { return activeRecordOptions; },
+		get drawer() { return drawer; },
+		get isDetail() { return isDetail; },
+		get recordId() { return recordId; },
 		openNew,
 		openEdit,
-		closeForm,
+		closeDrawer,
 		saveRecord,
 		deleteRecord,
-		getFormSubmitState,
-		submitStandaloneForm,
+		openDetail,
+		closeDetail,
 		formatCell,
 		formatTs,
+		displayValue,
 	};
 }

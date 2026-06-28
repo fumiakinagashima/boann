@@ -4,7 +4,6 @@ import type { Tool } from '@anthropic-ai/sdk/resources/messages';
 import type { Db } from '../db';
 import { entityTypes, entityFields, entities } from '../db/schema';
 import { createApp, createEntityType, createRecord, createPage, refColumns } from '../db/table-service';
-import type { PageComponent } from '../db/table-service';
 import { parseJson, now } from './shared';
 
 export const tools: Tool[] = [
@@ -212,41 +211,15 @@ export const tools: Tool[] = [
 	{
 		name: 'create_page',
 		description:
-			'現在編集中のアプリにページを追加する。コンポーネント（list: 一覧表示, form: 入力フォーム）を配置して画面を定義する。create_table 実行後に呼ぶ。',
+			'現在編集中のアプリに一覧ページを追加する。table_id で表示するテーブルを指定する。create_table 実行後に呼ぶ。',
 		input_schema: {
 			type: 'object',
 			properties: {
 				app_id: { type: 'string', description: 'アプリID' },
-				label: { type: 'string', description: 'ページの表示名（例: 顧客一覧, 顧客登録）' },
-				components: {
-					type: 'array',
-					description: 'ページに配置するコンポーネント一覧',
-					items: {
-						type: 'object',
-						properties: {
-							type: {
-								type: 'string',
-								enum: ['list', 'form'],
-								description: 'list: レコード一覧表示（表・編集可）, form: 新規登録フォーム'
-							},
-							table_id: { type: 'string', description: '対象テーブルのID（create_table の結果の id）' },
-							title: { type: 'string', description: 'コンポーネントのタイトル（省略時はテーブル名）' },
-							fields: {
-								type: 'array',
-								items: { type: 'string' },
-								description: '表示するフィールドキーの一覧（省略時は全フィールド）'
-							},
-							actions: {
-								type: 'array',
-								items: { type: 'string', enum: ['create', 'edit', 'delete'] },
-								description: '使用可能なアクション（デフォルト: 全て）'
-							}
-						},
-						required: ['type', 'table_id']
-					}
-				}
+				label: { type: 'string', description: 'ページの表示名（例: 顧客一覧）' },
+				table_id: { type: 'string', description: '表示するテーブルのID（create_table の結果の id）' }
 			},
-			required: ['app_id', 'label', 'components']
+			required: ['app_id', 'label', 'table_id']
 		}
 	}
 ];
@@ -308,18 +281,10 @@ const createTableSchema = z.object({
 	)
 });
 
-const pageComponentInputSchema = z.object({
-	type: z.enum(['list', 'form']),
-	table_id: z.string(),
-	title: z.string().optional(),
-	fields: z.array(z.string()).optional(),
-	actions: z.array(z.enum(['create', 'edit', 'delete'])).optional()
-});
-
 const createPageSchema = z.object({
 	app_id: z.string(),
 	label: z.string().min(1),
-	components: z.array(pageComponentInputSchema).min(1)
+	table_id: z.string().optional()
 });
 
 const createAppFieldSchema = z.object({
@@ -447,23 +412,25 @@ export async function handleGetEntities(db: Db, input: unknown) {
 	};
 }
 
-export async function handleCreateEntity(db: Db, input: unknown) {
+export async function handleCreateEntity(db: Db, input: unknown, accountId?: string) {
 	const { entity_type_id, data } = createEntitySchema.parse(input);
 	const id = crypto.randomUUID();
 	await db
 		.insert(entities)
-		.values({ id, entityTypeId: entity_type_id, data: JSON.stringify(data) });
+		.values({ id, entityTypeId: entity_type_id, data: JSON.stringify(data), createdBy: accountId ?? null, updatedBy: accountId ?? null });
 	const [row] = await db.select().from(entities).where(eq(entities.id, id));
 	return { ...row, data: parseJson(row.data) };
 }
 
-export async function handleUpdateEntity(db: Db, input: unknown) {
+export async function handleUpdateEntity(db: Db, input: unknown, accountId?: string) {
 	const { id, data } = updateEntitySchema.parse(input);
 	const [existing] = await db.select().from(entities).where(eq(entities.id, id));
 	if (!existing) throw new Error(`レコードが見つかりません: ${id}`);
 
 	const merged = JSON.stringify({ ...parseJson(existing.data), ...data });
-	await db.update(entities).set({ data: merged, updatedAt: now() }).where(eq(entities.id, id));
+	const set: Record<string, unknown> = { data: merged, updatedAt: now() };
+	if (accountId !== undefined) set.updatedBy = accountId;
+	await db.update(entities).set(set).where(eq(entities.id, id));
 	const [row] = await db.select().from(entities).where(eq(entities.id, id));
 	return { ...row, data: parseJson(row.data) };
 }
@@ -490,14 +457,6 @@ export async function handleCreateTable(db: Db, input: unknown) {
 
 export async function handleCreatePage(db: Db, input: unknown) {
 	const data = createPageSchema.parse(input);
-	const components: PageComponent[] = data.components.map(c => ({
-		id: crypto.randomUUID(),
-		type: c.type,
-		tableId: c.table_id,
-		title: c.title ?? null,
-		fields: c.fields ?? null,
-		actions: c.actions ?? ['create', 'edit', 'delete']
-	}));
-	const result = await createPage(db, data.app_id, { label: data.label, components });
-	return { id: result.id, label: data.label, appId: data.app_id, componentCount: components.length };
+	const result = await createPage(db, data.app_id, { label: data.label, tableId: data.table_id ?? null });
+	return { id: result.id, label: data.label, appId: data.app_id };
 }

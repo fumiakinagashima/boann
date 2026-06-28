@@ -64,7 +64,9 @@ export const entities = sqliteTable('entities', {
 		.default(sql`(unixepoch())`),
 	updatedAt: integer('updated_at', { mode: 'timestamp' })
 		.notNull()
-		.default(sql`(unixepoch())`)
+		.default(sql`(unixepoch())`),
+	createdBy: text('created_by'),
+	updatedBy: text('updated_by'),
 });
 
 export const integrations = sqliteTable('integrations', {

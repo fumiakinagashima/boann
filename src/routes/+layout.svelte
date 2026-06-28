@@ -5,8 +5,12 @@
 	import Sidebar from '$lib/components/Sidebar.svelte';
 	import { themeStore } from '$lib/stores/theme.svelte';
 	import { notificationCenter } from '$lib/stores/notifications.svelte';
+	import { page } from '$app/state';
 	import { untrack } from 'svelte';
 	import { NOTIFICATION_POLL_INTERVAL_MS } from '$lib/constants';
+
+	// ページビュー（/apps/[id]/pages/[pageId]）はサイドバーを使わず独自ヘッダーを持つ
+	const isAppPageView = $derived(page.route.id === '/apps/[id]/pages/[pageId]');
 
 	let { data, children } = $props();
 
@@ -38,6 +42,8 @@
 	<main class="content-full">
 		{@render children()}
 	</main>
+{:else if isAppPageView}
+	{@render children()}
 {:else}
 	<div class="shell">
 		<Sidebar account={data.account} bookmarkedIds={data.bookmarkedIds} apps={data.apps} />

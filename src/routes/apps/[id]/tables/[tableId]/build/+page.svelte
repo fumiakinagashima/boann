@@ -21,18 +21,19 @@
 	{#snippet main()}
 		<div class="settings-panel">
 		<div class="panel-header">
-			<a href="/apps/{data.appId}/tables/{data.app.id}" class="back-link">
+			<a href="/apps/{data.appId}" class="back-link">
 				<ChevronLeft size={15} />
-				{data.app.label}
+				アプリ設定
 			</a>
 			<div class="meta-actions">
 				<form method="POST" action="?/delete" onsubmit={confirmDeleteTable} class="delete-form">
 					<button type="submit" class="btn-danger-sm" title="テーブルを削除">削除</button>
 				</form>
-				<button class="btn-save-meta" onclick={s.saveMeta} disabled={s.savingMeta || !s.appLabel.trim()}>
-					{s.savingMeta ? '…' : '保存'}
+				{#if s.saveError}<span class="save-error">{s.saveError}</span>{/if}
+				{#if s.saved}<span class="saved-msg">✓ 保存しました</span>{/if}
+				<button class="btn-save" onclick={s.save} disabled={s.saving || !s.dirty || !s.appLabel.trim()}>
+					{s.saving ? '保存中…' : '保存'}
 				</button>
-				{#if s.metaSaved}<span class="saved-msg">✓</span>{/if}				
 			</div>
 		</div>
 
@@ -59,14 +60,6 @@
 			<section>
 				<div class="fields-header">
 					<h2 class="section-title">フィールド</h2>
-					{#if s.dirty}
-						<div class="dirty-actions">
-							{#if s.saveError}<span class="save-error">{s.saveError}</span>{/if}
-							<button class="btn-save-fields" onclick={s.saveFields} disabled={s.saving}>
-								{s.saving ? '保存中…' : '変更を保存'}
-							</button>
-						</div>
-					{/if}
 				</div>
 
 				<div class="field-list">
@@ -432,7 +425,7 @@
 		flex-shrink: 0;
 	}
 
-	.btn-save-meta {
+	.btn-save {
 		padding: 5px 14px;
 		border-radius: 6px;
 		font-size: 0.8125rem;
@@ -441,13 +434,18 @@
 		border: none;
 		cursor: pointer;
 		transition: opacity 0.15s;
-		&:hover { opacity: 0.85; }
+		&:hover:not(:disabled) { opacity: 0.85; }
 		&:disabled { opacity: 0.4; cursor: not-allowed; }
 	}
 
 	.saved-msg {
 		font-size: 0.8125rem;
 		color: var(--color-text-muted);
+	}
+
+	.save-error {
+		font-size: 0.8125rem;
+		color: var(--color-danger);
 	}
 
 	.delete-form { display: contents; }
@@ -475,33 +473,6 @@
 	.fields-header {
 		display: flex;
 		align-items: center;
-		justify-content: space-between;
-		gap: 12px;
-	}
-
-	.dirty-actions {
-		display: flex;
-		align-items: center;
-		gap: 10px;
-	}
-
-	.save-error {
-		font-size: 0.8125rem;
-		color: var(--color-danger);
-	}
-
-	.btn-save-fields {
-		padding: 5px 14px;
-		border-radius: 6px;
-		font-size: 0.8125rem;
-		font-weight: 500;
-		background: var(--color-primary);
-		color: #fff;
-		border: none;
-		cursor: pointer;
-		transition: opacity 0.15s;
-		&:hover { opacity: 0.85; }
-		&:disabled { opacity: 0.4; cursor: not-allowed; }
 	}
 
 	.field-list {

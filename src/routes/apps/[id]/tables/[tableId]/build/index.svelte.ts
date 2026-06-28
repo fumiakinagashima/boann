@@ -37,27 +37,16 @@ function slugify(s: string): string {
 }
 
 export function createTableBuildState(getData: () => PageData) {
-	// ── App meta ─────────────────────────────────────────────────
+	// ── Meta ─────────────────────────────────────────────────────
 	let appLabel = $state(getData().app.label);
-	let savingMeta = $state(false);
-	let metaSaved = $state(false);
 
-	async function saveMeta() {
-		savingMeta = true;
-		try {
-			await fetch(`/api/database/tables/${getData().app.name}`, {
-				method: 'PATCH',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ label: appLabel })
-			});
-			await invalidateAll();
-			metaSaved = true;
-			setTimeout(() => (metaSaved = false), 2000);
-		} finally {
-			savingMeta = false;
+	// サーバーデータが変わったとき、未保存変更がなければラベルを同期する
+	$effect(() => {
+		const serverLabel = getData().app.label;
+		if (!untrack(() => dirty) && !untrack(() => saving)) {
+			appLabel = serverLabel;
 		}
-	}
-
+	});
 
 	// ── Fields ───────────────────────────────────────────────────
 	function fromServerFields(): FieldRow[] {
@@ -78,77 +67,25 @@ export function createTableBuildState(getData: () => PageData) {
 	let rows = $state<FieldRow[]>(fromServerFields());
 	let dirty = $state(false);
 	let saving = $state(false);
+	let saved = $state(false);
 	let saveError = $state('');
 	let expandedId = $state<string | null>(null);
 
+	// dirty=true または saving=true のときはリセットしない（AIチャットのinvalidateAll等で変更が消えないよう）
 	$effect(() => {
 		const serverKeys = getData().fields.map((f) => f.key).sort().join(',');
 		const localKeys = untrack(() => rows.map((r) => r.key).sort().join(','));
-		if (serverKeys !== localKeys) {
+		if (serverKeys !== localKeys && !untrack(() => dirty) && !untrack(() => saving)) {
 			rows = fromServerFields();
 			dirty = false;
 		}
 	});
 
-	function addField() {
-		const newRow: FieldRow = {
-			_id: crypto.randomUUID(), label: '', key: '', type: 'text',
-			required: false, defaultValue: '', description: '', options: [], refTable: '', refLabelKey: ''
-		};
-		rows = [...rows, newRow];
-		expandedId = newRow._id;
-		dirty = true;
-		tick().then(() => {
-			document.querySelector<HTMLInputElement>(`#label-${newRow._id}`)?.focus();
-		});
-	}
+	function markDirty() { dirty = true; saved = false; }
 
-	function removeField(id: string) {
-		rows = rows.filter((r) => r._id !== id);
-		if (expandedId === id) expandedId = null;
-		dirty = true;
-	}
-
-	function onLabelInput(row: FieldRow, val: string) {
-		row.label = val;
-		const slug = slugify(val);
-		if (slug) {
-			row.key = slug;
-		} else if (!row.key) {
-			const idx = rows.findIndex(r => r._id === row._id);
-			row.key = 'field_' + (idx + 1);
-		}
-		dirty = true;
-	}
-
-	function markDirty() { dirty = true; }
-
-	// ── Select options ───────────────────────────────────────────
-	function addOption(row: FieldRow) {
-		row.options = [...row.options, { label: '', value: '' }];
-		dirty = true;
-	}
-
-	function onOptionLabelInput(row: FieldRow, idx: number, val: string) {
-		const prevSlug = slugify(row.options[idx].label);
-		row.options[idx].label = val;
-		if (!row.options[idx].value || row.options[idx].value === prevSlug) {
-			row.options[idx].value = slugify(val) || val;
-		}
-		dirty = true;
-	}
-
-	function onOptionValueInput(row: FieldRow, idx: number, val: string) {
-		row.options[idx].value = val;
-		dirty = true;
-	}
-
-	function removeOption(row: FieldRow, idx: number) {
-		row.options = row.options.filter((_, i) => i !== idx);
-		dirty = true;
-	}
-
-	async function saveFields() {
+	// ── Unified save ─────────────────────────────────────────────
+	async function save() {
+		if (!appLabel.trim()) return;
 		const validRows = rows.filter((r) => r.label.trim() && r.key.trim());
 		saving = true;
 		saveError = '';
@@ -157,6 +94,7 @@ export function createTableBuildState(getData: () => PageData) {
 				method: 'PATCH',
 				headers: { 'Content-Type': 'application/json' },
 				body: JSON.stringify({
+					label: appLabel.trim(),
 					fields: validRows.map((r, i) => ({
 						_id: r._id,
 						key: r.key,
@@ -177,11 +115,70 @@ export function createTableBuildState(getData: () => PageData) {
 				saveError = body.error ?? '保存に失敗しました';
 				return;
 			}
+			rows = validRows;
 			dirty = false;
+			saved = true;
+			setTimeout(() => (saved = false), 2000);
 			await invalidateAll();
 		} finally {
 			saving = false;
 		}
+	}
+
+	function addField() {
+		const newRow: FieldRow = {
+			_id: crypto.randomUUID(), label: '', key: '', type: 'text',
+			required: false, defaultValue: '', description: '', options: [], refTable: '', refLabelKey: ''
+		};
+		rows = [...rows, newRow];
+		expandedId = newRow._id;
+		markDirty();
+		tick().then(() => {
+			document.querySelector<HTMLInputElement>(`#label-${newRow._id}`)?.focus();
+		});
+	}
+
+	function removeField(id: string) {
+		rows = rows.filter((r) => r._id !== id);
+		if (expandedId === id) expandedId = null;
+		markDirty();
+	}
+
+	function onLabelInput(row: FieldRow, val: string) {
+		row.label = val;
+		const slug = slugify(val);
+		if (slug) {
+			row.key = slug;
+		} else if (!row.key) {
+			const idx = rows.findIndex(r => r._id === row._id);
+			row.key = 'field_' + (idx + 1);
+		}
+		markDirty();
+	}
+
+	// ── Select options ───────────────────────────────────────────
+	function addOption(row: FieldRow) {
+		row.options = [...row.options, { label: '', value: '' }];
+		markDirty();
+	}
+
+	function onOptionLabelInput(row: FieldRow, idx: number, val: string) {
+		const prevSlug = slugify(row.options[idx].label);
+		row.options[idx].label = val;
+		if (!row.options[idx].value || row.options[idx].value === prevSlug) {
+			row.options[idx].value = slugify(val) || val;
+		}
+		markDirty();
+	}
+
+	function onOptionValueInput(row: FieldRow, idx: number, val: string) {
+		row.options[idx].value = val;
+		markDirty();
+	}
+
+	function removeOption(row: FieldRow, idx: number) {
+		row.options = row.options.filter((_, i) => i !== idx);
+		markDirty();
 	}
 
 	function typeLabel(type: string) {
@@ -221,7 +218,7 @@ export function createTableBuildState(getData: () => PageData) {
 		const [moved] = next.splice(from, 1);
 		next.splice(to, 0, moved);
 		rows = next;
-		dirty = true;
+		markDirty();
 		dragSrcId = null;
 		dragOverId = null;
 	}
@@ -233,31 +230,29 @@ export function createTableBuildState(getData: () => PageData) {
 
 	return {
 		get appLabel() { return appLabel; },
-		set appLabel(v) { appLabel = v; },
-		get savingMeta() { return savingMeta; },
-		get metaSaved() { return metaSaved; },
+		set appLabel(v: string) { appLabel = v; markDirty(); },
 		get rows() { return rows; },
 		get dirty() { return dirty; },
 		get saving() { return saving; },
+		get saved() { return saved; },
 		get saveError() { return saveError; },
 		get expandedId() { return expandedId; },
-		set expandedId(v) { expandedId = v; },
+		set expandedId(v: string | null) { expandedId = v; },
 		get refTableQuery() { return refTableQuery; },
-		set refTableQuery(v) { refTableQuery = v; },
+		set refTableQuery(v: string) { refTableQuery = v; },
 		get refTableDropdownOpen() { return refTableDropdownOpen; },
-		set refTableDropdownOpen(v) { refTableDropdownOpen = v; },
+		set refTableDropdownOpen(v: boolean) { refTableDropdownOpen = v; },
 		get dragSrcId() { return dragSrcId; },
 		get dragOverId() { return dragOverId; },
-		saveMeta,
+		save,
+		markDirty,
 		addField,
 		removeField,
 		onLabelInput,
-		markDirty,
 		addOption,
 		onOptionLabelInput,
 		onOptionValueInput,
 		removeOption,
-		saveFields,
 		typeLabel,
 		refTableLabel,
 		onDragStart,

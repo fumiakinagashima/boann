@@ -22,24 +22,80 @@ async function nextSortOrder(
 	return max + 1;
 }
 
-export type PageComponentType = 'list' | 'form';
+// ───── Page types ─────────────────────────────────────────────────────────────
 
-export type PageComponent = {
-	id: string;
-	type: PageComponentType;
-	tableId: string;
-	title?: string | null;
-	fields?: string[] | null;
-	actions: ('create' | 'edit' | 'delete')[];
+/** 詳細ビューに表示する関連テーブル（このページのテーブルを参照しているテーブル）設定 */
+export type DetailRelatedTable = {
+	tableId: string;    // entity_types.id
+	refFieldKey: string; // 参照フィールドのキー（entity_fields.key）
+	label: string;       // セクション表示名
+	fields: string[] | null; // null = 全フィールド
+	actions: ('detail' | 'create' | 'edit' | 'delete')[]; // セクション内で使える機能
+};
+
+/** ページ設定（app_pages.components カラムに JSON で保存） */
+export type PageConfig = {
+	fields: string[] | null;                                      // 一覧表示フィールド（null = 全て）
+	actions: ('detail' | 'create' | 'edit' | 'delete')[];        // 一覧で使える機能
+	detail: {
+		relatedTables: DetailRelatedTable[];                       // 詳細ビューの関連テーブル
+	};
 };
 
 export type AppPageRow = {
 	id: string;
 	appId: string;
 	label: string;
-	components: PageComponent[];
+	tableId: string | null;   // entity_types.id（ページが表示するメインテーブル）
+	config: PageConfig;
 	sortOrder: number;
 };
+
+/** 別テーブルから参照されているテーブル情報（詳細ビューの関連データ候補） */
+export type ReferencingTable = {
+	tableId: string;
+	tableName: string;
+	tableLabel: string;
+	refFieldKey: string;
+	refFieldLabel: string;
+};
+
+function defaultPageConfig(): PageConfig {
+	return { fields: null, actions: ['create', 'edit', 'delete'], detail: { relatedTables: [] } };
+}
+
+function parsePageConfig(raw: string | null | undefined): PageConfig {
+	const def = defaultPageConfig();
+	if (!raw) return def;
+	try {
+		const parsed = JSON.parse(raw);
+		// 旧形式（コンポーネント配列）→ 新形式に変換
+		if (Array.isArray(parsed)) {
+			if (parsed.length === 0) return def;
+			const first = parsed[0] as { fields?: string[] | null; actions?: string[] };
+			return {
+				fields: first.fields ?? null,
+				actions: (first.actions ?? ['create', 'edit', 'delete']) as PageConfig['actions'],
+				detail: { relatedTables: [] }
+			};
+		}
+		const relatedTables = (parsed.detail?.relatedTables ?? []).map(
+			(rt: Partial<DetailRelatedTable>) => ({
+				...rt,
+				actions: rt.actions ?? ['create', 'edit', 'delete']
+			})
+		);
+		return {
+			fields: parsed.fields ?? null,
+			actions: parsed.actions ?? ['create', 'edit', 'delete'],
+			detail: { relatedTables }
+		};
+	} catch {
+		return def;
+	}
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 
 /** クエリ件数が可変の場合に `db.batch([...])` を呼ぶためのヘルパー。空配列なら何もしない。 */
 async function batchIfNonEmpty<U extends BatchItem<'sqlite'>>(db: Db, queries: U[]): Promise<void> {
@@ -87,7 +143,7 @@ const RESERVED_NAMES = new Set([
 	'new', 'schema', // サブルート名
 ]);
 
-const SYSTEM_KEYS = new Set(['id', 'createdAt', 'updatedAt', 'entityTypeId']);
+const SYSTEM_KEYS = new Set(['id', 'createdAt', 'updatedAt', 'createdBy', 'updatedBy', 'entityTypeId']);
 
 // account 型フィールドが参照する仮想テーブル。accounts はコアテーブルなので entity_types には存在せず、
 // id→name の解決のために getTableInfo / listRecords が専用ブランチで擬似的に提供する。
@@ -271,7 +327,8 @@ export async function listRecords(db: Db, type: string, limit = 200): Promise<Re
 		.map(e => ({
 			id: e.id,
 			...(JSON.parse(e.data ?? '{}') as RecordRow),
-			createdAt: toTs(e.createdAt), updatedAt: toTs(e.updatedAt)
+			createdAt: toTs(e.createdAt), updatedAt: toTs(e.updatedAt),
+			createdBy: e.createdBy ?? null, updatedBy: e.updatedBy ?? null
 		}));
 }
 
@@ -281,26 +338,27 @@ export async function getRecord(db: Db, type: string, id: string): Promise<Recor
 	return {
 		id: e.id,
 		...(JSON.parse(e.data ?? '{}') as RecordRow),
-		createdAt: toTs(e.createdAt), updatedAt: toTs(e.updatedAt)
+		createdAt: toTs(e.createdAt), updatedAt: toTs(e.updatedAt),
+		createdBy: e.createdBy ?? null, updatedBy: e.updatedBy ?? null
 	};
 }
 
-export async function createRecord(db: Db, type: string, data: Record<string, unknown>): Promise<RecordRow> {
+export async function createRecord(db: Db, type: string, data: Record<string, unknown>, accountId?: string): Promise<RecordRow> {
 	const id = crypto.randomUUID();
 
 	const [et] = await db.select().from(entityTypes).where(eq(entityTypes.name, type));
 	if (!et) throw new Error(`Table not found: ${type}`);
 
-	const { id: _, entityTypeId: __, createdAt: ___, updatedAt: ____, ...entityData } = data;
-	await db.insert(entities).values({ id, entityTypeId: et.id, data: JSON.stringify(entityData) });
+	const { id: _, entityTypeId: __, createdAt: ___, updatedAt: ____, createdBy: _____, updatedBy: ______, ...entityData } = data;
+	await db.insert(entities).values({ id, entityTypeId: et.id, data: JSON.stringify(entityData), createdBy: accountId ?? null, updatedBy: accountId ?? null });
 	return (await getRecord(db, type, id))!;
 }
 
-export async function updateRecord(db: Db, type: string, id: string, data: Record<string, unknown>): Promise<RecordRow> {
-	const { id: _, entityTypeId: __, createdAt: ___, updatedAt: ____, ...entityData } = data;
-	await db.update(entities).set({
-		data: JSON.stringify(entityData), updatedAt: new Date()
-	}).where(eq(entities.id, id));
+export async function updateRecord(db: Db, type: string, id: string, data: Record<string, unknown>, accountId?: string): Promise<RecordRow> {
+	const { id: _, entityTypeId: __, createdAt: ___, updatedAt: ____, createdBy: _____, updatedBy: ______, ...entityData } = data;
+	const set: Record<string, unknown> = { data: JSON.stringify(entityData), updatedAt: new Date() };
+	if (accountId !== undefined) set.updatedBy = accountId;
+	await db.update(entities).set(set).where(eq(entities.id, id));
 	return (await getRecord(db, type, id))!;
 }
 
@@ -315,7 +373,8 @@ export async function listRecordsByEntityTypeId(db: Db, entityTypeId: string, li
 		.map(e => ({
 			id: e.id,
 			...(JSON.parse(e.data ?? '{}') as RecordRow),
-			createdAt: toTs(e.createdAt), updatedAt: toTs(e.updatedAt)
+			createdAt: toTs(e.createdAt), updatedAt: toTs(e.updatedAt),
+			createdBy: e.createdBy ?? null, updatedBy: e.updatedBy ?? null
 		}));
 }
 
@@ -450,26 +509,17 @@ export async function getTablesByAppId(db: Db, appId: string): Promise<{ id: str
 	}));
 }
 
-function parseComponents(raw: string | null | undefined): PageComponent[] {
-	if (!raw) return [];
-	try {
-		const parsed = JSON.parse(raw);
-		return Array.isArray(parsed) ? (parsed as PageComponent[]) : [];
-	} catch {
-		return [];
-	}
-}
-
 export async function getPageById(db: Db, pageId: string): Promise<AppPageRow | null> {
 	const [row] = await db.select({
 		id: appPages.id,
 		appId: appPages.appId,
 		label: appPages.label,
+		tableId: appPages.tableId,
 		components: appPages.components,
 		sortOrder: appPages.sortOrder
 	}).from(appPages).where(eq(appPages.id, pageId));
 	if (!row) return null;
-	return { ...row, components: parseComponents(row.components) };
+	return { ...row, config: parsePageConfig(row.components) };
 }
 
 export async function getPagesByAppId(db: Db, appId: string): Promise<AppPageRow[]> {
@@ -477,18 +527,20 @@ export async function getPagesByAppId(db: Db, appId: string): Promise<AppPageRow
 		id: appPages.id,
 		appId: appPages.appId,
 		label: appPages.label,
+		tableId: appPages.tableId,
 		components: appPages.components,
 		sortOrder: appPages.sortOrder
 	}).from(appPages).where(eq(appPages.appId, appId)).orderBy(appPages.sortOrder);
-	return rows.map(row => ({ ...row, components: parseComponents(row.components) }));
+	return rows.map(row => ({ ...row, config: parsePageConfig(row.components) }));
 }
 
 export type PageInput = {
-	label: string;
-	components: PageComponent[];
+	label?: string;
+	tableId?: string | null;
+	config?: PageConfig;
 };
 
-export async function createPage(db: Db, appId: string, input: PageInput): Promise<{ id: string }> {
+export async function createPage(db: Db, appId: string, input: { label: string; tableId?: string | null }): Promise<{ id: string }> {
 	const [maxRow] = await db.select({ sortOrder: appPages.sortOrder })
 		.from(appPages).where(eq(appPages.appId, appId))
 		.orderBy(desc(appPages.sortOrder)).limit(1);
@@ -496,22 +548,62 @@ export async function createPage(db: Db, appId: string, input: PageInput): Promi
 	const id = crypto.randomUUID();
 	await db.insert(appPages).values({
 		id, appId, label: input.label,
-		components: JSON.stringify(input.components),
+		tableId: input.tableId ?? null,
+		components: JSON.stringify(defaultPageConfig()),
 		sortOrder
 	});
 	return { id };
 }
 
-export async function updatePage(db: Db, pageId: string, input: Partial<PageInput>): Promise<void> {
+export async function updatePage(db: Db, pageId: string, input: PageInput): Promise<void> {
 	const set: Record<string, unknown> = {};
 	if (input.label !== undefined) set.label = input.label;
-	if (input.components !== undefined) set.components = JSON.stringify(input.components);
+	if (input.tableId !== undefined) set.tableId = input.tableId;
+	if (input.config !== undefined) set.components = JSON.stringify(input.config);
 	if (Object.keys(set).length === 0) return;
 	await db.update(appPages).set(set).where(eq(appPages.id, pageId));
 }
 
 export async function deletePage(db: Db, pageId: string): Promise<void> {
 	await db.delete(appPages).where(eq(appPages.id, pageId));
+}
+
+/** このテーブルを recordSelect/account フィールドで参照している他テーブルを返す（詳細ビューの関連データ候補） */
+export async function findTablesReferencingTable(db: Db, tableName: string): Promise<ReferencingTable[]> {
+	const fields = await db.select({
+		fieldKey: entityFields.key,
+		fieldLabel: entityFields.label,
+		entityTypeId: entityFields.entityTypeId
+	}).from(entityFields).where(eq(entityFields.refTable, tableName));
+	if (fields.length === 0) return [];
+
+	const etIds = [...new Set(fields.map(f => f.entityTypeId))];
+	const ets = await db.select({ id: entityTypes.id, name: entityTypes.name, label: entityTypes.label })
+		.from(entityTypes).where(inArray(entityTypes.id, etIds));
+	const etMap = new Map(ets.map(et => [et.id, et]));
+
+	return fields.flatMap(f => {
+		const et = etMap.get(f.entityTypeId);
+		if (!et) return [];
+		return [{ tableId: et.id, tableName: et.name, tableLabel: et.label, refFieldKey: f.fieldKey, refFieldLabel: f.fieldLabel }];
+	});
+}
+
+/** 関連フィールドの値で絞り込んでレコードを返す（詳細ビューの関連データ表示用） */
+export async function listRecordsByRefField(
+	db: Db, entityTypeId: string, refFieldKey: string, refValue: string, limit = 200
+): Promise<RecordRow[]> {
+	const rows = await db.select().from(entities)
+		.where(and(
+			eq(entities.entityTypeId, entityTypeId),
+			sql`json_extract(${entities.data}, ${`$.${refFieldKey}`}) = ${refValue}`
+		))
+		.orderBy(desc(entities.createdAt)).limit(limit);
+	return rows.map(e => ({
+		id: e.id,
+		...(JSON.parse(e.data ?? '{}') as RecordRow),
+		createdAt: toTs(e.createdAt), updatedAt: toTs(e.updatedAt)
+	}));
 }
 
 // アプリ設定のページタブ: ドラッグ&ドロップ後の並び順を sortOrder に反映する。
