@@ -17,7 +17,8 @@ const ADMIN_ONLY_PREFIXES = [
 	'/api/integrations',
 	'/api/email/settings',
 	'/api/ai/settings',
-	'/api/documents/test'
+	'/api/documents/test',
+	'/api/imports'
 ];
 
 function isPublicPath(pathname: string): boolean {
