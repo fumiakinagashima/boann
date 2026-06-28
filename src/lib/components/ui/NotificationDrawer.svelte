@@ -27,6 +27,12 @@
 	async function selectNotification(item: NotificationItem) {
 		onclose();
 		await notificationCenter.markRead(item.id);
+		// リンク型のシードを持つ通知（アプリ生成など）は対象ページへ直接遷移する。
+		const link = item.seedContent.find((c) => c.type === 'link');
+		if (link && link.type === 'link') {
+			await goto(link.href);
+			return;
+		}
 		await goto(`/?notification=${item.id}`);
 	}
 </script>

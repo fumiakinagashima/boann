@@ -23,7 +23,7 @@ export default {
 	async queue(batch, env, _ctx) {
 		const db = createDb(env.DB);
 		for (const message of batch.messages) {
-			await processImportJob(db, message.body as ImportJobMessage);
+			await processImportJob(db, env, message.body as ImportJobMessage);
 			message.ack();
 		}
 	}

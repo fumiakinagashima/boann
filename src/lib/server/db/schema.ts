@@ -140,8 +140,14 @@ export const notifications = sqliteTable('notifications', {
 export const importJobs = sqliteTable('import_jobs', {
 	id: text('id').primaryKey(),
 	accountId: text('account_id').notNull(),
-	// 'queued' | 'processing' | 'done' | 'error'
-	status: text('status').notNull().default('queued'),
+	// 'designing' | 'ready' | 'applying' | 'done' | 'error'
+	status: text('status').notNull().default('designing'),
+	filename: text('filename'),
+	content: text('content'),
+	// 設計完了で埋まる ImportPlan の JSON。チャット修正で可変。
+	plan: text('plan'),
+	// プラン修正チャットの履歴（MessageContent ベース）の JSON。
+	chat: text('chat').notNull().default('[]'),
 	appId: text('app_id'),
 	error: text('error'),
 	createdAt: integer('created_at', { mode: 'timestamp' })
