@@ -179,6 +179,57 @@ export async function generateImportPlan(opts: {
 	return importPlanSchema.parse(block.input);
 }
 
+const REFINE_SYSTEM_PROMPT = `あなたはノーコードアプリ基盤 Boann の設計アシスタントです。
+既に設計済みのアプリのプラン（JSON）に対し、ユーザーの修正依頼を反映した**新しいプラン全体**を出力します。
+
+ルール:
+- 依頼された変更のみを反映し、それ以外の構成・命名は極力維持する。
+- 表示名（label）は日本語、識別名（name/key）は英小文字・数字・アンダースコアのみ。
+- テーブル間の関係は recordSelect 型フィールド（ref_table に参照先テーブルの name）で表現する。
+- 各テーブルには最低1つの一覧ページを保つ。
+- 必ず emit_app_plan ツールでプラン全体を返す（差分ではなく完全な新プラン）。`;
+
+export async function refineImportPlan(opts: {
+	apiKey: string;
+	model: string;
+	currentPlan: ImportPlan;
+	content: string | null;
+	message: string;
+	history: { role: 'user' | 'assistant'; text: string }[];
+}): Promise<ImportPlan> {
+	const anthropic = new Anthropic({ apiKey: opts.apiKey });
+	const pastRequests = opts.history
+		.filter((m) => m.role === 'user')
+		.map((m) => `- ${m.text}`)
+		.join('\n');
+
+	const userText = [
+		'現在のプラン(JSON):',
+		'```json',
+		JSON.stringify(opts.currentPlan, null, 2),
+		'```',
+		opts.content ? `\n元のファイル内容:\n---\n${opts.content}\n---` : '',
+		pastRequests ? `\nこれまでの修正依頼:\n${pastRequests}` : '',
+		`\n今回の修正依頼:\n${opts.message}`,
+		'\n上記を反映した新しいプラン全体を emit_app_plan で返してください。'
+	].join('\n');
+
+	const response = await anthropic.messages.create({
+		model: opts.model,
+		max_tokens: 4096,
+		system: REFINE_SYSTEM_PROMPT,
+		tools: [PLAN_TOOL],
+		tool_choice: { type: 'tool', name: 'emit_app_plan' },
+		messages: [{ role: 'user', content: userText }]
+	});
+
+	const block = response.content.find((b) => b.type === 'tool_use');
+	if (!block || block.type !== 'tool_use') {
+		throw new Error('プランを更新できませんでした');
+	}
+	return importPlanSchema.parse(block.input);
+}
+
 // MOCK_AI 用の決定的プラン（顧客管理の例）。
 export function mockImportPlan(_content: string): ImportPlan {
 	return importPlanSchema.parse({

@@ -17,6 +17,7 @@ export const load: PageServerLoad = async ({ params, platform, locals }) => {
 			status: job.status,
 			filename: job.filename,
 			plan: job.plan,
+			chat: job.chat,
 			appId: job.appId,
 			error: job.error
 		}

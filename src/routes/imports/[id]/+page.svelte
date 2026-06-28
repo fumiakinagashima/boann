@@ -3,7 +3,7 @@
 	import { goto } from '$app/navigation';
 	import type { PageData } from './$types';
 	import type { ImportPlan } from '$lib/server/ai/import-plan';
-	import type { ImportJobStatus } from '$lib/server/db/import-job-service';
+	import type { ImportJobStatus, ImportChatMessage } from '$lib/server/db/import-job-service';
 
 	let { data }: { data: PageData } = $props();
 
@@ -23,6 +23,11 @@
 	let appId = $state<string | null>(data.job.appId);
 	let jobError = $state<string | null>(data.job.error);
 	let applyError = $state('');
+
+	let chat = $state<ImportChatMessage[]>(data.job.chat ?? []);
+	let chatInput = $state('');
+	let chatLoading = $state(false);
+	let chatError = $state('');
 
 	const jobId = data.job.id;
 
@@ -71,6 +76,40 @@
 		return () => { polling = false; };
 	});
 
+	async function sendRefine() {
+		const text = chatInput.trim();
+		if (!text || chatLoading) return;
+		chatError = '';
+		chatInput = '';
+		chat = [...chat, { role: 'user', text }];
+		chatLoading = true;
+		try {
+			const res = await fetch(`/api/imports/${jobId}/refine`, {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ message: text })
+			});
+			const d = (await res.json()) as { plan: ImportPlan; chat: ImportChatMessage[] } | { error: string };
+			if (!res.ok || !('plan' in d)) {
+				chatError = 'error' in d ? d.error : 'プランの更新に失敗しました';
+				return;
+			}
+			plan = d.plan;
+			chat = d.chat;
+		} catch {
+			chatError = 'ネットワークエラーが発生しました';
+		} finally {
+			chatLoading = false;
+		}
+	}
+
+	function onChatKeydown(e: KeyboardEvent) {
+		if (e.key === 'Enter' && !e.shiftKey) {
+			e.preventDefault();
+			sendRefine();
+		}
+	}
+
 	async function applyPlan() {
 		applyError = '';
 		status = 'applying';
@@ -114,7 +153,9 @@
 			<p class="sub">このまま閉じても、完了したら通知でお知らせします。</p>
 		</div>
 	{:else if plan}
-		<p class="intro">以下の内容でアプリを作成します。問題なければ「アプリを作成」を押してください。</p>
+		<div class="ready-layout">
+		<div class="plan-pane">
+		<p class="intro">以下の内容でアプリを作成します。チャットで修正を依頼でき、問題なければ「アプリを作成」を押してください。</p>
 
 		<div class="app-summary">
 			<span class="app-icon">{plan.app.icon ?? '📦'}</span>
@@ -178,17 +219,165 @@
 			<a class="btn-ghost" href="/">キャンセル</a>
 			<button class="btn-primary" onclick={applyPlan}>この内容でアプリを作成</button>
 		</div>
+		</div>
+
+		<aside class="chat-pane">
+			<div class="chat-header">AIに修正を依頼</div>
+			<div class="chat-list">
+				{#if chat.length === 0}
+					<p class="chat-empty">例:「顧客テーブルに電話番号を追加して」「活動履歴に金額フィールドを足して」</p>
+				{/if}
+				{#each chat as msg, i (i)}
+					<div class="msg {msg.role}">{msg.text}</div>
+				{/each}
+				{#if chatLoading}<div class="msg assistant loading">更新中…</div>{/if}
+			</div>
+			{#if chatError}<p class="chat-error">{chatError}</p>{/if}
+			<div class="chat-input">
+				<textarea
+					bind:value={chatInput}
+					onkeydown={onChatKeydown}
+					placeholder="修正したい内容を入力（Enterで送信）"
+					rows="2"
+					disabled={chatLoading}
+				></textarea>
+				<button class="send-btn" onclick={sendRefine} disabled={chatLoading || !chatInput.trim()}>送信</button>
+			</div>
+		</aside>
+		</div>
 	{/if}
 </div>
 
 <style lang="scss">
 	.page {
-		max-width: 760px;
+		max-width: 1080px;
 		margin: 0 auto;
 		padding: 32px 40px 64px;
 		display: flex;
 		flex-direction: column;
 		gap: 16px;
+	}
+
+	.ready-layout {
+		display: grid;
+		grid-template-columns: minmax(0, 1fr) 360px;
+		gap: 24px;
+		align-items: start;
+	}
+
+	.plan-pane {
+		display: flex;
+		flex-direction: column;
+		gap: 16px;
+		min-width: 0;
+	}
+
+	@media (max-width: 860px) {
+		.ready-layout { grid-template-columns: 1fr; }
+	}
+
+	/* Refinement chat */
+	.chat-pane {
+		position: sticky;
+		top: 24px;
+		display: flex;
+		flex-direction: column;
+		border: 1px solid var(--color-border);
+		border-radius: 12px;
+		overflow: hidden;
+		max-height: calc(100vh - 80px);
+		background: var(--color-background);
+	}
+
+	.chat-header {
+		padding: 12px 14px;
+		border-bottom: 1px solid var(--color-border);
+		font-size: 0.8125rem;
+		font-weight: 600;
+		color: var(--color-text);
+		flex-shrink: 0;
+	}
+
+	.chat-list {
+		flex: 1;
+		min-height: 160px;
+		overflow-y: auto;
+		padding: 12px;
+		display: flex;
+		flex-direction: column;
+		gap: 8px;
+	}
+
+	.chat-empty {
+		font-size: 0.75rem;
+		color: var(--color-text-muted);
+		line-height: 1.6;
+		margin: 0;
+	}
+
+	.msg {
+		font-size: 0.8125rem;
+		line-height: 1.5;
+		padding: 8px 10px;
+		border-radius: 8px;
+		white-space: pre-wrap;
+		word-break: break-word;
+		max-width: 90%;
+	}
+	.msg.user {
+		align-self: flex-end;
+		background: var(--color-primary);
+		color: #fff;
+	}
+	.msg.assistant {
+		align-self: flex-start;
+		background: var(--color-surface);
+		color: var(--color-text);
+	}
+	.msg.loading { color: var(--color-text-muted); }
+
+	.chat-error {
+		font-size: 0.75rem;
+		color: var(--color-danger);
+		margin: 0;
+		padding: 0 12px;
+	}
+
+	.chat-input {
+		display: flex;
+		gap: 8px;
+		align-items: flex-end;
+		padding: 10px;
+		border-top: 1px solid var(--color-border);
+		flex-shrink: 0;
+	}
+
+	.chat-input textarea {
+		flex: 1;
+		resize: none;
+		border: 1px solid var(--color-border);
+		border-radius: 8px;
+		padding: 8px 10px;
+		font-size: 0.8125rem;
+		font-family: inherit;
+		background: var(--color-background);
+		color: var(--color-text);
+		&:focus { outline: none; border-color: var(--color-primary); }
+	}
+
+	.send-btn {
+		padding: 8px 14px;
+		border-radius: 7px;
+		font-size: 0.8125rem;
+		font-weight: 500;
+		background: var(--color-primary);
+		color: #fff;
+		border: none;
+		cursor: pointer;
+		flex-shrink: 0;
+		transition: opacity 0.15s;
+		&:hover { opacity: 0.88; }
+		&:disabled { opacity: 0.4; cursor: not-allowed; }
 	}
 
 	.header {
