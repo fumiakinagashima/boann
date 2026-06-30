@@ -18,12 +18,16 @@ export const PATCH: RequestHandler = async ({ params, request, platform, locals 
 		}
 		const body = (await request.json()) as {
 			name?: string;
+			triggerType?: 'schedule' | 'event';
 			triggerHour?: number;
 			triggerMinute?: number;
+			triggerEvent?: 'create' | 'update' | 'delete' | null;
+			triggerEntityTypeId?: string | null;
 			steps?: WorkflowStep[];
 			enabled?: boolean;
 		};
 		const name = body.name?.trim() ?? existing.name;
+		const triggerType = body.triggerType ?? existing.triggerType;
 		const triggerHour = body.triggerHour ?? existing.triggerHour;
 		const triggerMinute = body.triggerMinute ?? existing.triggerMinute;
 		const steps = body.steps ?? existing.steps;
@@ -32,7 +36,7 @@ export const PATCH: RequestHandler = async ({ params, request, platform, locals 
 			listEntityTypesForWorkflow(db),
 			listSlackIntegrationsForWorkflow(db)
 		]);
-		const validation = validateWorkflow(triggerHour, triggerMinute, steps, entityTypes, slackIntegrations);
+		const validation = validateWorkflow(triggerType, triggerHour, triggerMinute, steps, entityTypes, slackIntegrations);
 		if (!validation.ok) {
 			return json({ error: validation.errors.join(' / ') }, { status: 422 });
 		}
@@ -40,8 +44,11 @@ export const PATCH: RequestHandler = async ({ params, request, platform, locals 
 		const row = await updateWorkflow(db, params.id, {
 			name,
 			steps,
+			triggerType,
 			triggerHour,
 			triggerMinute,
+			triggerEvent: body.triggerEvent !== undefined ? body.triggerEvent : existing.triggerEvent,
+			triggerEntityTypeId: body.triggerEntityTypeId !== undefined ? body.triggerEntityTypeId : existing.triggerEntityTypeId,
 			enabled: body.enabled
 		});
 		return json(row);

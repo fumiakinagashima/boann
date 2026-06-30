@@ -72,15 +72,13 @@
 </script>
 
 <div class="record-detail">
-	<div class="detail-header">
-		<span class="detail-id mono">{record.id}</span>
-		<div class="header-actions">
-			<button class="action-btn" onclick={onEdit}>編集</button>
-			<button class="action-btn danger" onclick={onDelete}>削除</button>
-		</div>
+	<div class="detail-actions">
+		<button class="action-btn" onclick={onEdit}>編集</button>
+		<button class="action-btn danger" onclick={onDelete}>削除</button>
 	</div>
 
 	<dl class="info-grid">
+		<dt>ID</dt><dd class="mono">{record.id}</dd>
 		{#each fields as field}
 			<dt>{field.label}</dt>
 			<dd class:notes={field.type === 'textarea'}>{displayValue(field)}</dd>
@@ -102,26 +100,16 @@
 		width: 100%;
 	}
 
-	.detail-header {
+	.detail-actions {
 		display: flex;
 		align-items: center;
-		justify-content: space-between;
+		justify-content: flex-end;
 		gap: 8px;
-	}
-
-	.detail-id {
-		font-size: 0.75rem;
-		color: var(--color-text-muted);
 	}
 
 	.mono {
 		font-family: ui-monospace, monospace;
-	}
-
-	.header-actions {
-		display: flex;
-		align-items: center;
-		gap: 8px;
+		font-size: 0.8125rem;
 	}
 
 	.action-btn {

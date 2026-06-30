@@ -88,8 +88,11 @@
 							const c = event.content;
 							onApply({
 								name: c.name,
+								triggerType: c.triggerType,
 								triggerHour: c.triggerHour,
 								triggerMinute: c.triggerMinute,
+								triggerEvent: c.triggerEvent,
+								triggerEntityTypeId: c.triggerEntityTypeId,
 								steps: c.steps
 							});
 						}

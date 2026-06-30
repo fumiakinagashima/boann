@@ -121,7 +121,8 @@ export type FieldDef = {
 };
 
 export type TableInfo = {
-	id: string;
+	id: string;        // entity type name（クエリパラメーター等で使うキー）
+	entityTypeId: string;  // entity_types.id（UUIDキー。イベントトリガー等で使用）
 	label: string;
 	icon: string;
 	isCore: boolean;
@@ -154,7 +155,7 @@ export { SYSTEM_DISPLAY_FIELDS } from '$lib/system-fields';
 
 function accountTableInfo(): TableInfo {
 	return {
-		id: ACCOUNT_REF_TABLE, label: 'アカウント', icon: 'user', isCore: true,
+		id: ACCOUNT_REF_TABLE, entityTypeId: '', label: 'アカウント', icon: 'user', isCore: true,
 		fields: [{ key: ACCOUNT_LABEL_KEY, label: '名前', type: 'text', required: true, options: [], listable: true }]
 	};
 }
@@ -179,7 +180,7 @@ export async function getTableInfo(db: Db, type: string, appId?: string | null):
 		.orderBy(entityFields.sortOrder);
 
 	return {
-		id: et.name, label: et.label, icon: et.icon ?? 'table', isCore: false,
+		id: et.name, entityTypeId: et.id, label: et.label, icon: et.icon ?? 'table', isCore: false,
 		fields: fields.map(f => ({
 			key: f.key, label: f.label, type: f.type, required: f.required,
 			options: JSON.parse(f.options ?? '[]'), listable: true,
@@ -203,7 +204,7 @@ export async function listAllTables(db: Db): Promise<(TableInfo & { count: numbe
 					.from(entities).where(eq(entities.entityTypeId, et.id))
 			]);
 			return {
-				id: et.name, label: et.label, icon: et.icon ?? 'table', isCore: false, count,
+				id: et.name, entityTypeId: et.id, label: et.label, icon: et.icon ?? 'table', isCore: false, count,
 				fields: fields.map(f => ({
 					key: f.key, label: f.label, type: f.type, required: f.required,
 					options: JSON.parse(f.options ?? '[]'), listable: true,

@@ -16,7 +16,7 @@ declare global {
 				MOCK_AI: string;
 				KV?: KVNamespace;
 				R2?: R2Bucket;
-				QUEUE?: Queue<import('$lib/server/imports/types').ImportJobMessage>;
+				QUEUE?: Queue<import('$lib/server/imports/types').ImportJobMessage | import('$lib/server/workflow/event-trigger').WorkflowEventMessage>;
 				// email (set EMAIL_PROVIDER to 'resend' | 'ses' | 'smtp')
 				EMAIL_PROVIDER?: string;
 				EMAIL_FROM?: string;

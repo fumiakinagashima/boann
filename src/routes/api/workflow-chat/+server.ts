@@ -19,7 +19,15 @@ export const POST: RequestHandler = async ({ request, platform, locals }) => {
 
 	const body = (await request.json()) as {
 		message: string;
-		current: { name: string; triggerHour: number; triggerMinute: number; steps: WorkflowStep[] };
+		current: {
+			name: string;
+			triggerType?: 'schedule' | 'event';
+			triggerHour: number;
+			triggerMinute: number;
+			triggerEvent?: 'create' | 'update' | 'delete' | null;
+			triggerEntityTypeId?: string | null;
+			steps: WorkflowStep[];
+		};
 		history: { role: 'user' | 'assistant'; text: string }[];
 	};
 

@@ -17,8 +17,11 @@ export const POST: RequestHandler = async ({ request, platform }) => {
 
 	const body = (await request.json()) as {
 		name?: string;
+		triggerType?: 'schedule' | 'event';
 		triggerHour?: number;
 		triggerMinute?: number;
+		triggerEvent?: 'create' | 'update' | 'delete' | null;
+		triggerEntityTypeId?: string | null;
 		steps?: WorkflowStep[];
 	};
 	if (!body.steps || body.steps.length === 0) {
@@ -37,8 +40,11 @@ export const POST: RequestHandler = async ({ request, platform }) => {
 					role: 'user',
 					content: buildWorkflowReviewPrompt({
 						name: body.name ?? '',
+						triggerType: body.triggerType,
 						triggerHour: body.triggerHour ?? 9,
 						triggerMinute: body.triggerMinute ?? 0,
+						triggerEvent: body.triggerEvent,
+						triggerEntityTypeId: body.triggerEntityTypeId,
 						steps: body.steps
 					})
 				}

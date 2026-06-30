@@ -8,7 +8,9 @@ import { createDb } from './src/lib/server/db';
 import { processDueReminders } from './src/lib/server/reminders/delivery';
 import { processDueWorkflows } from './src/lib/server/workflow/run';
 import { processImportJob } from './src/lib/server/imports/consumer';
+import { dispatchWorkflowEvents } from './src/lib/server/workflow/event-trigger';
 import type { ImportJobMessage } from './src/lib/server/imports/types';
+import type { WorkflowEventMessage } from './src/lib/server/workflow/event-trigger';
 import sveltekitWorker from './.svelte-kit/cloudflare/_worker.js';
 
 export default {
@@ -18,12 +20,17 @@ export default {
 		ctx.waitUntil(processDueReminders(db, env));
 		ctx.waitUntil(processDueWorkflows(db, env));
 	},
-	// boann-imports キュー: アプリ生成ジョブを非同期処理する。
-	// 失敗は consumer 内で握って通知するため、メッセージは原則 ack（リトライしない）。
+	// boann-imports キュー: アプリ生成ジョブおよびワークフローイベントを非同期処理する。
+	// 失敗は各 handler 内で握って通知するため、メッセージは原則 ack（リトライしない）。
 	async queue(batch, env, _ctx) {
 		const db = createDb(env.DB);
 		for (const message of batch.messages) {
-			await processImportJob(db, env, message.body as ImportJobMessage);
+			const body = message.body as ImportJobMessage | WorkflowEventMessage;
+			if (body.type === 'workflow-event') {
+				await dispatchWorkflowEvents(db, body.entityTypeId, body.event, body.recordId);
+			} else {
+				await processImportJob(db, env, body);
+			}
 			message.ack();
 		}
 	}

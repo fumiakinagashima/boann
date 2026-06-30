@@ -34,8 +34,11 @@ const workflowStepSchema: z.ZodType<WorkflowStep> = z.lazy(() =>
 const saveWorkflowInputSchema = z.object({
 	id: z.string().optional(),
 	name: z.string().min(1),
+	triggerType: z.enum(['schedule', 'event']).optional(),
 	triggerHour: z.number().int().min(0).max(23),
 	triggerMinute: z.number().int().min(0).max(59),
+	triggerEvent: z.enum(['create', 'update', 'delete']).nullable().optional(),
+	triggerEntityTypeId: z.string().nullable().optional(),
 	steps: z.array(workflowStepSchema)
 });
 
@@ -49,11 +52,14 @@ export const tools: Tool[] = [
 			properties: {
 				id: { type: 'string', description: '既存ワークフローを更新する場合のID（get_workflowで取得した値）。新規作成時は指定しない' },
 				name: { type: 'string', description: 'ワークフロー名' },
-				triggerHour: { type: 'number', description: '実行時刻（時、0-23、JST）' },
-				triggerMinute: { type: 'number', description: '実行時刻（分、0-59、JST）' },
+				triggerType: { type: 'string', enum: ['schedule', 'event'], description: 'トリガー種別。schedule=毎日指定時刻、event=レコード操作時。省略時はschedule' },
+				triggerHour: { type: 'number', description: '実行時刻（時、0-23、JST）。schedule時のみ有効' },
+				triggerMinute: { type: 'number', description: '実行時刻（分、0-59、JST）。schedule時のみ有効' },
+				triggerEvent: { type: 'string', enum: ['create', 'update', 'delete'], description: 'event時のみ。対象操作（create=作成、update=更新、delete=削除）' },
+				triggerEntityTypeId: { type: 'string', description: 'event時のみ。監視するテーブルのentity_types.id（UUIDキー）' },
 				steps: {
 					type: 'array',
-					description: 'ステップの配列（action または condition）'
+					description: 'ステップの配列（action または condition）。eventトリガーでは@trigger:idで操作されたレコードのID、@trigger:eventでイベント種別を参照できる'
 				}
 			},
 			required: ['name', 'triggerHour', 'triggerMinute', 'steps']
@@ -106,12 +112,12 @@ export const tools: Tool[] = [
 ];
 
 export async function handleSaveWorkflow(db: Db, input: unknown, env?: ToolEnv) {
-	const { id, name, triggerHour, triggerMinute, steps } = saveWorkflowInputSchema.parse(input);
+	const { id, name, triggerType, triggerHour, triggerMinute, triggerEvent, triggerEntityTypeId, steps } = saveWorkflowInputSchema.parse(input);
 	const [entityTypes, slackIntegrations] = await Promise.all([
 		listEntityTypesForWorkflow(db),
 		listSlackIntegrationsForWorkflow(db)
 	]);
-	const validation = validateWorkflow(triggerHour, triggerMinute, steps, entityTypes, slackIntegrations);
+	const validation = validateWorkflow(triggerType ?? 'schedule', triggerHour, triggerMinute, steps, entityTypes, slackIntegrations);
 	if (!validation.ok) {
 		throw new Error(`ワークフローの内容に問題があります: ${validation.errors.join(' / ')}`);
 	}
@@ -122,7 +128,7 @@ export async function handleSaveWorkflow(db: Db, input: unknown, env?: ToolEnv) 
 		if (existing.accountId && existing.accountId !== env?.accountId) {
 			throw new Error('このワークフローを更新する権限がありません。');
 		}
-		const workflow = await updateWorkflow(db, id, { name, steps, triggerHour, triggerMinute });
+		const workflow = await updateWorkflow(db, id, { name, steps, triggerType, triggerHour, triggerMinute, triggerEvent, triggerEntityTypeId });
 		return {
 			id: workflow.id,
 			name: workflow.name,
@@ -134,8 +140,11 @@ export async function handleSaveWorkflow(db: Db, input: unknown, env?: ToolEnv) 
 	const workflow = await createWorkflow(db, {
 		name,
 		steps,
+		triggerType,
 		triggerHour,
 		triggerMinute,
+		triggerEvent,
+		triggerEntityTypeId,
 		accountId: env?.accountId,
 		appId: env?.appId
 	});
@@ -175,8 +184,11 @@ function toGetWorkflowResult(row: WorkflowRow) {
 	return {
 		id: row.id,
 		name: row.name,
+		triggerType: row.triggerType,
 		triggerHour: row.triggerHour,
 		triggerMinute: row.triggerMinute,
+		triggerEvent: row.triggerEvent,
+		triggerEntityTypeId: row.triggerEntityTypeId,
 		steps: row.steps,
 		enabled: row.enabled
 	};

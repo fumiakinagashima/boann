@@ -172,8 +172,11 @@ export type WorkflowContent = {
 	type: 'workflow';
 	id?: string;
 	name: string;
+	triggerType: 'schedule' | 'event';
 	triggerHour: number;
 	triggerMinute: number;
+	triggerEvent: 'create' | 'update' | 'delete' | null;
+	triggerEntityTypeId: string | null;
 	steps: WorkflowStep[];
 };
 

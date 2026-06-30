@@ -1,4 +1,4 @@
-import { asc, eq, or, isNull, desc } from 'drizzle-orm';
+import { asc, eq, or, isNull, desc, and } from 'drizzle-orm';
 import type { BatchItem } from 'drizzle-orm/batch';
 import { workflows, workflowRuns } from './schema';
 import type { Db } from '.';
@@ -8,8 +8,11 @@ export type WorkflowRow = {
 	id: string;
 	name: string;
 	steps: WorkflowStep[];
+	triggerType: 'schedule' | 'event';
 	triggerHour: number;
 	triggerMinute: number;
+	triggerEvent: 'create' | 'update' | 'delete' | null;
+	triggerEntityTypeId: string | null;
 	enabled: boolean;
 	accountId: string | null;
 	appId: string | null;
@@ -22,8 +25,11 @@ function toRow(r: typeof workflows.$inferSelect): WorkflowRow {
 		id: r.id,
 		name: r.name,
 		steps: JSON.parse(r.steps) as WorkflowStep[],
+		triggerType: (r.triggerType ?? 'schedule') as 'schedule' | 'event',
 		triggerHour: r.triggerHour,
 		triggerMinute: r.triggerMinute,
+		triggerEvent: (r.triggerEvent ?? null) as 'create' | 'update' | 'delete' | null,
+		triggerEntityTypeId: r.triggerEntityTypeId ?? null,
 		enabled: r.enabled,
 		accountId: r.accountId,
 		appId: r.appId ?? null,
@@ -37,8 +43,11 @@ export async function createWorkflow(
 	input: {
 		name: string;
 		steps: WorkflowStep[];
+		triggerType?: 'schedule' | 'event';
 		triggerHour: number;
 		triggerMinute: number;
+		triggerEvent?: 'create' | 'update' | 'delete' | null;
+		triggerEntityTypeId?: string | null;
 		accountId?: string;
 		appId?: string;
 	}
@@ -58,8 +67,11 @@ export async function createWorkflow(
 		id,
 		name: input.name,
 		steps: JSON.stringify(input.steps),
+		triggerType: input.triggerType ?? 'schedule',
 		triggerHour: input.triggerHour,
 		triggerMinute: input.triggerMinute,
+		triggerEvent: input.triggerEvent ?? null,
+		triggerEntityTypeId: input.triggerEntityTypeId ?? null,
 		enabled: false,
 		accountId: input.accountId ?? null,
 		appId,
@@ -113,21 +125,49 @@ export async function getEnabledWorkflows(db: Db): Promise<WorkflowRow[]> {
 export async function updateWorkflow(
 	db: Db,
 	id: string,
-	input: { name: string; steps: WorkflowStep[]; triggerHour: number; triggerMinute: number; enabled?: boolean }
+	input: {
+		name: string;
+		steps: WorkflowStep[];
+		triggerType?: 'schedule' | 'event';
+		triggerHour: number;
+		triggerMinute: number;
+		triggerEvent?: 'create' | 'update' | 'delete' | null;
+		triggerEntityTypeId?: string | null;
+		enabled?: boolean;
+	}
 ): Promise<WorkflowRow> {
 	await db
 		.update(workflows)
 		.set({
 			name: input.name,
 			steps: JSON.stringify(input.steps),
+			triggerType: input.triggerType ?? 'schedule',
 			triggerHour: input.triggerHour,
 			triggerMinute: input.triggerMinute,
+			triggerEvent: input.triggerEvent ?? null,
+			triggerEntityTypeId: input.triggerEntityTypeId ?? null,
 			...(input.enabled !== undefined ? { enabled: input.enabled } : {}),
 			updatedAt: new Date()
 		})
 		.where(eq(workflows.id, id));
 	const [row] = await db.select().from(workflows).where(eq(workflows.id, id));
 	return toRow(row);
+}
+
+export async function listEnabledEventWorkflows(
+	db: Db,
+	entityTypeId: string,
+	event: 'create' | 'update' | 'delete'
+): Promise<WorkflowRow[]> {
+	const rows = await db.select().from(workflows).where(
+		and(
+			eq(workflows.enabled, true),
+			eq(workflows.triggerType, 'event'),
+			eq(workflows.triggerEntityTypeId, entityTypeId),
+			eq(workflows.triggerEvent, event)
+		)
+	);
+	return rows.map(toRow);
 }
 
 export async function deleteWorkflow(db: Db, id: string): Promise<void> {

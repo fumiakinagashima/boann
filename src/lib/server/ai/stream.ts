@@ -178,13 +178,16 @@ export function parseUITag(tag: string): MessageContent | null {
 		} else if (type === 'reply') {
 			return { type: 'reply', title, fields: JSON.parse(body), submitLabel };
 		} else if (type === 'workflow') {
-			const { triggerHour, triggerMinute, steps } = JSON.parse(body);
+			const { triggerType, triggerHour, triggerMinute, triggerEvent, triggerEntityTypeId, steps } = JSON.parse(body);
 			return {
 				type: 'workflow',
 				id,
 				name: name ?? '新規ワークフロー',
+				triggerType: triggerType ?? 'schedule',
 				triggerHour,
 				triggerMinute,
+				triggerEvent: triggerEvent ?? null,
+				triggerEntityTypeId: triggerEntityTypeId ?? null,
 				steps: sanitizeWorkflowSteps(steps)
 			};
 		}

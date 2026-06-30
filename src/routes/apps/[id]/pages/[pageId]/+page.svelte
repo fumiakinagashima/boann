@@ -75,6 +75,10 @@
 
 				<section class="detail-card">
 					<dl class="field-list">
+						<div class="field-row">
+							<dt>ID</dt>
+							<dd class="mono">{data.record.id}</dd>
+						</div>
 						{#each data.displayFields as field}
 							<div class="field-row">
 								<dt>{field.label}</dt>
@@ -472,6 +476,8 @@ table {
 	dt { color: var(--color-text-muted); font-size: 0.875rem; }
 	dd { margin: 0; color: var(--color-text); font-size: 0.9375rem; word-break: break-word; }
 }
+
+.mono { font-family: ui-monospace, monospace; font-size: 0.8125rem; }
 
 .related-section { display: flex; flex-direction: column; gap: 12px; }
 .related-section-header {

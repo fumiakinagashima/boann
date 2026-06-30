@@ -71,6 +71,13 @@
       "when": 1751300000000,
       "tag": "0017_workflow_runs_fk",
       "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "6",
+      "when": 1751400000000,
+      "tag": "0018_workflow_event_trigger",
+      "breakpoints": true
     }
   ]
 }

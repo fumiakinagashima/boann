@@ -129,6 +129,7 @@ function resolveOperandType(
 }
 
 export function validateWorkflow(
+	triggerType: 'schedule' | 'event' = 'schedule',
 	triggerHour: number,
 	triggerMinute: number,
 	steps: WorkflowStep[],
@@ -139,11 +140,13 @@ export function validateWorkflow(
 	const entityTypeIds = new Set(entityTypes.map((e) => e.id));
 	const slackIntegrationIds = new Set(slackIntegrations.map((s) => s.id));
 
-	if (!Number.isInteger(triggerHour) || triggerHour < 0 || triggerHour > 23) {
-		errors.push('トリガーの時刻（時）が不正です');
-	}
-	if (!Number.isInteger(triggerMinute) || triggerMinute < 0 || triggerMinute > 59) {
-		errors.push('トリガーの時刻（分）が不正です');
+	if (triggerType === 'schedule') {
+		if (!Number.isInteger(triggerHour) || triggerHour < 0 || triggerHour > 23) {
+			errors.push('トリガーの時刻（時）が不正です');
+		}
+		if (!Number.isInteger(triggerMinute) || triggerMinute < 0 || triggerMinute > 59) {
+			errors.push('トリガーの時刻（分）が不正です');
+		}
 	}
 	if (steps.length === 0) {
 		errors.push('ステップが1つもありません');

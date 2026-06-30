@@ -352,7 +352,7 @@ export function buildSystemBlocks(appContext?: AppContext): TextBlockParam[] {
 	];
 }
 
-export const WORKFLOW_REVIEW_SYSTEM_PROMPT = `あなたはBoannというノーコードアプリプラットフォームのワークフロー（毎日決まった時刻に実行する自動化フロー）レビューAIです。
+export const WORKFLOW_REVIEW_SYSTEM_PROMPT = `あなたはBoannというノーコードアプリプラットフォームのワークフロー（スケジュール実行またはレコード操作イベントで起動する自動化フロー）レビューAIです。
 ユーザーが作成中・保存済みのワークフロー定義（トリガー時刻・ステップ構成）を読み、有効化する前に見直した方がよい論理的な問題を指摘するのが役目です。必須パラメータの未入力やステップ参照エラーなどの構造的な誤りは別のバリデーションで検出済みなので、それ以外の「実行はできるが意図と食い違っている可能性がある」点に注目してください。
 
 ## レビュー観点（例）
@@ -404,17 +404,24 @@ function renderWorkflowStepsForAI(steps: WorkflowStep[], indent = ''): string {
 
 export function buildWorkflowReviewPrompt(input: {
 	name: string;
+	triggerType?: 'schedule' | 'event';
 	triggerHour: number;
 	triggerMinute: number;
+	triggerEvent?: 'create' | 'update' | 'delete' | null;
+	triggerEntityTypeId?: string | null;
 	steps: WorkflowStep[];
 }): string {
+	const EVENT_LABEL: Record<string, string> = { create: '作成', update: '更新', delete: '削除' };
+	const triggerDesc = input.triggerType === 'event'
+		? `イベント: テーブル(${input.triggerEntityTypeId ?? '未選択'}) の レコード${EVENT_LABEL[input.triggerEvent ?? ''] ?? '(未選択)'} 時\n（ステップ内で @trigger:id = 操作されたレコードID、@trigger:event = イベント種別 を参照可能）`
+		: `スケジュール: 毎日 ${String(input.triggerHour).padStart(2, '0')}:${String(input.triggerMinute).padStart(2, '0')}`;
 	return `これから有効化するワークフローをレビューしてください。論理的な誤り・未到達ステップ・改善点があれば指摘してください。
 
 ## ワークフロー名
 ${input.name || '（未入力）'}
 
 ## トリガー
-毎日 ${String(input.triggerHour).padStart(2, '0')}:${String(input.triggerMinute).padStart(2, '0')}
+${triggerDesc}
 
 ## ステップ構成
 ${input.steps.length > 0 ? renderWorkflowStepsForAI(input.steps) : '（ステップが1つもありません）'}`;
@@ -422,14 +429,17 @@ ${input.steps.length > 0 ? renderWorkflowStepsForAI(input.steps) : '（ステッ
 
 export function buildWorkflowChatSystemPrompt(current: {
 	name: string;
+	triggerType?: 'schedule' | 'event';
 	triggerHour: number;
 	triggerMinute: number;
+	triggerEvent?: 'create' | 'update' | 'delete' | null;
+	triggerEntityTypeId?: string | null;
 	steps: WorkflowStep[];
 }): string {
-	return `あなたはBoannというノーコードアプリプラットフォームの「ワークフロー」（毎日決まった時刻に実行する自動化フロー）作成を専門にサポートするAIアシスタントです。画面右側のエディタと連動しており、あなたが提案した内容はそのまま右側に反映されます。
+	return `あなたはBoannというノーコードアプリプラットフォームの「ワークフロー」（スケジュールまたはイベントで起動する自動化フロー）作成を専門にサポートするAIアシスタントです。画面右側のエディタと連動しており、あなたが提案した内容はそのまま右側に反映されます。
 
 ## 役目
-ユーザーとの会話から、トリガー時刻とステップ構成（action/condition）を組み立てて提案する。ワークフロー作成・編集に関係のない質問には対応せず、ワークフロー作成の話題に戻すよう促す。
+ユーザーとの会話から、トリガー設定とステップ構成（action/condition）を組み立てて提案する。ワークフロー作成・編集に関係のない質問には対応せず、ワークフロー作成の話題に戻すよう促す。
 
 ## steps（配列、上から順に実行）の要素は3種類
 - action: \`{"id":"s1","kind":"action","label":"...","tool":"...","params":{...}}\`
@@ -448,16 +458,21 @@ ${ITEM_REF_SEMANTICS_NOTE}
 ${WORKFLOW_ACTION_TOOLS.map(describeWorkflowActionToolForAI).join('\n')}
 結果（resultType付き）は条件のleft/rightや後続ステップのparamsで参照可能。condition の left は必ず先行アクションの結果（@step:<id> または @item:<field>）を指定する（リテラル不可）。operator は == != > < >= <= のいずれか。
 
+## トリガー種別
+- schedule（スケジュール）: 毎日指定時刻に実行。triggerHour/triggerMinute を指定する
+- event（イベント）: 特定テーブルのレコード作成/更新/削除時に実行。triggerEntityTypeId（entity_types.id）と triggerEvent（create/update/delete）を指定する。ステップ内で @trigger:id = 操作されたレコードID、@trigger:event = イベント種別 を参照可能
+
 ## 現在の編集状態（画面右側の内容。ユーザーが手動で編集している場合もある）
 - 名前: ${current.name || '（未入力）'}
-- トリガー: 毎日 ${String(current.triggerHour).padStart(2, '0')}:${String(current.triggerMinute).padStart(2, '0')}
+- トリガー: ${current.triggerType === 'event' ? `イベント（テーブル: ${current.triggerEntityTypeId ?? '未選択'} / ${current.triggerEvent ?? '未選択'}時）` : `スケジュール（毎日 ${String(current.triggerHour).padStart(2, '0')}:${String(current.triggerMinute).padStart(2, '0')}）`}
 - ステップ: ${current.steps.length > 0 ? `\n${renderWorkflowStepsForAI(current.steps)}` : '（なし）'}
 
 ## 提案方法
 ステップ構成を提案・更新する際は、必ず以下の形式で**現在の編集状態を踏まえた上で更新後の構成全体**を出力する（差分ではなく常に全体）。テキストで簡潔に説明を添えた上で、必ずこのタグを含める:
 <ui type="workflow" name="ワークフロー名">
-{"triggerHour":9,"triggerMinute":0,"steps":[...]}
+{"triggerType":"schedule","triggerHour":9,"triggerMinute":0,"steps":[...]}
 </ui>
+イベントトリガーの場合: {"triggerType":"event","triggerHour":9,"triggerMinute":0,"triggerEvent":"create","triggerEntityTypeId":"<entity_types.id>","steps":[...]}
 
 会話のみで構成の確定に至っていない場合（要件を確認している段階等）はタグを出力しなくてよい。
 

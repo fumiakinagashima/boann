@@ -16,8 +16,11 @@
 	type Props = {
 		id?: string;
 		initialName?: string;
+		initialTriggerType?: 'schedule' | 'event';
 		initialTriggerHour?: number;
 		initialTriggerMinute?: number;
+		initialTriggerEvent?: 'create' | 'update' | 'delete' | null;
+		initialTriggerEntityTypeId?: string | null;
 		initialSteps?: WorkflowStep[];
 		initialEnabled?: boolean;
 		runs?: WorkflowRunRow[];
@@ -29,8 +32,11 @@
 	let {
 		id,
 		initialName = '新規ワークフロー',
+		initialTriggerType = 'schedule',
 		initialTriggerHour = 9,
 		initialTriggerMinute = 0,
+		initialTriggerEvent = null,
+		initialTriggerEntityTypeId = null,
 		initialSteps = [],
 		initialEnabled = false,
 		runs = [],
@@ -47,7 +53,7 @@
 	let wfRef = $state<WorkflowInstance | null>(null);
 
 	export function getState(): WorkflowState {
-		return wfRef?.getState() ?? { name: initialName, triggerHour: initialTriggerHour, triggerMinute: initialTriggerMinute, steps: initialSteps };
+		return wfRef?.getState() ?? { name: initialName, triggerType: initialTriggerType, triggerHour: initialTriggerHour, triggerMinute: initialTriggerMinute, triggerEvent: initialTriggerEvent, triggerEntityTypeId: initialTriggerEntityTypeId, steps: initialSteps };
 	}
 	export function setState(s: WorkflowState) {
 		wfRef?.setState(s);
@@ -65,10 +71,26 @@
 
 	async function runNow() {
 		if (runningNow || !currentId) return;
-		if (!confirm('保存されている状態で実行されます。よろしいですか？')) return;
+
+		let triggerRecordId: string | undefined;
+		if (initialTriggerType === 'event') {
+			const input = prompt(
+				'イベントトリガーのテスト実行です。\n@trigger:id として使用するレコードIDを入力してください（空欄の場合は空文字で実行）。'
+			);
+			if (input === null) return; // キャンセル
+			triggerRecordId = input.trim();
+		} else {
+			if (!confirm('保存されている状態で実行されます。よろしいですか？')) return;
+		}
+
 		runningNow = true;
 		try {
-			const res = await fetch(`/api/workflows/${currentId}/run`, { method: 'POST' });
+			const body = triggerRecordId !== undefined ? JSON.stringify({ triggerRecordId }) : undefined;
+			const res = await fetch(`/api/workflows/${currentId}/run`, {
+				method: 'POST',
+				headers: body ? { 'Content-Type': 'application/json' } : {},
+				body
+			});
 			const result = (await res.json()) as { ok?: boolean; name?: string; error?: string };
 			if (!res.ok) {
 				toast.error(result.error ?? '実行に失敗しました');
@@ -131,7 +153,7 @@
 
 <div class="editor-wrap">
 	<div class="editor-row1">
-		<Toggle bind:checked={enabled} label="有効化（毎日指定時刻に実行）" />
+		<Toggle bind:checked={enabled} label="有効化" />
 		<div class="editor-row1-actions">
 			{#if currentId}
 				<button class="btn-run-now" onclick={runNow} disabled={runningNow}>
@@ -183,7 +205,7 @@
 		{#if !noChatPanel}
 			<div class="chat-embedded">
 				<WorkflowChatPanel
-					getCurrent={() => wfRef?.getState() ?? { name: initialName, triggerHour: initialTriggerHour, triggerMinute: initialTriggerMinute, steps: initialSteps }}
+					getCurrent={() => wfRef?.getState() ?? { name: initialName, triggerType: initialTriggerType, triggerHour: initialTriggerHour, triggerMinute: initialTriggerMinute, triggerEvent: initialTriggerEvent, triggerEntityTypeId: initialTriggerEntityTypeId, steps: initialSteps }}
 					onApply={(state) => wfRef?.setState(state)}
 				/>
 			</div>
@@ -192,8 +214,11 @@
 			<Workflow
 				bind:this={wfRef}
 				name={initialName}
+				triggerType={initialTriggerType}
 				triggerHour={initialTriggerHour}
 				triggerMinute={initialTriggerMinute}
+				triggerEvent={initialTriggerEvent}
+				triggerEntityTypeId={initialTriggerEntityTypeId}
 				steps={initialSteps}
 				editable={true}
 				{entityTypes}
