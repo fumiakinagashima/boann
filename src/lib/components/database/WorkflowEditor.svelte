@@ -7,7 +7,7 @@
 	import Toggle from '$lib/components/ui/Toggle.svelte';
 	import { formatJstDateTime } from '$lib/datetime';
 	import type { WorkflowStep } from '$lib/types/chat';
-	import type { WorkflowRunRow } from '$lib/server/db/workflow-run-service';
+	import type { WorkflowRunRow, StepLog } from '$lib/server/db/workflow-run-service';
 	import type { EntityTypeForWorkflow } from '$lib/server/db/table-service';
 	import type { SlackIntegrationOption } from '$lib/server/slack';
 
@@ -116,6 +116,17 @@
 		}
 	}
 
+	let expandedRunId = $state<string | null>(null);
+
+	function toggleRunExpand(runId: string) {
+		expandedRunId = expandedRunId === runId ? null : runId;
+	}
+
+	function stepLogLabel(log: StepLog): string {
+		const status = log.ok ? '✓' : '✗';
+		const ms = log.ms < 1000 ? `${log.ms}ms` : `${(log.ms / 1000).toFixed(1)}s`;
+		return `${status} ${log.label}（${ms}）`;
+	}
 </script>
 
 <div class="editor-wrap">
@@ -202,20 +213,62 @@
 						<tr>
 							<th>開始</th>
 							<th>結果</th>
-							<th>エラー</th>
+							<th>詳細</th>
 						</tr>
 					</thead>
 					<tbody>
 						{#each runs as run (run.id)}
-							<tr>
+							{@const hasDetail = !!(run.error || (run.log && run.log.length > 0))}
+							{@const expanded = expandedRunId === run.id}
+							<tr
+								class:expandable={hasDetail}
+								class:expanded
+								onclick={hasDetail ? () => toggleRunExpand(run.id) : undefined}
+								role={hasDetail ? 'button' : undefined}
+								tabindex={hasDetail ? 0 : undefined}
+								onkeydown={hasDetail ? (e) => e.key === 'Enter' && toggleRunExpand(run.id) : undefined}
+							>
 								<td class="run-log-date">{formatJstDateTime(run.startedAt)}</td>
 								<td>
 									<span class="run-log-badge" class:ok={run.ok} class:fail={!run.ok}>
 										{run.ok ? '成功' : '失敗'}
 									</span>
 								</td>
-								<td class="run-log-error">{run.error ?? ''}</td>
+								<td class="run-log-summary">
+									{#if run.error}
+										<span class="run-log-error-text">{run.error}</span>
+									{:else if run.log && run.log.length > 0}
+										<span class="run-log-step-count">{run.log.length}ステップ</span>
+									{/if}
+									{#if hasDetail}
+										<span class="run-log-chevron">{expanded ? '▲' : '▼'}</span>
+									{/if}
+								</td>
 							</tr>
+							{#if expanded && hasDetail}
+								<tr class="run-log-detail-row">
+									<td colspan="3">
+										{#if run.log && run.log.length > 0}
+											<ul class="run-step-list">
+												{#each run.log as step (step.id)}
+													<li class="run-step-item" class:step-ok={step.ok} class:step-fail={!step.ok}>
+														<span class="run-step-label">{stepLogLabel(step)}</span>
+														{#if step.result}
+															<span class="run-step-detail">{step.result}</span>
+														{/if}
+														{#if step.error}
+															<span class="run-step-error">{step.error}</span>
+														{/if}
+													</li>
+												{/each}
+											</ul>
+										{/if}
+										{#if run.error && !(run.log && run.log.length > 0)}
+											<p class="run-detail-error">{run.error}</p>
+										{/if}
+									</td>
+								</tr>
+							{/if}
 						{/each}
 					</tbody>
 				</table>
@@ -375,8 +428,92 @@
 		color: var(--color-text-muted);
 	}
 
-	.run-log-error {
+	.run-log-summary {
+		display: flex;
+		align-items: center;
+		gap: 8px;
+	}
+
+	.run-log-error-text {
 		color: var(--color-danger, var(--color-error));
+		font-size: 0.8125rem;
+		flex: 1;
+		white-space: nowrap;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		max-width: 320px;
+	}
+
+	.run-log-step-count {
+		color: var(--color-text-muted);
+		font-size: 0.8125rem;
+	}
+
+	.run-log-chevron {
+		color: var(--color-text-muted);
+		font-size: 0.7rem;
+		margin-left: auto;
+	}
+
+	tr.expandable {
+		cursor: pointer;
+		&:hover td {
+			background: color-mix(in srgb, var(--color-text) 4%, transparent);
+		}
+	}
+
+	tr.expanded td {
+		background: color-mix(in srgb, var(--color-text) 4%, transparent);
+	}
+
+	.run-log-detail-row td {
+		padding: 0 10px 10px 24px;
+		background: color-mix(in srgb, var(--color-text) 2%, transparent);
+	}
+
+	.run-step-list {
+		margin: 0;
+		padding: 0;
+		list-style: none;
+		display: flex;
+		flex-direction: column;
+		gap: 4px;
+	}
+
+	.run-step-item {
+		display: flex;
+		flex-direction: column;
+		gap: 2px;
+		padding: 4px 8px;
+		border-radius: 4px;
+		font-size: 0.8125rem;
+
+		&.step-ok {
+			border-left: 2px solid var(--color-success);
+		}
+		&.step-fail {
+			border-left: 2px solid var(--color-error);
+		}
+	}
+
+	.run-step-label {
+		font-weight: 500;
+	}
+
+	.run-step-detail {
+		color: var(--color-text-muted);
+		font-size: 0.75rem;
+	}
+
+	.run-step-error {
+		color: var(--color-error);
+		font-size: 0.75rem;
+	}
+
+	.run-detail-error {
+		margin: 4px 0 0;
+		color: var(--color-error);
+		font-size: 0.8125rem;
 	}
 
 	.run-log-badge {
