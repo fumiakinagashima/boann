@@ -124,11 +124,7 @@
 															{@const detailPage = data.allPages.find(p => p.tableId === section.config.tableId)}
 															{#if detailPage}
 																<a class="action-btn" href="/apps/{data.app.id}/pages/{detailPage.id}?recordId={row.id}&from={encodeURIComponent(page.url.href)}">詳細</a>
-															{:else}
-																<button class="action-btn" onclick={() => s.openEdit(
-																	section.config.tableId, section.tableName, section.fields, section.recordOptions, row
-																)}>詳細</button>
-															{/if}
+														{/if}
 														{/if}
 														{#if section.config.actions.includes('edit')}
 															<button class="action-btn" onclick={() => s.openEdit(
@@ -421,6 +417,7 @@ table {
 	color: var(--color-text-muted);
 	font-size: 0.75rem;
 	cursor: pointer;
+	text-decoration: none;
 	transition: border-color 0.15s, color 0.15s, background 0.15s;
 
 	&:hover {
