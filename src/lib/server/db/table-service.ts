@@ -454,6 +454,15 @@ export async function deleteApp(db: Db, id: string): Promise<void> {
 	await db.batch(queries as [BatchItem<'sqlite'>, ...BatchItem<'sqlite'>[]]);
 }
 
+function uniqueFieldKey(usedKeys: Set<string>, candidate?: string): string {
+	const key = candidate && !usedKeys.has(candidate)
+		? candidate
+		: 'field_' + crypto.randomUUID().replace(/-/g, '').slice(0, 8);
+	if (usedKeys.has(key)) return uniqueFieldKey(usedKeys);
+	usedKeys.add(key);
+	return key;
+}
+
 export async function createEntityType(db: Db, input: EntityTypeInput): Promise<{ id: string; name: string }> {
 	if (RESERVED_NAMES.has(input.name)) {
 		throw new Error(`テーブル名 "${input.name}" はシステムで予約されています。別の名前を使用してください。`);
@@ -472,18 +481,22 @@ export async function createEntityType(db: Db, input: EntityTypeInput): Promise<
 	const tableSortOrder = await nextSortOrder(db, entityTypes, entityTypes.appId, input.appId ?? null, entityTypes.sortOrder);
 	await db.batch([
 		db.insert(entityTypes).values({ id, name: input.name, label: input.label, icon: input.icon, appId: input.appId, sortOrder: tableSortOrder }),
-		...input.fields.map((f, i) =>
-			db.insert(entityFields).values({
-				id: crypto.randomUUID(), entityTypeId: id,
-				key: f.key, label: f.label, type: f.type as CustomFieldType,
+		...(() => {
+			const usedKeys = new Set<string>();
+			return input.fields.map((f, i) => {
+				const key = uniqueFieldKey(usedKeys, f.key);
+				return db.insert(entityFields).values({
+					id: crypto.randomUUID(), entityTypeId: id,
+					key, label: f.label, type: f.type as CustomFieldType,
 				required: f.required ?? false,
 				options: JSON.stringify(f.options ?? []),
 				defaultValue: f.defaultValue ?? null,
 				description: f.description ?? null,
 				...refColumns(f),
 				sortOrder: i
-			})
-		)
+				});
+			});
+		})()
 	]);
 	return { id, name: input.name };
 }
@@ -648,12 +661,14 @@ export async function updateEntityType(db: Db, name: string, input: Partial<Enti
 
 	if (input.fields != null) {
 		queries.push(db.delete(entityFields).where(eq(entityFields.entityTypeId, et.id)));
+		const usedKeys = new Set<string>();
 		for (let i = 0; i < input.fields.length; i++) {
 			const f = input.fields[i];
+			const key = uniqueFieldKey(usedKeys, f.key);
 			queries.push(
 				db.insert(entityFields).values({
 					id: crypto.randomUUID(), entityTypeId: et.id,
-					key: f.key, label: f.label, type: f.type as CustomFieldType,
+					key, label: f.label, type: f.type as CustomFieldType,
 					required: f.required ?? false,
 					options: JSON.stringify(f.options ?? []),
 					defaultValue: f.defaultValue ?? null,

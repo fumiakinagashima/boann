@@ -36,6 +36,7 @@ function slugify(s: string): string {
 		.replace(/^_+|_+$/g, '');
 }
 
+
 export function createTableBuildState(getData: () => PageData) {
 	// ── Meta ─────────────────────────────────────────────────────
 	let appLabel = $state(getData().app.label);
@@ -146,13 +147,6 @@ export function createTableBuildState(getData: () => PageData) {
 
 	function onLabelInput(row: FieldRow, val: string) {
 		row.label = val;
-		const slug = slugify(val);
-		if (slug) {
-			row.key = slug;
-		} else if (!row.key) {
-			const idx = rows.findIndex(r => r._id === row._id);
-			row.key = 'field_' + (idx + 1);
-		}
 		markDirty();
 	}
 
