@@ -2,11 +2,21 @@ import { desc, eq } from 'drizzle-orm';
 import { workflowRuns } from './schema';
 import type { Db } from '.';
 
+export type StepLog = {
+	id: string;
+	label: string;
+	ok: boolean;
+	result?: string;
+	error?: string;
+	ms: number;
+};
+
 export type WorkflowRunRow = {
 	id: string;
 	workflowId: string;
 	ok: boolean;
 	error: string | null;
+	log: StepLog[] | null;
 	startedAt: Date;
 	finishedAt: Date;
 };
@@ -17,6 +27,7 @@ function toRow(r: typeof workflowRuns.$inferSelect): WorkflowRunRow {
 		workflowId: r.workflowId,
 		ok: r.ok,
 		error: r.error,
+		log: r.log ? (JSON.parse(r.log) as StepLog[]) : null,
 		startedAt: r.startedAt,
 		finishedAt: r.finishedAt
 	};
@@ -24,13 +35,14 @@ function toRow(r: typeof workflowRuns.$inferSelect): WorkflowRunRow {
 
 export async function recordWorkflowRun(
 	db: Db,
-	input: { workflowId: string; ok: boolean; error?: string | null; startedAt: Date; finishedAt: Date }
+	input: { workflowId: string; ok: boolean; error?: string | null; log?: StepLog[]; startedAt: Date; finishedAt: Date }
 ): Promise<void> {
 	await db.insert(workflowRuns).values({
 		id: crypto.randomUUID(),
 		workflowId: input.workflowId,
 		ok: input.ok,
 		error: input.error ?? null,
+		log: input.log ? JSON.stringify(input.log) : null,
 		startedAt: input.startedAt,
 		finishedAt: input.finishedAt
 	});

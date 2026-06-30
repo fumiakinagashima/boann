@@ -219,6 +219,7 @@ export const workflowRuns = sqliteTable('workflow_runs', {
 	workflowId: text('workflow_id').notNull(),
 	ok: integer('ok', { mode: 'boolean' }).notNull(),
 	error: text('error'),
+	log: text('log'),
 	startedAt: integer('started_at', { mode: 'timestamp' }).notNull(),
 	finishedAt: integer('finished_at', { mode: 'timestamp' }).notNull()
 });

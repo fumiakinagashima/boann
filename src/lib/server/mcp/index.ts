@@ -29,6 +29,8 @@ export type ToolName =
 	| 'save_workflow'
 	| 'list_workflows'
 	| 'get_workflow'
+	| 'run_workflow'
+	| 'get_workflow_run_logs'
 	| 'create_table'
 	| 'create_page';
 
@@ -68,6 +70,8 @@ export async function dispatchTool(
 		case 'save_workflow':                  return workflows.handleSaveWorkflow(db, input, env);
 		case 'list_workflows':                 return workflows.handleListWorkflows(db, env);
 		case 'get_workflow':                   return workflows.handleGetWorkflow(db, input, env);
+		case 'run_workflow':                   return workflows.handleRunWorkflow(db, input, env);
+		case 'get_workflow_run_logs':           return workflows.handleGetWorkflowRunLogs(db, input);
 		case 'create_table':                   return entities.handleCreateTable(db, input);
 		case 'create_page':                    return entities.handleCreatePage(db, input);
 		default:

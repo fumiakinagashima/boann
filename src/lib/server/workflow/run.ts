@@ -2,11 +2,12 @@ import type { Db } from '../db';
 import type { ToolEnv } from '../mcp/shared';
 import { dispatchTool, type ToolName } from '../mcp';
 import { getEnabledWorkflows, getWorkflow, type WorkflowRow } from '../db/workflow-service';
-import { recordWorkflowRun } from '../db/workflow-run-service';
+import { recordWorkflowRun, type StepLog } from '../db/workflow-run-service';
 import { getAccount } from '../db/account-service';
 import { getJstHourMinute } from '$lib/datetime';
 import { getWorkflowActionTool, parseStepRef, parseItemRef } from '$lib/workflow-tools';
 import { WORKFLOW_FOREACH_MAX_ITEMS, WORKFLOW_MAX_ACTIONS_PER_RUN } from '$lib/constants';
+import { createRecordByEntityTypeId, updateRecordByEntityTypeId, deleteRecord } from '../db/table-service';
 import type {
 	WorkflowStep,
 	WorkflowActionStep,
@@ -88,7 +89,7 @@ async function runAction(
 	selfEmail: string | null,
 	itemStack: ItemStack,
 	budget: Budget
-): Promise<void> {
+): Promise<{ result?: string }> {
 	consumeBudget(budget);
 	const toolDef = getWorkflowActionTool(step.tool);
 	if (!toolDef) throw new WorkflowAbortError(`未対応のツールです: ${step.tool}`);
@@ -107,6 +108,40 @@ async function runAction(
 		} else {
 			resolvedParams[field.key] = String(value);
 		}
+	}
+
+	// エンティティ書き込み操作はMCPツールを介さずDBサービスを直接呼ぶ
+	if (step.tool === 'create_entity') {
+		const entityTypeId = step.params?.entity_type_id;
+		if (!entityTypeId) throw new WorkflowAbortError(`「${step.label}」の対象テーブルが選択されていません`);
+		const dataStr = resolvedParams['data'] as string | undefined;
+		if (!dataStr) throw new WorkflowAbortError(`「${step.label}」のデータが指定されていません`);
+		let data: Record<string, unknown>;
+		try { data = JSON.parse(dataStr); } catch { throw new WorkflowAbortError(`「${step.label}」のデータがJSON形式ではありません`); }
+		const record = await createRecordByEntityTypeId(db, entityTypeId, data, env?.accountId);
+		return { result: `レコード作成完了（id: ${record.id}）` };
+	}
+
+	if (step.tool === 'update_entity') {
+		const entityTypeId = step.params?.entity_type_id;
+		if (!entityTypeId) throw new WorkflowAbortError(`「${step.label}」の対象テーブルが選択されていません`);
+		const recordId = resolvedParams['id'] as string | undefined;
+		if (!recordId) throw new WorkflowAbortError(`「${step.label}」のレコードIDが指定されていません`);
+		const dataStr = resolvedParams['data'] as string | undefined;
+		if (!dataStr) throw new WorkflowAbortError(`「${step.label}」のデータが指定されていません`);
+		let data: Record<string, unknown>;
+		try { data = JSON.parse(dataStr); } catch { throw new WorkflowAbortError(`「${step.label}」のデータがJSON形式ではありません`); }
+		await updateRecordByEntityTypeId(db, entityTypeId, recordId, data, env?.accountId);
+		return { result: `レコード更新完了（id: ${recordId}）` };
+	}
+
+	if (step.tool === 'delete_entity') {
+		const entityTypeId = step.params?.entity_type_id;
+		if (!entityTypeId) throw new WorkflowAbortError(`「${step.label}」の対象テーブルが選択されていません`);
+		const recordId = resolvedParams['id'] as string | undefined;
+		if (!recordId) throw new WorkflowAbortError(`「${step.label}」のレコードIDが指定されていません`);
+		await deleteRecord(db, '', recordId);
+		return { result: `レコード削除完了（id: ${recordId}）` };
 	}
 
 	let input: Record<string, unknown> = resolvedParams;
@@ -133,6 +168,7 @@ async function runAction(
 	if (toolDef.listResult) {
 		listResults.set(step.id, toolDef.listResult.extractList(raw));
 	}
+	return {};
 }
 
 async function runForeach(
@@ -143,14 +179,15 @@ async function runForeach(
 	env: ToolEnv | undefined,
 	selfEmail: string | null,
 	itemStack: ItemStack,
-	budget: Budget
+	budget: Budget,
+	logs: StepLog[]
 ): Promise<void> {
 	const refId = parseStepRef(step.source);
 	if (!refId) throw new WorkflowAbortError(`「${step.label}」の対象が選択されていません`);
 	const items = listResults.get(refId);
 	if (!items) throw new WorkflowAbortError(`「${step.label}」の参照先のリスト結果が見つかりません: ${refId}`);
 	for (const item of items.slice(0, WORKFLOW_FOREACH_MAX_ITEMS)) {
-		await runSteps(db, step.body, results, listResults, env, selfEmail, [...itemStack, { foreachStepId: step.id, item }], budget);
+		await runSteps(db, step.body, results, listResults, env, selfEmail, [...itemStack, { foreachStepId: step.id, item }], budget, logs);
 	}
 }
 
@@ -162,19 +199,28 @@ async function runSteps(
 	env: ToolEnv | undefined,
 	selfEmail: string | null,
 	itemStack: ItemStack = [],
-	budget: Budget = { remaining: WORKFLOW_MAX_ACTIONS_PER_RUN }
+	budget: Budget = { remaining: WORKFLOW_MAX_ACTIONS_PER_RUN },
+	logs: StepLog[] = []
 ): Promise<void> {
 	for (const step of steps) {
 		if (step.kind === 'action') {
-			await runAction(db, step, results, listResults, env, selfEmail, itemStack, budget);
+			const start = Date.now();
+			try {
+				const { result } = await runAction(db, step, results, listResults, env, selfEmail, itemStack, budget);
+				logs.push({ id: step.id, label: step.label, ok: true, result, ms: Date.now() - start });
+			} catch (e) {
+				const error = e instanceof Error ? e.message : String(e);
+				logs.push({ id: step.id, label: step.label, ok: false, error, ms: Date.now() - start });
+				throw e;
+			}
 		} else if (step.kind === 'condition') {
 			const left = resolveOperand(step.left, results, itemStack);
 			const right = resolveOperand(step.right, results, itemStack);
 			if (compare(left, step.operator, right)) {
-				await runSteps(db, step.then, results, listResults, env, selfEmail, itemStack, budget);
+				await runSteps(db, step.then, results, listResults, env, selfEmail, itemStack, budget, logs);
 			}
 		} else {
-			await runForeach(db, step, results, listResults, env, selfEmail, itemStack, budget);
+			await runForeach(db, step, results, listResults, env, selfEmail, itemStack, budget, logs);
 		}
 	}
 }
@@ -213,6 +259,7 @@ async function executeWorkflow(db: Db, workflow: WorkflowRow, env?: ToolEnv): Pr
 		};
 	}
 	const startedAt = new Date();
+	const logs: StepLog[] = [];
 	try {
 		const account = workflow.accountId ? await getAccount(db, workflow.accountId) : null;
 		// send_notification 等、env.accountId を「通知・登録の宛先」として参照するツールのために、
@@ -220,12 +267,12 @@ async function executeWorkflow(db: Db, workflow: WorkflowRow, env?: ToolEnv): Pr
 		const toolEnv: ToolEnv | undefined = workflow.accountId
 			? { ...(env ?? {}), accountId: workflow.accountId }
 			: env;
-		await runSteps(db, workflow.steps, new Map(), new Map(), toolEnv, account?.email ?? null);
-		await recordWorkflowRun(db, { workflowId: workflow.id, ok: true, startedAt, finishedAt: new Date() });
+		await runSteps(db, workflow.steps, new Map(), new Map(), toolEnv, account?.email ?? null, [], { remaining: WORKFLOW_MAX_ACTIONS_PER_RUN }, logs);
+		await recordWorkflowRun(db, { workflowId: workflow.id, ok: true, log: logs, startedAt, finishedAt: new Date() });
 		return { id: workflow.id, name: workflow.name, ok: true };
 	} catch (e) {
 		const error = e instanceof Error ? e.message : String(e);
-		await recordWorkflowRun(db, { workflowId: workflow.id, ok: false, error, startedAt, finishedAt: new Date() });
+		await recordWorkflowRun(db, { workflowId: workflow.id, ok: false, error, log: logs, startedAt, finishedAt: new Date() });
 		return { id: workflow.id, name: workflow.name, ok: false, error };
 	} finally {
 		await releaseRunLock(env?.KV, workflow.id);

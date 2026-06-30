@@ -84,6 +84,27 @@ export const WORKFLOW_ACTION_TOOLS: WorkflowActionToolDef[] = [
 						}))
 					: []
 		}
+	},
+	{
+		value: 'create_entity',
+		label: '自作テーブルにレコード作成',
+		params: [{ key: 'data', label: 'フィールド値（JSON形式）', type: 'textarea', required: true }],
+		note: '対象テーブルは「対象」の選択で決まる。dataはフィールドキーと値のJSONオブジェクト（例: {"name":"田中","status":"active"}）'
+	},
+	{
+		value: 'update_entity',
+		label: '自作テーブルのレコードを更新',
+		params: [
+			{ key: 'id', label: 'レコードID', type: 'text', required: true },
+			{ key: 'data', label: '更新フィールド値（JSON形式）', type: 'textarea', required: true }
+		],
+		note: '対象テーブルは「対象」の選択で決まる。idは更新対象のレコードID（@item:idなど）、dataは更新するフィールドキーと値のJSONオブジェクト'
+	},
+	{
+		value: 'delete_entity',
+		label: '自作テーブルのレコードを削除',
+		params: [{ key: 'id', label: 'レコードID', type: 'text', required: true }],
+		note: '対象テーブルは「対象」の選択で決まる。idは削除対象のレコードID'
 	}
 ];
 
@@ -97,8 +118,10 @@ export type WorkflowActionCategory = {
 	key: string;
 	label: string;
 	targets: WorkflowActionCategoryTarget[];
-	/** trueの場合、各カスタムテーブル（entity_type）が顧客・案件などと同じ並びで対象の選択肢に追加される（get_entities固定） */
+	/** trueの場合、各カスタムテーブル（entity_type）が対象の選択肢に追加される */
 	includeEntityTargets?: boolean;
+	/** includeEntityTargets時に使用するツール（未指定はget_entities） */
+	entityTargetTool?: string;
 	/** trueの場合、設定済みのSlack連携（Incoming Webhook）が個別の対象選択肢として追加される（send_slack_notification固定） */
 	includeSlackTargets?: boolean;
 };
@@ -123,11 +146,35 @@ export const WORKFLOW_ACTION_CATEGORIES: WorkflowActionCategory[] = [
 		label: '検索',
 		targets: [],
 		includeEntityTargets: true
+	},
+	{
+		key: 'data_create',
+		label: 'データ作成',
+		targets: [],
+		includeEntityTargets: true,
+		entityTargetTool: 'create_entity'
+	},
+	{
+		key: 'data_update',
+		label: 'データ更新',
+		targets: [],
+		includeEntityTargets: true,
+		entityTargetTool: 'update_entity'
+	},
+	{
+		key: 'data_delete',
+		label: 'データ削除',
+		targets: [],
+		includeEntityTargets: true,
+		entityTargetTool: 'delete_entity'
 	}
 ];
 
 export function findWorkflowActionCategory(tool: string): WorkflowActionCategory | undefined {
-	if (tool === 'get_entities') return WORKFLOW_ACTION_CATEGORIES.find((c) => c.includeEntityTargets);
+	if (tool === 'get_entities') return WORKFLOW_ACTION_CATEGORIES.find((c) => c.includeEntityTargets && !c.entityTargetTool);
+	if (tool === 'create_entity') return WORKFLOW_ACTION_CATEGORIES.find((c) => c.entityTargetTool === 'create_entity');
+	if (tool === 'update_entity') return WORKFLOW_ACTION_CATEGORIES.find((c) => c.entityTargetTool === 'update_entity');
+	if (tool === 'delete_entity') return WORKFLOW_ACTION_CATEGORIES.find((c) => c.entityTargetTool === 'delete_entity');
 	if (tool === 'send_slack_notification') return WORKFLOW_ACTION_CATEGORIES.find((c) => c.includeSlackTargets);
 	return WORKFLOW_ACTION_CATEGORIES.find((c) => c.targets.some((t) => t.tool === tool));
 }

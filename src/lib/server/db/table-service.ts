@@ -392,6 +392,21 @@ export async function listRecordsByEntityTypeId(db: Db, entityTypeId: string, li
 		}));
 }
 
+export async function createRecordByEntityTypeId(db: Db, entityTypeId: string, data: Record<string, unknown>, accountId?: string): Promise<RecordRow> {
+	const id = crypto.randomUUID();
+	const { id: _, entityTypeId: __, createdAt: ___, updatedAt: ____, createdBy: _____, updatedBy: ______, ...entityData } = data;
+	await db.insert(entities).values({ id, entityTypeId, data: JSON.stringify(entityData), createdBy: accountId ?? null, updatedBy: accountId ?? null });
+	return (await getRecord(db, '', id))!;
+}
+
+export async function updateRecordByEntityTypeId(db: Db, _entityTypeId: string, recordId: string, data: Record<string, unknown>, accountId?: string): Promise<RecordRow> {
+	const { id: _, entityTypeId: __, createdAt: ___, updatedAt: ____, createdBy: _____, updatedBy: ______, ...entityData } = data;
+	const set: Record<string, unknown> = { data: JSON.stringify(entityData), updatedAt: new Date() };
+	if (accountId !== undefined) set.updatedBy = accountId;
+	await db.update(entities).set(set).where(eq(entities.id, recordId));
+	return (await getRecord(db, '', recordId))!;
+}
+
 export async function getFieldsByEntityTypeId(db: Db, entityTypeId: string): Promise<FieldDef[]> {
 	const fields = await db.select().from(entityFields)
 		.where(eq(entityFields.entityTypeId, entityTypeId))

@@ -6,6 +6,8 @@ import { createWorkflow, updateWorkflow, listWorkflows, listWorkflowsByAppId, ge
 import { listEntityTypesForWorkflow } from '../db/table-service';
 import { listSlackIntegrationsForWorkflow } from '../slack';
 import { validateWorkflow } from '$lib/workflow-validation';
+import { runWorkflowNow } from '../workflow/run';
+import { listWorkflowRuns } from '../db/workflow-run-service';
 import type { WorkflowStep } from '$lib/types/chat';
 
 const workflowStepSchema: z.ZodType<WorkflowStep> = z.lazy(() =>
@@ -74,6 +76,31 @@ export const tools: Tool[] = [
 				name: { type: 'string', description: 'ワークフロー名（部分一致）。idが分からない場合に使う' }
 			},
 			required: []
+		}
+	},
+	{
+		name: 'run_workflow',
+		description:
+			'指定したワークフローを今すぐ実行する。「〇〇ワークフローを実行して」「今すぐ動かして」などの依頼に使う。実行結果（成功/失敗・エラー内容）を返す。',
+		input_schema: {
+			type: 'object',
+			properties: {
+				id: { type: 'string', description: '実行するワークフローのID（list_workflows または get_workflow で取得）' }
+			},
+			required: ['id']
+		}
+	},
+	{
+		name: 'get_workflow_run_logs',
+		description:
+			'ワークフローの実行ログ（最近の実行履歴）を取得する。「最後に実行した結果は？」「エラーの詳細を見せて」などの依頼に使う。各ステップの成否も含む。',
+		input_schema: {
+			type: 'object',
+			properties: {
+				id: { type: 'string', description: '対象ワークフローのID' },
+				limit: { type: 'number', description: '取得する件数（デフォルト: 5）' }
+			},
+			required: ['id']
 		}
 	}
 ];
@@ -181,4 +208,48 @@ export async function handleGetWorkflow(db: Db, input: unknown, env?: ToolEnv) {
 		};
 	}
 	return toGetWorkflowResult(matches[0]);
+}
+
+const runWorkflowInputSchema = z.object({ id: z.string() });
+
+export async function handleRunWorkflow(db: Db, input: unknown, env?: ToolEnv) {
+	const { id } = runWorkflowInputSchema.parse(input);
+	const row = await getWorkflow(db, id);
+	if (!row) throw new Error(`ワークフローが見つかりません（id: ${id}）`);
+	const result = await runWorkflowNow(db, id, env);
+	return {
+		id: result.id,
+		name: result.name,
+		ok: result.ok,
+		...(result.error ? { error: result.error } : {}),
+		message: result.ok
+			? `ワークフロー「${result.name}」を実行しました。`
+			: `ワークフロー「${result.name}」の実行に失敗しました: ${result.error}`
+	};
+}
+
+const getWorkflowRunLogsInputSchema = z.object({
+	id: z.string(),
+	limit: z.number().int().min(1).max(50).optional()
+});
+
+export async function handleGetWorkflowRunLogs(db: Db, input: unknown) {
+	const { id, limit } = getWorkflowRunLogsInputSchema.parse(input);
+	const row = await getWorkflow(db, id);
+	if (!row) throw new Error(`ワークフローが見つかりません（id: ${id}）`);
+	const runs = await listWorkflowRuns(db, id, limit ?? 5);
+	if (runs.length === 0) {
+		return { runs: [], message: `ワークフロー「${row.name}」の実行ログはまだありません。` };
+	}
+	return {
+		workflowName: row.name,
+		runs: runs.map((r) => ({
+			id: r.id,
+			ok: r.ok,
+			...(r.error ? { error: r.error } : {}),
+			steps: r.log ?? [],
+			startedAt: r.startedAt.toISOString(),
+			finishedAt: r.finishedAt.toISOString()
+		}))
+	};
 }

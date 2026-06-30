@@ -57,6 +57,13 @@
       "when": 1751100000000,
       "tag": "0015_entity_audit",
       "breakpoints": true
+    },
+    {
+      "idx": 16,
+      "version": "6",
+      "when": 1751200000000,
+      "tag": "0016_workflow_run_log",
+      "breakpoints": true
     }
   ]
 }

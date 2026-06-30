@@ -188,6 +188,7 @@
 	function effectiveTargets(category: {
 		targets: { value: string; label: string; tool: string }[];
 		includeEntityTargets?: boolean;
+		entityTargetTool?: string;
 		includeSlackTargets?: boolean;
 	}) {
 		const base = category.targets.map((t) => ({ value: t.tool, label: t.label }));
@@ -200,9 +201,11 @@
 		return [...base, ...entityTargets, ...slackTargets];
 	}
 
-	/** 対象selectの現在値。get_entities/send_slack_notificationの場合はparamsから`entity:<id>`/`slack:<id>`形式に変換する。 */
+	const ENTITY_WRITE_TOOLS = new Set(['get_entities', 'create_entity', 'update_entity', 'delete_entity']);
+
+	/** 対象selectの現在値。エンティティ操作ツールはparamsから`entity:<id>`形式に変換する。 */
 	function currentTargetValue(step: { tool: string; params?: Record<string, string> }): string {
-		if (step.tool === 'get_entities') return `entity:${step.params?.entity_type_id ?? ''}`;
+		if (ENTITY_WRITE_TOOLS.has(step.tool)) return `entity:${step.params?.entity_type_id ?? ''}`;
 		if (step.tool === 'send_slack_notification') return `slack:${step.params?.integration_id ?? ''}`;
 		return step.tool;
 	}
@@ -213,7 +216,8 @@
 		categoryKey: string
 	) {
 		if (value.startsWith('entity:')) {
-			step.tool = 'get_entities';
+			const category = WORKFLOW_ACTION_CATEGORIES.find((c) => c.key === categoryKey);
+			step.tool = category?.entityTargetTool ?? 'get_entities';
 			step.params = { entity_type_id: value.slice('entity:'.length) };
 		} else if (value.startsWith('slack:')) {
 			step.tool = 'send_slack_notification';
