@@ -216,7 +216,7 @@ export const workflows = sqliteTable('workflows', {
 
 export const workflowRuns = sqliteTable('workflow_runs', {
 	id: text('id').primaryKey(),
-	workflowId: text('workflow_id').notNull(),
+	workflowId: text('workflow_id').notNull().references(() => workflows.id),
 	ok: integer('ok', { mode: 'boolean' }).notNull(),
 	error: text('error'),
 	log: text('log'),

@@ -1,6 +1,6 @@
 import { asc, eq, or, isNull, desc } from 'drizzle-orm';
 import type { BatchItem } from 'drizzle-orm/batch';
-import { workflows } from './schema';
+import { workflows, workflowRuns } from './schema';
 import type { Db } from '.';
 import type { WorkflowStep } from '$lib/types/chat';
 
@@ -131,7 +131,10 @@ export async function updateWorkflow(
 }
 
 export async function deleteWorkflow(db: Db, id: string): Promise<void> {
-	await db.delete(workflows).where(eq(workflows.id, id));
+	await db.batch([
+		db.delete(workflowRuns).where(eq(workflowRuns.workflowId, id)),
+		db.delete(workflows).where(eq(workflows.id, id))
+	]);
 }
 
 function stepsReferenceEntityType(steps: WorkflowStep[], entityTypeId: string): boolean {
