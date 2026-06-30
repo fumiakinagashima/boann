@@ -19,9 +19,11 @@
 		onclose: () => void;
 		onSaved?: (record: Record<string, unknown>) => void;
 		onDeleted?: (id: string) => void;
+		appId?: string;
 	};
 
-	let { type, recordId = null, initialView = 'detail', prefill, onclose, onSaved, onDeleted }: Props = $props();
+	let { type, recordId = null, initialView = 'detail', prefill, onclose, onSaved, onDeleted, appId }: Props = $props();
+	const qs = $derived(appId ? `?appId=${appId}` : '');
 
 	type View =
 		| { kind: 'detail' }
@@ -54,8 +56,8 @@
 		try {
 			if (recordId) {
 				const [infoRes, recRes] = await Promise.all([
-					fetch(`/api/database/${type}/info`),
-					fetch(`/api/database/${type}/records/${recordId}`)
+					fetch(`/api/database/${type}/info${qs}`),
+					fetch(`/api/database/${type}/records/${recordId}${qs}`)
 				]);
 				if (infoRes.ok && recRes.ok) {
 					const { info } = (await infoRes.json()) as { info: { label: string; fields: FieldDef[] } };
@@ -92,13 +94,13 @@
 		formLoading = true;
 		(async () => {
 			try {
-				const infoRes = await fetch(`/api/database/${view.type}/info`);
+				const infoRes = await fetch(`/api/database/${view.type}/info${qs}`);
 				const { info } = infoRes.ok
 					? ((await infoRes.json()) as { info: { label: string; fields: FieldDef[] } })
 					: { info: { label: labelFor(view.type), fields: [] as FieldDef[] } };
 				let values: Record<string, unknown> = view.prefill ?? {};
 				if (view.mode === 'edit' && view.recordId) {
-					const recRes = await fetch(`/api/database/${view.type}/records/${view.recordId}`);
+					const recRes = await fetch(`/api/database/${view.type}/records/${view.recordId}${qs}`);
 					if (recRes.ok) values = (await recRes.json()) as Record<string, unknown>;
 				}
 				if (view.mode === 'create') {
@@ -137,8 +139,8 @@
 		try {
 			const url =
 				view.mode === 'edit'
-					? `/api/database/${view.type}/records/${view.recordId}`
-					: `/api/database/${view.type}/records`;
+					? `/api/database/${view.type}/records/${view.recordId}${qs}`
+					: `/api/database/${view.type}/records${qs}`;
 			const res = await fetch(url, {
 				method: view.mode === 'edit' ? 'PATCH' : 'POST',
 				headers: { 'Content-Type': 'application/json' },
@@ -164,7 +166,7 @@
 	async function handleDelete(targetType: string, targetId: string) {
 		if (!confirm('このレコードを削除しますか？')) return;
 		try {
-			const res = await fetch(`/api/database/${targetType}/records/${targetId}`, { method: 'DELETE' });
+			const res = await fetch(`/api/database/${targetType}/records/${targetId}${qs}`, { method: 'DELETE' });
 			if (!res.ok) {
 				toast.error('削除に失敗しました');
 				return;
@@ -235,6 +237,7 @@
 						record={genericRecord}
 						onEdit={() => pushFormSpec({ type, recordId: String(genericRecord!.id) })}
 						onDelete={() => handleDelete(type, String(genericRecord!.id))}
+						{appId}
 					/>
 				{/if}
 			{:else if formLoading}
@@ -246,6 +249,7 @@
 						fullWidth
 						onsubmit={(data) => submitForm(currentView as Extract<View, { kind: 'form' }>, data)}
 						oncancel={viewStack.length > 1 ? goBack : onclose}
+						{appId}
 					/>
 				{/key}
 			{/if}

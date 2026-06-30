@@ -66,7 +66,7 @@
 						{#if data.page.config.actions.includes('delete')}
 							<button class="btn-danger" onclick={async () => {
 								if (!confirm('このレコードを削除しますか？')) return;
-								const res = await fetch(`/api/database/${data.et!.name}/records/${data.record!.id}`, { method: 'DELETE' });
+								const res = await fetch(`/api/database/${data.et!.name}/records/${data.record!.id}?appId=${data.app.id}`, { method: 'DELETE' });
 								if (res.ok || res.status === 204) s.closeDetail();
 							}}>削除</button>
 						{/if}
@@ -134,7 +134,7 @@
 														{#if section.config.actions.includes('delete')}
 															<button class="action-btn danger" onclick={async () => {
 																if (!confirm('削除しますか？')) return;
-																const res = await fetch(`/api/database/${section.tableName}/records/${row.id}`, { method: 'DELETE' });
+																const res = await fetch(`/api/database/${section.tableName}/records/${row.id}?appId=${data.app.id}`, { method: 'DELETE' });
 																if (res.ok || res.status === 204) { const { invalidateAll } = await import('$app/navigation'); await invalidateAll(); }
 															}}>削除</button>
 														{/if}
@@ -203,7 +203,7 @@
 											{#if data.page.config.actions.includes('delete')}
 												<button class="action-btn danger" onclick={async () => {
 													if (!confirm('削除しますか？')) return;
-													const res = await fetch(`/api/database/${data.et!.name}/records/${row.id}`, { method: 'DELETE' });
+													const res = await fetch(`/api/database/${data.et!.name}/records/${row.id}?appId=${data.app.id}`, { method: 'DELETE' });
 													if (res.ok || res.status === 204) { const { invalidateAll } = await import('$app/navigation'); await invalidateAll(); }
 												}}>削除</button>
 											{/if}

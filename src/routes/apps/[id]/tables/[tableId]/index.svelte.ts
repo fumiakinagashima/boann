@@ -56,9 +56,10 @@ export function createTableRecordsState(getData: () => PageData) {
 		saveError = '';
 		try {
 			const appName = getData().app.name;
+			const appId = getData().appId;
 			const url = formMode === 'new'
-				? `/api/database/${appName}/records`
-				: `/api/database/${appName}/records/${editingId}`;
+				? `/api/database/${appName}/records?appId=${appId}`
+				: `/api/database/${appName}/records/${editingId}?appId=${appId}`;
 			const res = await fetch(url, {
 				method: formMode === 'new' ? 'POST' : 'PATCH',
 				headers: { 'Content-Type': 'application/json' },
@@ -81,7 +82,8 @@ export function createTableRecordsState(getData: () => PageData) {
 		deleting = true;
 		try {
 			const appName = getData().app.name;
-			const res = await fetch(`/api/database/${appName}/records/${editingId}`, { method: 'DELETE' });
+			const appId = getData().appId;
+			const res = await fetch(`/api/database/${appName}/records/${editingId}?appId=${appId}`, { method: 'DELETE' });
 			if (res.ok || res.status === 204) {
 				closeForm();
 				await invalidateAll();

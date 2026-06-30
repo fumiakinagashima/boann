@@ -165,10 +165,13 @@ export function refColumns(f: { type: string; refTable?: string | null; refLabel
 	return { refTable: f.refTable ?? null, refLabelKey: f.refLabelKey ?? null };
 }
 
-export async function getTableInfo(db: Db, type: string): Promise<TableInfo | null> {
+export async function getTableInfo(db: Db, type: string, appId?: string | null): Promise<TableInfo | null> {
 	if (type === ACCOUNT_REF_TABLE) return accountTableInfo();
 
-	const [et] = await db.select().from(entityTypes).where(eq(entityTypes.name, type));
+	const cond = appId
+		? and(eq(entityTypes.name, type), eq(entityTypes.appId, appId))
+		: eq(entityTypes.name, type);
+	const [et] = await db.select().from(entityTypes).where(cond);
 	if (!et) return null;
 
 	const fields = await db.select().from(entityFields)
@@ -289,8 +292,11 @@ export async function listEntityTypesSimple(db: Db): Promise<EntityTypeSimple[]>
 	return rows;
 }
 
-export async function getEntityTypeByName(db: Db, name: string): Promise<{ id: string } | null> {
-	const [et] = await db.select({ id: entityTypes.id }).from(entityTypes).where(eq(entityTypes.name, name));
+export async function getEntityTypeByName(db: Db, name: string, appId?: string | null): Promise<{ id: string } | null> {
+	const cond = appId
+		? and(eq(entityTypes.name, name), eq(entityTypes.appId, appId))
+		: eq(entityTypes.name, name);
+	const [et] = await db.select({ id: entityTypes.id }).from(entityTypes).where(cond);
 	return et ?? null;
 }
 
@@ -312,7 +318,7 @@ export async function listEntityTypesForWorkflow(db: Db): Promise<EntityTypeForW
 	);
 }
 
-export async function listRecords(db: Db, type: string, limit = 200): Promise<RecordRow[]> {
+export async function listRecords(db: Db, type: string, limit = 200, appId?: string | null): Promise<RecordRow[]> {
 	// accounts は account 型フィールドの選択肢・ラベル解決にのみ使うため、id と name だけを返す（機密情報を露出しない）。
 	if (type === ACCOUNT_REF_TABLE) {
 		return (await db.select({ id: accounts.id, name: accounts.name })
@@ -320,7 +326,10 @@ export async function listRecords(db: Db, type: string, limit = 200): Promise<Re
 			.map(a => ({ id: a.id, name: a.name }));
 	}
 
-	const [et] = await db.select().from(entityTypes).where(eq(entityTypes.name, type));
+	const cond = appId
+		? and(eq(entityTypes.name, type), eq(entityTypes.appId, appId))
+		: eq(entityTypes.name, type);
+	const [et] = await db.select().from(entityTypes).where(cond);
 	if (!et) return [];
 
 	return (await db.select().from(entities)
@@ -345,10 +354,13 @@ export async function getRecord(db: Db, type: string, id: string): Promise<Recor
 	};
 }
 
-export async function createRecord(db: Db, type: string, data: Record<string, unknown>, accountId?: string): Promise<RecordRow> {
+export async function createRecord(db: Db, type: string, data: Record<string, unknown>, accountId?: string, appId?: string | null): Promise<RecordRow> {
 	const id = crypto.randomUUID();
 
-	const [et] = await db.select().from(entityTypes).where(eq(entityTypes.name, type));
+	const cond = appId
+		? and(eq(entityTypes.name, type), eq(entityTypes.appId, appId))
+		: eq(entityTypes.name, type);
+	const [et] = await db.select().from(entityTypes).where(cond);
 	if (!et) throw new Error(`Table not found: ${type}`);
 
 	const { id: _, entityTypeId: __, createdAt: ___, updatedAt: ____, createdBy: _____, updatedBy: ______, ...entityData } = data;
@@ -584,7 +596,7 @@ export async function deletePage(db: Db, pageId: string): Promise<void> {
 }
 
 /** このテーブルを recordSelect/account フィールドで参照している他テーブルを返す（詳細ビューの関連データ候補） */
-export async function findTablesReferencingTable(db: Db, tableName: string): Promise<ReferencingTable[]> {
+export async function findTablesReferencingTable(db: Db, tableName: string, appId?: string | null): Promise<ReferencingTable[]> {
 	const fields = await db.select({
 		fieldKey: entityFields.key,
 		fieldLabel: entityFields.label,
@@ -593,8 +605,11 @@ export async function findTablesReferencingTable(db: Db, tableName: string): Pro
 	if (fields.length === 0) return [];
 
 	const etIds = [...new Set(fields.map(f => f.entityTypeId))];
+	const etCond = appId
+		? and(inArray(entityTypes.id, etIds), eq(entityTypes.appId, appId))
+		: inArray(entityTypes.id, etIds);
 	const ets = await db.select({ id: entityTypes.id, name: entityTypes.name, label: entityTypes.label })
-		.from(entityTypes).where(inArray(entityTypes.id, etIds));
+		.from(entityTypes).where(etCond);
 	const etMap = new Map(ets.map(et => [et.id, et]));
 
 	return fields.flatMap(f => {
@@ -645,8 +660,11 @@ export async function getEntityTypeById(db: Db, id: string): Promise<{ id: strin
 	return et ?? null;
 }
 
-export async function updateEntityType(db: Db, name: string, input: Partial<EntityTypeInput>): Promise<void> {
-	const [et] = await db.select().from(entityTypes).where(eq(entityTypes.name, name));
+export async function updateEntityType(db: Db, name: string, input: Partial<EntityTypeInput>, appId?: string | null): Promise<void> {
+	const cond = appId
+		? and(eq(entityTypes.name, name), eq(entityTypes.appId, appId))
+		: eq(entityTypes.name, name);
+	const [et] = await db.select().from(entityTypes).where(cond);
 	if (!et) throw new Error(`Table not found: ${name}`);
 
 	const queries: BatchItem<'sqlite'>[] = [];
@@ -683,8 +701,11 @@ export async function updateEntityType(db: Db, name: string, input: Partial<Enti
 	await batchIfNonEmpty(db, queries);
 }
 
-export async function deleteEntityType(db: Db, name: string): Promise<void> {
-	const [et] = await db.select().from(entityTypes).where(eq(entityTypes.name, name));
+export async function deleteEntityType(db: Db, name: string, appId?: string | null): Promise<void> {
+	const cond = appId
+		? and(eq(entityTypes.name, name), eq(entityTypes.appId, appId))
+		: eq(entityTypes.name, name);
+	const [et] = await db.select().from(entityTypes).where(cond);
 	if (!et) return;
 	await db.batch([
 		db.delete(entities).where(eq(entities.entityTypeId, et.id)),

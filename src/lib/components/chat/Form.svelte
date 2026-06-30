@@ -14,9 +14,10 @@
 		formRef?: HTMLFormElement | null;
 		// ダイアログ内など、横幅いっぱいに広げたい場合に true（max-width を外す）
 		fullWidth?: boolean;
+		appId?: string;
 	};
 
-	let { title, fields, submitLabel, onsubmit, oncancel, hideActions = false, formRef = $bindable(null), fullWidth = false }: Props = $props();
+	let { title, fields, submitLabel, onsubmit, oncancel, hideActions = false, formRef = $bindable(null), fullWidth = false, appId }: Props = $props();
 
 	let values = $state<Record<string, string>>(
 		untrack(() => Object.fromEntries(fields.map((f) => [f.key, f.value ?? ''])))
@@ -31,7 +32,7 @@
 			fields.filter((f) => isRefField(f.type) && f.refTable).map((f) => f.refTable!)
 		)];
 		for (const refTable of refTables) {
-			const res = await fetch(`/api/database/${refTable}/records`);
+			const res = await fetch(`/api/database/${refTable}/records${appId ? `?appId=${appId}` : ''}`);
 			if (res.ok) {
 				const data = (await res.json()) as { rows: Record<string, unknown>[] };
 				recordOptions[refTable] = data.rows.map((r) => ({

@@ -8,9 +8,10 @@
 		record: Record<string, unknown>;
 		onEdit: () => void;
 		onDelete: () => void;
+		appId?: string;
 	};
 
-	let { fields, record, onEdit, onDelete }: Props = $props();
+	let { fields, record, onEdit, onDelete, appId }: Props = $props();
 
 	// recordSelect フィールドの id→name ラベルを参照テーブルから解決する（Form.svelte と同方式）
 	let refLabels = $state<Record<string, Record<string, string>>>({});
@@ -19,7 +20,7 @@
 		const refTables = [...new Set(fields.filter((f) => isRefField(f.type) && f.refTable).map((f) => f.refTable!))];
 		for (const refTable of refTables) {
 			try {
-				const res = await fetch(`/api/database/${refTable}/records`);
+				const res = await fetch(`/api/database/${refTable}/records${appId ? `?appId=${appId}` : ''}`);
 				if (!res.ok) continue;
 				const data = (await res.json()) as { rows: Record<string, unknown>[] };
 				const map: Record<string, string> = {};

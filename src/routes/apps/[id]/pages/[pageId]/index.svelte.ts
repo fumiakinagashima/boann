@@ -52,9 +52,10 @@ export function createPageViewState(getData: () => PageData) {
 		drawer.saving = true;
 		drawer.saveError = '';
 		try {
+			const appId = getData().app.id;
 			const url = drawer.mode === 'new'
-				? `/api/database/${drawer.tableName}/records`
-				: `/api/database/${drawer.tableName}/records/${drawer.editingId}`;
+				? `/api/database/${drawer.tableName}/records?appId=${appId}`
+				: `/api/database/${drawer.tableName}/records/${drawer.editingId}?appId=${appId}`;
 			const res = await fetch(url, {
 				method: drawer.mode === 'new' ? 'POST' : 'PATCH',
 				headers: { 'Content-Type': 'application/json' },
@@ -77,7 +78,8 @@ export function createPageViewState(getData: () => PageData) {
 		if (!confirm('このレコードを削除しますか？')) return;
 		drawer.deleting = true;
 		try {
-			const res = await fetch(`/api/database/${drawer.tableName}/records/${drawer.editingId}`, { method: 'DELETE' });
+			const appId = getData().app.id;
+			const res = await fetch(`/api/database/${drawer.tableName}/records/${drawer.editingId}?appId=${appId}`, { method: 'DELETE' });
 			if (res.ok || res.status === 204) {
 				closeDrawer();
 				await invalidateAll();

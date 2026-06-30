@@ -9,9 +9,10 @@
 		initialValues?: Record<string, string>;
 		onsubmit: (data: Record<string, string>) => void;
 		submitting?: boolean;
+		appId?: string;
 	};
 
-	let { fields, initialValues = {}, onsubmit, submitting = false }: Props = $props();
+	let { fields, initialValues = {}, onsubmit, submitting = false, appId }: Props = $props();
 
 	let values = $state<Record<string, string>>(
 		untrack(() => Object.fromEntries(fields.map(f => [f.key, initialValues[f.key] ?? ''])))
@@ -25,7 +26,7 @@
 		for (const field of refFields) {
 			const refTable = field.refTable!;
 			if (!tableCache[refTable]) {
-				const res = await fetch(`/api/database/${refTable}/records`);
+				const res = await fetch(`/api/database/${refTable}/records${appId ? `?appId=${appId}` : ''}`);
 				if (!res.ok) continue;
 				tableCache[refTable] = await res.json() as { info: { fields: { key: string }[] }; rows: Record<string, unknown>[] };
 			}

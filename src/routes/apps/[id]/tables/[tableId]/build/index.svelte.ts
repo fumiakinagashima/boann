@@ -91,7 +91,8 @@ export function createTableBuildState(getData: () => PageData) {
 		saving = true;
 		saveError = '';
 		try {
-			const res = await fetch(`/api/database/tables/${getData().app.name}`, {
+			const appId = getData().appId;
+			const res = await fetch(`/api/database/tables/${getData().app.name}?appId=${appId}`, {
 				method: 'PATCH',
 				headers: { 'Content-Type': 'application/json' },
 				body: JSON.stringify({

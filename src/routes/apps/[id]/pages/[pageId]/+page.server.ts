@@ -28,12 +28,13 @@ export type RelatedSection = {
 
 async function loadRecordOptions(
 	db: ReturnType<typeof createDb>,
-	fields: FieldDef[]
+	fields: FieldDef[],
+	appId: string
 ): Promise<Record<string, { value: string; label: string }[]>> {
 	const refFields = fields.filter(f => isRefField(f.type) && f.refTable);
 	const options: Record<string, { value: string; label: string }[]> = {};
 	await Promise.all(refFields.map(async (f) => {
-		const [info, rows] = await Promise.all([getTableInfo(db, f.refTable!), listRecords(db, f.refTable!)]);
+		const [info, rows] = await Promise.all([getTableInfo(db, f.refTable!, appId), listRecords(db, f.refTable!, 200, appId)]);
 		if (info) {
 			const labelKey = f.refLabelKey || info.fields[0]?.key || 'id';
 			options[f.key] = rows.map(r => ({ value: String(r.id), label: String(r[labelKey] ?? r.id) }));
@@ -70,7 +71,7 @@ export const load: PageServerLoad = async ({ params, url, platform }) => {
 		? [...fields, ...SYSTEM_DISPLAY_FIELDS].filter(f => page.config.fields!.includes(f.key))
 		: fields;
 	const sysInDisplay = SYSTEM_DISPLAY_FIELDS.filter(sf => displayFields.some(df => df.key === sf.key));
-	const recordOptions = await loadRecordOptions(db, [...fields, ...sysInDisplay]);
+	const recordOptions = await loadRecordOptions(db, [...fields, ...sysInDisplay], params.id);
 
 	if (recordId) {
 		// ── 詳細ビュー ──────────────────────────────────────────
@@ -91,7 +92,7 @@ export const load: PageServerLoad = async ({ params, url, platform }) => {
 						: relFields;
 					const [relRecords, relOptions] = await Promise.all([
 						listRecordsByRefField(db, rt.tableId, rt.refFieldKey, recordId),
-						loadRecordOptions(db, relFields)
+						loadRecordOptions(db, relFields, params.id)
 					]);
 					return {
 						config: rt,

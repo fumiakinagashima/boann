@@ -18,7 +18,7 @@ export const load: PageServerLoad = async ({ params, platform }) => {
 	const tableCache: Record<string, { fields: { key: string }[]; rows: Record<string, unknown>[] }> = {};
 	await Promise.all(
 		[...new Set(refFields.map(f => f.refTable!))].map(async (refTable) => {
-			const [info, rows] = await Promise.all([getTableInfo(db, refTable), listRecords(db, refTable)]);
+			const [info, rows] = await Promise.all([getTableInfo(db, refTable, params.id), listRecords(db, refTable, 200, params.id)]);
 			if (info) tableCache[refTable] = { fields: info.fields, rows };
 		})
 	);

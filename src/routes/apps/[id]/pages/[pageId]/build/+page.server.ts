@@ -32,7 +32,7 @@ export const load: PageServerLoad = async ({ params, platform }) => {
 	if (page.tableId) {
 		const currentTable = tables.find(t => t.id === page.tableId);
 		if (currentTable) {
-			referencingTables = await findTablesReferencingTable(db, currentTable.name);
+			referencingTables = await findTablesReferencingTable(db, currentTable.name, params.id);
 		}
 	}
 
