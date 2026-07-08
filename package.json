@@ -11,6 +11,7 @@
     "check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
     "check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch",
     "db:studio": "drizzle-kit studio --config=drizzle.local.config.ts",
+    "db:migrate:local": "wrangler d1 migrations apply boann --local --env dev",
     "test:unit": "vitest run",
     "test:e2e": "playwright test"
   },

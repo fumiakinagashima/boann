@@ -16,6 +16,7 @@ const config = {
 			config: 'wrangler.build.jsonc',
 			platformProxy: {
 				enabled: true,
+				environment: 'dev',
 				persist: { path: '.wrangler/state/v3' }
 			}
 		})

@@ -33,3 +33,34 @@ max_retries = 3
 
 [vars]
 MOCK_AI = "false"
+
+# ローカル開発用の環境（`vite dev`/`wrangler dev` はこちらを使う。svelte.config.js の
+# platformProxy.environment = "dev" で選択している）。
+# 本番リソースIDと分離するため、値は実在しないダミーでよい（--remote を使わない限り検証されない）。
+# Wrangler の環境は d1_databases/kv_namespaces/r2_buckets/queues を継承しないため、
+# 上のトップレベル定義とは別に、ここで local 用の値を明示的に定義する。
+[[env.dev.d1_databases]]
+binding = "DB"
+database_name = "boann"
+database_id = "local"
+migrations_dir = "drizzle"
+
+[[env.dev.kv_namespaces]]
+binding = "KV"
+id = "local"
+
+[[env.dev.r2_buckets]]
+binding = "R2"
+bucket_name = "boann-local"
+
+[[env.dev.queues.producers]]
+binding = "QUEUE"
+queue = "boann"
+
+[[env.dev.queues.consumers]]
+queue = "boann"
+max_batch_size = 10
+max_retries = 3
+
+[env.dev.vars]
+MOCK_AI = "false"
