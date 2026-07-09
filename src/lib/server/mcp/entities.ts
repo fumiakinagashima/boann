@@ -344,7 +344,7 @@ export async function handleCreateApp(db: Db, input: unknown) {
 	});
 
 	for (const record of data.seed_records) {
-		await createRecord(db, data.name, record);
+		await createRecord(db, data.name, record, undefined, app.id);
 	}
 
 	return {

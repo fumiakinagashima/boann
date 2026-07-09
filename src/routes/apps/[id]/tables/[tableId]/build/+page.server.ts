@@ -9,7 +9,7 @@ export const load: PageServerLoad = async ({ params, platform }) => {
 	const db = createDb(platform.env.DB);
 	const [app, allApps] = await Promise.all([
 		getEntityTypeById(db, params.tableId),
-		listEntityTypesSimple(db)
+		listEntityTypesSimple(db, params.id)
 	]);
 	if (!app) error(404, 'テーブルが見つかりません');
 	const [fields, otherApps] = await Promise.all([
@@ -44,7 +44,7 @@ export const actions: Actions = {
 				message: `このテーブルはワークフロー（${used.map((w) => w.name).join(', ')}）で使用されているため削除できません。`
 			});
 		}
-		await deleteEntityType(db, et.name);
+		await deleteEntityType(db, et.name, et.appId);
 		redirect(303, `/apps/${params.id}`);
 	}
 };

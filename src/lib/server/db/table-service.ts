@@ -283,14 +283,18 @@ export type EntityTypeForWorkflow = {
 
 export type EntityTypeSimple = { id: string; name: string; label: string; icon: string | null };
 
-export async function listEntityTypesSimple(db: Db): Promise<EntityTypeSimple[]> {
-	const rows = await db.select({
+/**
+ * テーブル一覧を簡易情報で取得する。appId を指定すると、そのアプリが持つテーブルのみに絞り込む
+ * （recordSelect の参照先候補は自アプリ内に限定する。他アプリの同名テーブルとの解決の曖昧さを避けるため）。
+ */
+export async function listEntityTypesSimple(db: Db, appId?: string): Promise<EntityTypeSimple[]> {
+	const query = db.select({
 		id: entityTypes.id,
 		name: entityTypes.name,
 		label: entityTypes.label,
 		icon: entityTypes.icon
 	}).from(entityTypes);
-	return rows;
+	return appId ? query.where(eq(entityTypes.appId, appId)) : query;
 }
 
 export async function getEntityTypeByName(db: Db, name: string, appId?: string | null): Promise<{ id: string } | null> {
@@ -671,8 +675,8 @@ export async function reorderTables(db: Db, appId: string, orderedIds: string[])
 	await db.batch(queries as [BatchItem<'sqlite'>, ...BatchItem<'sqlite'>[]]);
 }
 
-export async function getEntityTypeById(db: Db, id: string): Promise<{ id: string; name: string; label: string; icon: string | null } | null> {
-	const [et] = await db.select({ id: entityTypes.id, name: entityTypes.name, label: entityTypes.label, icon: entityTypes.icon })
+export async function getEntityTypeById(db: Db, id: string): Promise<{ id: string; name: string; label: string; icon: string | null; appId: string | null } | null> {
+	const [et] = await db.select({ id: entityTypes.id, name: entityTypes.name, label: entityTypes.label, icon: entityTypes.icon, appId: entityTypes.appId })
 		.from(entityTypes).where(eq(entityTypes.id, id));
 	return et ?? null;
 }
