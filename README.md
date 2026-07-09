@@ -11,7 +11,7 @@ Users type something like "Build me a customer management app" and the AI design
 - **Record CRUD** — Form dialogs for creating/editing records, detail views with related data sections, list views with filters and pagination.
 - **Workflows** (`/workflows`) — No-code automation with schedule triggers (cron) and event triggers (record create/update/delete). Steps include: get records, create/update/delete records, send email, send notification, send Slack message, call external API, foreach loop, condition branch. AI-generated, AI-reviewed, manually runnable.
 - **Event Triggers** — Record mutations (create/update/delete) enqueue a Cloudflare Queue message. The Queue consumer matches enabled event-trigger workflows and runs them with `@trigger:id` / `@trigger:event` references resolved at runtime.
-- **File Import** (`/apps/[id]/import`) — Upload a text or markdown file, AI designs a table schema and import plan, user reviews and applies.
+- **File Import** (`/imports/[id]`) — From the app list, "Create App" → "From a file": upload a text/Markdown/Excel (`.xlsx`) file, AI designs a table schema and import plan (structure only — row data is not imported as records), user reviews and can refine it via chat before applying.
 - **External Integrations** (`/settings/integrations`) — Register external API connections (API key, Bearer, Basic auth). Used by AI chat and workflows via `call_external_api`.
 - **Email** (`/settings/email`) — Configure an email provider (Resend, AWS SES, or SMTP). Used by workflows, reminders, and password reset.
 - **Notifications & Reminders** — In-app notification center with unread count polling. Reminders fire via Cloudflare Cron Trigger and deliver to notification center, email, or Slack.
@@ -72,12 +72,21 @@ Apply migrations to the local D1 SQLite database (created under `.wrangler/state
 bunx wrangler d1 migrations apply boann --local
 ```
 
-The migration seeds a test admin account and general user accounts:
+The migration does **not** seed any accounts — create one manually:
 
-| Email | Password | Permission |
-|---|---|---|
-| `info@alcogy.com` | `password` | admin |
-| `user1@example.com` – `user5@example.com` | `password` | general |
+```sh
+# 1. Hash a password
+bun -e "
+import { hashPassword } from './src/lib/server/auth/password';
+console.log(await hashPassword('REPLACE_WITH_A_PASSWORD'));
+"
+
+# 2. Insert an admin account (id can be any UUID, e.g. `bun -e "console.log(crypto.randomUUID())"`)
+bunx wrangler d1 execute boann --local --command "
+INSERT INTO accounts (id, name, email, permission, password_hash)
+VALUES ('<uuid>', 'Admin', 'admin@example.com', 'admin', '<hash from step 1>');
+"
+```
 
 ### 4. Start the dev server
 
@@ -108,33 +117,39 @@ All application data is stored in a small set of core tables:
 
 | Table | Purpose |
 |---|---|
-| `apps` | App container (name, label, icon) |
-| `entity_types` | Table definitions (name, label, fields, belongs to an app) |
+| `apps` | App container (name, label, icon, creator `accountId` — edit/delete requires the owner or an admin; null owner = editable by anyone) |
+| `entity_types` | Table definitions (name, label, fields; name is unique per app, not globally) |
 | `entity_fields` | Field definitions per table (key, type, options, sort order) |
 | `entities` | All records across all tables (flexible `data` JSON column) |
 | `app_pages` | Page definitions (which table to show, view config, related sections) |
 | `workflows` | Workflow definitions (steps, trigger config) |
 | `workflow_runs` | Execution logs per workflow run |
+| `bookmarks` | Per-account bookmarked apps (shown in the sidebar) |
+| `import_jobs` | File-import drafts (uploaded content → AI plan → chat refinements → applied app) |
 | `integrations` | External API connection settings |
 | `accounts` | User accounts |
 | `notifications` | In-app notification center |
-| `reminders` | Scheduled reminders |
+| `reminders` | Scheduled reminders (delivery infra only — see note below) |
 | `chats` / `chat_messages` | Chat history |
 | `ai_settings` | AI model override |
 | `email_providers` | Email provider config |
 
+> **Note**: `reminders` has a Cron-driven delivery path (`processDueReminders`), but there is currently no UI or MCP tool that creates rows in it — the feature is effectively dormant until a creation path is added back.
+
 ### MCP tools
 
-The AI interacts with the system via MCP tools defined in `src/lib/server/mcp/`:
+The AI interacts with the system via MCP tools defined in `src/lib/server/mcp/` (see `src/lib/server/mcp/index.ts` for the authoritative registry):
 
-- **entities**: `create_app`, `add_entity_field`, `list_entity_types`, `get_entity_fields`, `get_entities`, `create_entity`, `update_entity`, `delete_entity`
-- **communication**: `create_reminder`, `send_email`, `send_notification`
+- **entities**: `create_app`, `create_entity_type`, `create_table`, `create_page`, `add_entity_field`, `list_entity_types`, `get_entity_fields`, `get_entities`, `create_entity`, `update_entity`
+- **communication**: `send_email`, `send_notification`, `send_slack_notification`, `delete_read_notifications`
 - **documents**: `build_handoff_data` (export data to CSV/Markdown, save to R2)
 - **integrations**: `list_integrations`, `call_external_api`
-- **workflows**: `list_workflows`, `create_workflow`, `update_workflow`, `run_workflow`, `get_workflow_run_logs`
+- **workflows**: `save_workflow` (create or update, depending on whether `id` is passed), `list_workflows`, `get_workflow`, `run_workflow`, `get_workflow_run_logs`
 - **help**: `get_help`
 
-Write operations (`create_entity`, `update_entity`, `delete_entity`) are excluded from the main chat context — they execute only through validated form submissions.
+There is no `delete_entity` MCP tool — record deletion happens only through the REST API (form submissions) or a workflow's `delete_entity` action step (a separate, workflow-only tool catalog in `src/lib/workflow-tools.ts`, not part of this MCP registry).
+
+The main top-level chat (`/`) additionally excludes every `create_*`/`update_*`/`delete_*`-prefixed tool (`src/lib/server/ai/stream.ts`), including `create_app` — despite the system prompt instructing the AI to call `create_app` for "build me an X app" requests. In practice, apps are created via the explicit "Create App" button (blank or from-file) rather than by asking the top-level chat to build one from scratch; the `create_app`-driven natural-language flow only works from within an app-scoped chat context that itself blocks `create_app` (`APP_BUILDER_BLOCKED`), so it is not currently reachable from any chat context. Record writes (`create_entity`, `update_entity`) are excluded from the main chat context by the same prefix rule — they execute only through validated form submissions — but remain available inside an app-scoped builder chat where relevant.
 
 ### Workflow execution
 
@@ -194,12 +209,15 @@ boann/
 │   │   ├── ui/               # UI component demo (/ui)
 │   │   ├── settings/         # Settings (/settings, /settings/integrations, /settings/email, /settings/ai, /settings/account)
 │   │   ├── apps/             # App builder (/apps/[id], tables, pages, workflows)
+│   │   ├── imports/          # File-import plan review + refine chat (/imports/[id])
 │   │   ├── accounts/         # Account management (/accounts, admin only)
 │   │   ├── workflows/        # Workflow management (/workflows)
 │   │   └── api/
 │   │       ├── chat/         # Chat API (SSE stream)
 │   │       ├── auth/         # Sign in, sign out, password reset
 │   │       ├── apps/         # App CRUD
+│   │       ├── imports/      # File-import job create/status/refine/apply
+│   │       ├── bookmarks/    # App bookmark toggle
 │   │       ├── integrations/ # External API connections CRUD
 │   │       ├── database/     # Record REST API (tables, records CRUD)
 │   │       ├── workflows/    # Workflow CRUD, run, review
@@ -218,6 +236,7 @@ boann/
 │       │   ├── ai/           # Claude API integration, system prompts
 │       │   ├── auth/         # Session, password hashing
 │       │   ├── workflow/     # Workflow execution engine, event trigger
+│       │   ├── imports/      # File-import Queue consumer, Excel/text extraction
 │       │   ├── email/        # Email sending
 │       │   └── slack/        # Slack Incoming Webhook
 │       ├── styles/           # Global styles, theme
