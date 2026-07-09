@@ -33,7 +33,7 @@ export const POST: RequestHandler = async ({ request, platform, locals }) => {
 				listEntityTypesForWorkflow(db),
 				listSlackIntegrationsForWorkflow(db)
 			]);
-			const validation = validateWorkflow(triggerType, triggerHour, triggerMinute, steps, entityTypes, slackIntegrations);
+			const validation = validateWorkflow(triggerType, triggerHour, triggerMinute, body.triggerEntityTypeId, steps, entityTypes, slackIntegrations);
 			if (!validation.ok) {
 				return json({ error: validation.errors.join(' / ') }, { status: 422 });
 			}

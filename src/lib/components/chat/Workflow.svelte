@@ -3,6 +3,7 @@
 	import type { WorkflowStep } from '$lib/types/chat';
 	import type { EntityTypeForWorkflow } from '$lib/server/db/table-service';
 	import type { SlackIntegrationOption } from '$lib/server/slack';
+	import { triggerFieldsFor } from '$lib/workflow-tools';
 	import WorkflowStepList from './WorkflowStepList.svelte';
 
 	export type WorkflowState = {
@@ -81,6 +82,12 @@
 		triggerEntityTypeId = def.triggerEntityTypeId ?? null;
 		steps = cloneSteps(def.steps);
 	}
+
+	// イベントトリガー時、ステップ内で @trigger:<field> として参照できるフィールド一覧
+	// （id/event等のシステムフィールド＋選択中テーブルのカスタムフィールド）
+	const triggerFields = $derived(
+		triggerType === 'event' ? triggerFieldsFor(entityTypes, triggerEntityTypeId) : []
+	);
 </script>
 
 <div class="wf-wrap">
@@ -144,6 +151,7 @@
 			depth={0}
 			{entityTypes}
 			{slackIntegrations}
+			{triggerFields}
 		/>
 	</div>
 </div>

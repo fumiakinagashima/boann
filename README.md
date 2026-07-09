@@ -147,7 +147,8 @@ Workflows run in `src/lib/server/workflow/run.ts`. Step types:
 **Reference syntax** in step parameters:
 - `@step:<stepId>` — result of a previous step
 - `@item:<field>` — current item in a foreach loop
-- `@trigger:id` / `@trigger:event` — trigger record ID and event type (event-trigger workflows only)
+- `@trigger:id` / `@trigger:event` / `@trigger:<fieldKey>` — trigger record ID, event type, and any other field of the triggering record (e.g. `@trigger:createdBy`), including the system fields `createdBy`/`updatedBy`/`createdAt`/`updatedAt`. Event-trigger workflows only; usable in the first condition step
+- `@self:account_id` — the workflow owner's account ID (any trigger type). Used e.g. as `@trigger:createdBy != @self:account_id` to detect edits made by someone other than the workflow owner
 
 **Safeguards**:
 - Budget cap (`WORKFLOW_MAX_ACTIONS_PER_RUN`) aborts runaway loops

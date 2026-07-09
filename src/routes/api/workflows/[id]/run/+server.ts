@@ -2,6 +2,7 @@ import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { createDb } from '$lib/server/db';
 import { getWorkflow } from '$lib/server/db/workflow-service';
+import { getRecord } from '$lib/server/db/table-service';
 import { runWorkflowNow, type TriggerContext } from '$lib/server/workflow/run';
 
 export const POST: RequestHandler = async ({ params, request, platform, locals }) => {
@@ -17,10 +18,14 @@ export const POST: RequestHandler = async ({ params, request, platform, locals }
 	if (workflow.triggerType === 'event') {
 		let body: { triggerRecordId?: string } = {};
 		try { body = await request.json(); } catch { /* body は省略可 */ }
+		const recordId = body.triggerRecordId?.trim() ?? '';
+		// @trigger:<field> のテスト実行用に、指定されたレコードIDの現在のフィールド値を読み込む
+		const record = recordId ? await getRecord(db, '', recordId) : null;
 		triggerContext = {
 			event: workflow.triggerEvent ?? 'create',
-			recordId: body.triggerRecordId?.trim() ?? '',
-			entityTypeId: workflow.triggerEntityTypeId ?? ''
+			recordId,
+			entityTypeId: workflow.triggerEntityTypeId ?? '',
+			data: record ?? undefined
 		};
 	}
 

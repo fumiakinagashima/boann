@@ -59,7 +59,7 @@ export const tools: Tool[] = [
 				triggerEntityTypeId: { type: 'string', description: 'event時のみ。監視するテーブルのentity_types.id（UUIDキー）' },
 				steps: {
 					type: 'array',
-					description: 'ステップの配列（action または condition）。eventトリガーでは@trigger:idで操作されたレコードのID、@trigger:eventでイベント種別を参照できる'
+					description: 'ステップの配列（action または condition）。eventトリガーでは@trigger:idで操作されたレコードのID、@trigger:eventでイベント種別、@trigger:<フィールドキー>（例: @trigger:createdBy）でそのレコードの他のフィールド値を、条件の判定対象（先頭ステップの条件でも）を含め参照できる。@self:account_idはワークフロー登録者自身のアカウントIDを表し、@trigger:createdBy != @self:account_id のように「自分以外が操作したか」を判定できる'
 				}
 			},
 			required: ['name', 'triggerHour', 'triggerMinute', 'steps']
@@ -117,7 +117,7 @@ export async function handleSaveWorkflow(db: Db, input: unknown, env?: ToolEnv) 
 		listEntityTypesForWorkflow(db),
 		listSlackIntegrationsForWorkflow(db)
 	]);
-	const validation = validateWorkflow(triggerType ?? 'schedule', triggerHour, triggerMinute, steps, entityTypes, slackIntegrations);
+	const validation = validateWorkflow(triggerType ?? 'schedule', triggerHour, triggerMinute, triggerEntityTypeId, steps, entityTypes, slackIntegrations);
 	if (!validation.ok) {
 		throw new Error(`ワークフローの内容に問題があります: ${validation.errors.join(' / ')}`);
 	}

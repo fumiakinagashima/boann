@@ -27,7 +27,7 @@ export default {
 		for (const message of batch.messages) {
 			const body = message.body as ImportJobMessage | WorkflowEventMessage;
 			if (body.type === 'workflow-event') {
-				await dispatchWorkflowEvents(db, body.entityTypeId, body.event, body.recordId);
+				await dispatchWorkflowEvents(db, body.entityTypeId, body.event, body.recordId, body.data, env);
 			} else {
 				await processImportJob(db, env, body);
 			}

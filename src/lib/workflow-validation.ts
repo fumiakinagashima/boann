@@ -3,7 +3,10 @@ import {
 	getWorkflowActionTool,
 	parseStepRef,
 	parseItemRef,
+	parseTriggerRef,
 	entityListItemFields,
+	triggerFieldsFor,
+	SELF_ACCOUNT_ID_REF,
 	type WorkflowListResultField
 } from './workflow-tools';
 
@@ -108,7 +111,8 @@ function walkList(
 function resolveOperandType(
 	operand: string,
 	visible: VisibleStep[],
-	itemScopes: ItemScope[]
+	itemScopes: ItemScope[],
+	triggerFields: WorkflowListResultField[] | null
 ): { ok: true; type: WorkflowResultType } | { ok: false; error: string } {
 	const itemRef = parseItemRef(operand);
 	if (itemRef !== null) {
@@ -121,6 +125,15 @@ function resolveOperandType(
 		}
 		return { ok: true, type: 'string' };
 	}
+	const triggerField = parseTriggerRef(operand);
+	if (triggerField !== null) {
+		if (!triggerFields) return { ok: false, error: `@trigger参照はイベントトリガーでのみ使用できます: ${operand}` };
+		if (!triggerFields.some((f) => f.key === triggerField)) {
+			return { ok: false, error: `トリガーレコードに存在しないフィールドです: ${triggerField}` };
+		}
+		return { ok: true, type: 'string' };
+	}
+	if (operand === SELF_ACCOUNT_ID_REF) return { ok: true, type: 'string' };
 	const refId = parseStepRef(operand);
 	if (refId === null) return { ok: true, type: 'string' }; // リテラルは文字列として扱う
 	const found = visible.find((v) => v.id === refId);
@@ -132,6 +145,7 @@ export function validateWorkflow(
 	triggerType: 'schedule' | 'event' = 'schedule',
 	triggerHour: number,
 	triggerMinute: number,
+	triggerEntityTypeId: string | null | undefined,
 	steps: WorkflowStep[],
 	entityTypes: EntityTypeForValidation[] = [],
 	slackIntegrations: SlackIntegrationForValidation[] = []
@@ -139,6 +153,13 @@ export function validateWorkflow(
 	const errors: string[] = [];
 	const entityTypeIds = new Set(entityTypes.map((e) => e.id));
 	const slackIntegrationIds = new Set(slackIntegrations.map((s) => s.id));
+	const triggerFields =
+		triggerType === 'event'
+			? triggerFieldsFor(
+					entityTypes.map((e) => ({ id: e.id, fields: e.fields ?? [] })),
+					triggerEntityTypeId
+				)
+			: null;
 
 	if (triggerType === 'schedule') {
 		if (!Number.isInteger(triggerHour) || triggerHour < 0 || triggerHour > 23) {
@@ -182,23 +203,28 @@ export function validateWorkflow(
 					continue;
 				}
 				if (value) {
-					const resolved = resolveOperandType(value, visible, itemScopes);
+					const resolved = resolveOperandType(value, visible, itemScopes, triggerFields);
 					if (!resolved.ok) errors.push(`「${step.label}」の「${field.label}」: ${resolved.error}`);
 				}
 			}
 		} else if (step.kind === 'condition') {
 			if (!step.left) {
 				errors.push(`「${step.label}」の判定対象が選択されていません`);
-			} else if (parseStepRef(step.left) === null && parseItemRef(step.left) === null) {
-				errors.push(`「${step.label}」の判定対象は先行ステップの結果または@itemを選択してください`);
+			} else if (
+				parseStepRef(step.left) === null &&
+				parseItemRef(step.left) === null &&
+				parseTriggerRef(step.left) === null &&
+				step.left !== SELF_ACCOUNT_ID_REF
+			) {
+				errors.push(`「${step.label}」の判定対象は先行ステップの結果・@item・@trigger・@selfのいずれかを選択してください`);
 			} else {
-				const leftResolved = resolveOperandType(step.left, visible, itemScopes);
+				const leftResolved = resolveOperandType(step.left, visible, itemScopes, triggerFields);
 				if (!leftResolved.ok) errors.push(`「${step.label}」の判定対象: ${leftResolved.error}`);
 			}
 			if (!step.right) {
 				errors.push(`「${step.label}」の比較先が未入力です`);
 			} else {
-				const rightResolved = resolveOperandType(step.right, visible, itemScopes);
+				const rightResolved = resolveOperandType(step.right, visible, itemScopes, triggerFields);
 				if (!rightResolved.ok) errors.push(`「${step.label}」の比較先: ${rightResolved.error}`);
 			}
 			if (step.then.length === 0) {

@@ -255,3 +255,46 @@ export function parseItemRef(value: string | undefined): ParsedItemRef | null {
 	if (sep === -1) return { foreachStepId: null, field: rest };
 	return { foreachStepId: rest.slice(0, sep), field: rest.slice(sep + 1) };
 }
+
+const TRIGGER_REF_PREFIX = '@trigger:';
+
+/**
+ * イベントトリガーで操作されたレコードのフィールドを参照する記法（`@trigger:<field>`）。
+ * id/event（レコードID・イベント種別）に加え、createdBy等のシステムフィールドやテーブル固有フィールドを指す。
+ */
+export function makeTriggerRef(field: string): string {
+	return `${TRIGGER_REF_PREFIX}${field}`;
+}
+
+export function parseTriggerRef(value: string | undefined): string | null {
+	if (!value || !value.startsWith(TRIGGER_REF_PREFIX)) return null;
+	return value.slice(TRIGGER_REF_PREFIX.length);
+}
+
+/**
+ * イベントトリガーの対象レコードで、テーブルのフィールド定義に関わらず常に参照できるシステムフィールド。
+ * キーは RecordRow（table-service.getRecord）が実際に返すキー名（createdBy等のキャメルケース）に合わせる。
+ */
+export const TRIGGER_SYSTEM_FIELDS: WorkflowListResultField[] = [
+	{ key: 'id', label: 'レコードID' },
+	{ key: 'event', label: 'イベント種別（create/update/delete）' },
+	{ key: 'createdBy', label: '作成者のアカウントID' },
+	{ key: 'updatedBy', label: '更新者のアカウントID' },
+	{ key: 'createdAt', label: '作成日時' },
+	{ key: 'updatedAt', label: '更新日時' }
+];
+
+/**
+ * イベントトリガーのstep1条件等で選択できる「トリガーレコードのフィールド」一覧を組み立てる。
+ * システムフィールド（id/event/createdBy等）に、選択中のトリガー対象テーブルのカスタムフィールドを加える。
+ */
+export function triggerFieldsFor(
+	entityTypes: { id: string; fields: WorkflowListResultField[] }[],
+	triggerEntityTypeId: string | null | undefined
+): WorkflowListResultField[] {
+	const match = entityTypes.find((e) => e.id === triggerEntityTypeId);
+	return [...TRIGGER_SYSTEM_FIELDS, ...(match?.fields ?? [])];
+}
+
+/** ワークフロー登録者自身のアカウントIDを参照する記法。createdBy等と比較して「自分が行った操作か」を判定するのに使う。 */
+export const SELF_ACCOUNT_ID_REF = '@self:account_id';

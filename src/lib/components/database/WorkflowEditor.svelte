@@ -75,7 +75,7 @@
 		let triggerRecordId: string | undefined;
 		if (initialTriggerType === 'event') {
 			const input = prompt(
-				'イベントトリガーのテスト実行です。\n@trigger:id として使用するレコードIDを入力してください（空欄の場合は空文字で実行）。'
+				'イベントトリガーのテスト実行です。\n@trigger:id / @trigger:<フィールド> として使用するレコードIDを入力してください（空欄の場合は空文字で実行）。'
 			);
 			if (input === null) return; // キャンセル
 			triggerRecordId = input.trim();

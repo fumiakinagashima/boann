@@ -19,7 +19,7 @@ export const PATCH: RequestHandler = async ({ params, url, request, platform, lo
 		const data = await request.json() as Record<string, unknown>;
 		const record = await updateRecord(db, params.type, params.id, data, locals.account?.id);
 		if (platform.env.QUEUE && record.entityTypeId) {
-			const msg: WorkflowEventMessage = { type: 'workflow-event', entityTypeId: record.entityTypeId as string, event: 'update', recordId: record.id as string };
+			const msg: WorkflowEventMessage = { type: 'workflow-event', entityTypeId: record.entityTypeId as string, event: 'update', recordId: record.id as string, data: record };
 			await platform.env.QUEUE.send(msg);
 		}
 		return json(record);
@@ -33,9 +33,12 @@ export const DELETE: RequestHandler = async ({ params, url, platform }) => {
 	const db = createDb(platform.env.DB);
 	const appId = url.searchParams.get('appId');
 	const info = await getTableInfo(db, params.type, appId);
+	// ワークフローの @trigger:<field> 参照用に、削除前のフィールド値スナップショットを取っておく
+	// （削除後は entities から読み出せないため）。
+	const snapshot = await getRecord(db, params.type, params.id);
 	await deleteRecord(db, params.type, params.id);
 	if (platform.env.QUEUE && info?.entityTypeId) {
-		const msg: WorkflowEventMessage = { type: 'workflow-event', entityTypeId: info.entityTypeId, event: 'delete', recordId: params.id };
+		const msg: WorkflowEventMessage = { type: 'workflow-event', entityTypeId: info.entityTypeId, event: 'delete', recordId: params.id, data: snapshot ?? undefined };
 		await platform.env.QUEUE.send(msg);
 	}
 	return new Response(null, { status: 204 });

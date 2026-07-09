@@ -30,13 +30,14 @@ export const PATCH: RequestHandler = async ({ params, request, platform, locals 
 		const triggerType = body.triggerType ?? existing.triggerType;
 		const triggerHour = body.triggerHour ?? existing.triggerHour;
 		const triggerMinute = body.triggerMinute ?? existing.triggerMinute;
+		const triggerEntityTypeId = body.triggerEntityTypeId !== undefined ? body.triggerEntityTypeId : existing.triggerEntityTypeId;
 		const steps = body.steps ?? existing.steps;
 
 		const [entityTypes, slackIntegrations] = await Promise.all([
 			listEntityTypesForWorkflow(db),
 			listSlackIntegrationsForWorkflow(db)
 		]);
-		const validation = validateWorkflow(triggerType, triggerHour, triggerMinute, steps, entityTypes, slackIntegrations);
+		const validation = validateWorkflow(triggerType, triggerHour, triggerMinute, triggerEntityTypeId, steps, entityTypes, slackIntegrations);
 		if (!validation.ok) {
 			return json({ error: validation.errors.join(' / ') }, { status: 422 });
 		}

@@ -413,7 +413,7 @@ export function buildWorkflowReviewPrompt(input: {
 }): string {
 	const EVENT_LABEL: Record<string, string> = { create: '作成', update: '更新', delete: '削除' };
 	const triggerDesc = input.triggerType === 'event'
-		? `イベント: テーブル(${input.triggerEntityTypeId ?? '未選択'}) の レコード${EVENT_LABEL[input.triggerEvent ?? ''] ?? '(未選択)'} 時\n（ステップ内で @trigger:id = 操作されたレコードID、@trigger:event = イベント種別 を参照可能）`
+		? `イベント: テーブル(${input.triggerEntityTypeId ?? '未選択'}) の レコード${EVENT_LABEL[input.triggerEvent ?? ''] ?? '(未選択)'} 時\n（ステップ内で @trigger:id = 操作されたレコードID、@trigger:event = イベント種別、@trigger:<フィールドキー>（例: @trigger:createdBy）= そのレコードの他のフィールド値を参照可能。@self:account_id はワークフロー登録者自身のアカウントID）`
 		: `スケジュール: 毎日 ${String(input.triggerHour).padStart(2, '0')}:${String(input.triggerMinute).padStart(2, '0')}`;
 	return `これから有効化するワークフローをレビューしてください。論理的な誤り・未到達ステップ・改善点があれば指摘してください。
 
@@ -456,11 +456,12 @@ ${ITEM_REF_SEMANTICS_NOTE}
 
 ## 使用できるアクションツール（tool フィールドに指定。params は各ツールの入力欄）
 ${WORKFLOW_ACTION_TOOLS.map(describeWorkflowActionToolForAI).join('\n')}
-結果（resultType付き）は条件のleft/rightや後続ステップのparamsで参照可能。condition の left は必ず先行アクションの結果（@step:<id> または @item:<field>）を指定する（リテラル不可）。operator は == != > < >= <= のいずれか。
+結果（resultType付き）は条件のleft/rightや後続ステップのparamsで参照可能。condition の left は必ず先行アクションの結果（@step:<id> または @item:<field>）、イベントトリガーの場合はトリガーレコードの参照（@trigger:<id|event|フィールドキー>）、または @self:account_id のいずれかを指定する（自由なリテラル不可）。operator は == != > < >= <= のいずれか。
 
 ## トリガー種別
 - schedule（スケジュール）: 毎日指定時刻に実行。triggerHour/triggerMinute を指定する
-- event（イベント）: 特定テーブルのレコード作成/更新/削除時に実行。triggerEntityTypeId（entity_types.id）と triggerEvent（create/update/delete）を指定する。ステップ内で @trigger:id = 操作されたレコードID、@trigger:event = イベント種別 を参照可能
+- event（イベント）: 特定テーブルのレコード作成/更新/削除時に実行。triggerEntityTypeId（entity_types.id）と triggerEvent（create/update/delete）を指定する。ステップ内で @trigger:id = 操作されたレコードID、@trigger:event = イベント種別、@trigger:<フィールドキー>（例: @trigger:createdBy）= そのレコードの他のフィールド値（システムフィールドのcreatedBy/updatedBy/createdAt/updatedAt含む）を参照可能。先頭ステップの条件（1番目のconditionステップ）でも参照できる
+- @self:account_id はトリガー種別によらず常に参照可能で、ワークフロー登録者自身のアカウントIDを表す。「自分以外が操作したレコードか」を判定する場合、\`{"left":"@trigger:createdBy","operator":"!=","right":"@self:account_id"}\` のように使う
 
 ## 現在の編集状態（画面右側の内容。ユーザーが手動で編集している場合もある）
 - 名前: ${current.name || '（未入力）'}

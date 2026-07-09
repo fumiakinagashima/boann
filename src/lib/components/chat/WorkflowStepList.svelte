@@ -9,7 +9,10 @@
 		parseStepRef,
 		makeItemRef,
 		parseItemRef,
+		makeTriggerRef,
+		parseTriggerRef,
 		entityListItemFields,
+		SELF_ACCOUNT_ID_REF,
 		type WorkflowListResultField
 	} from '$lib/workflow-tools';
 	import type { VisibleStep, VisibleListStep } from '$lib/workflow-validation';
@@ -31,6 +34,8 @@
 		depth: number;
 		entityTypes?: EntityTypeForWorkflow[];
 		slackIntegrations?: SlackIntegrationOption[];
+		/** イベントトリガー時、@trigger:<field> として参照できるフィールド一覧（トリガーがscheduleの場合は空） */
+		triggerFields?: WorkflowListResultField[];
 	};
 
 	let {
@@ -41,7 +46,8 @@
 		editable,
 		depth,
 		entityTypes = [],
-		slackIntegrations = []
+		slackIntegrations = [],
+		triggerFields = []
 	}: Props = $props();
 
 	function makeId(): string {
@@ -101,7 +107,7 @@
 		return visible;
 	}
 
-	/** params/condition の参照select用: 現在の値を `'__literal__'` / ステップid / `item:<foreachのid>:<field>` に変換する。 */
+	/** params/condition の参照select用: 現在の値を `'__literal__'` / ステップid / `item:<foreachのid>:<field>` / `trigger:<field>` / `self:account_id` に変換する。 */
 	function refSelectValue(operand: string | undefined): string {
 		const itemRef = parseItemRef(operand);
 		if (itemRef !== null) {
@@ -109,6 +115,9 @@
 			const foreachStepId = itemRef.foreachStepId ?? itemScopes[itemScopes.length - 1]?.foreachStepId ?? '';
 			return `item:${foreachStepId}:${itemRef.field}`;
 		}
+		const triggerField = parseTriggerRef(operand);
+		if (triggerField !== null) return `trigger:${triggerField}`;
+		if (operand === SELF_ACCOUNT_ID_REF) return 'self:account_id';
 		const stepId = parseStepRef(operand);
 		if (stepId !== null) return stepId;
 		return '__literal__';
@@ -122,6 +131,8 @@
 			const sep = rest.indexOf(':');
 			return makeItemRef(rest.slice(0, sep), rest.slice(sep + 1));
 		}
+		if (value.startsWith('trigger:')) return makeTriggerRef(value.slice('trigger:'.length));
+		if (value === 'self:account_id') return SELF_ACCOUNT_ID_REF;
 		return makeStepRef(value);
 	}
 
@@ -149,6 +160,16 @@
 	function itemToken(opt: ItemOption): string {
 		return `@item:${opt.foreachStepId}:${opt.field.key}`;
 	}
+
+	function triggerSelectValue(field: WorkflowListResultField): string {
+		return `trigger:${field.key}`;
+	}
+
+	function triggerToken(field: WorkflowListResultField): string {
+		return makeTriggerRef(field.key);
+	}
+
+	const SELF_SELECT_VALUE = 'self:account_id';
 
 	// カテゴリ選択中（対象未選択でtoolが空の）ステップのカテゴリを覚えておくための一時状態。
 	// tool が決まれば常にそこからカテゴリを逆引きできるため、これは未確定の間だけ使う。
@@ -354,24 +375,30 @@
 			{#if helpOpenFor[step.id]}
 				<div class="wf-help-panel">
 					<div class="wf-help-title">ここで使える変数</div>
-					{#if visible.length === 0 && itemOpts.length === 0}
-						<p class="wf-help-empty">まだ使える変数はありません（先行ステップに数値・件数等の結果を持つアクションを追加してください）</p>
-					{:else}
-						<ul class="wf-help-list">
-							{#each visible as v (v.id)}
-								<li>
-									<span class="wf-help-name">{v.label}</span>{v.resultDesc ? `（${v.resultDesc}）` : ''}
-									<code class="wf-help-token">@step:{v.id}</code>
-								</li>
-							{/each}
-							{#each itemOpts as opt (opt.foreachStepId + ':' + opt.field.key)}
-								<li>
-									<span class="wf-help-name">{opt.field.label}</span>
-									<code class="wf-help-token">{itemToken(opt)}</code>
-								</li>
-							{/each}
-						</ul>
-					{/if}
+					<ul class="wf-help-list">
+						{#each visible as v (v.id)}
+							<li>
+								<span class="wf-help-name">{v.label}</span>{v.resultDesc ? `（${v.resultDesc}）` : ''}
+								<code class="wf-help-token">@step:{v.id}</code>
+							</li>
+						{/each}
+						{#each itemOpts as opt (opt.foreachStepId + ':' + opt.field.key)}
+							<li>
+								<span class="wf-help-name">{opt.field.label}</span>
+								<code class="wf-help-token">{itemToken(opt)}</code>
+							</li>
+						{/each}
+						{#each triggerFields as f (f.key)}
+							<li>
+								<span class="wf-help-name">{f.label}（トリガーレコード）</span>
+								<code class="wf-help-token">{triggerToken(f)}</code>
+							</li>
+						{/each}
+						<li>
+							<span class="wf-help-name">自分（ワークフロー登録者）のアカウントID</span>
+							<code class="wf-help-token">{SELF_ACCOUNT_ID_REF}</code>
+						</li>
+					</ul>
 				</div>
 			{/if}
 
@@ -384,7 +411,7 @@
 						{@const shown = isParamShown(step.id, field.key, hasValue, !!field.required)}
 						{#if shown}
 							{@const selVal = refSelectValue(step.params?.[field.key])}
-							{@const hasRefs = visible.length > 0 || itemOpts.length > 0 || selVal !== '__literal__'}
+							{@const hasRefs = visible.length > 0 || itemOpts.length > 0 || triggerFields.length > 0 || selVal !== '__literal__'}
 							<div class="wf-line wf-param" class:wf-param-optional={!field.required}>
 								<label for="wf-param-{step.id}-{field.key}">{field.label}</label>
 								{#if field.type === 'select'}
@@ -418,6 +445,10 @@
 										{#each itemOpts as opt (opt.foreachStepId + ':' + opt.field.key)}
 											<option value={itemSelectValue(opt)}>{itemOptionLabel(opt)}</option>
 										{/each}
+										{#each triggerFields as f (f.key)}
+											<option value={triggerSelectValue(f)}>{f.label}（トリガーレコード）</option>
+										{/each}
+										<option value={SELF_SELECT_VALUE}>自分のアカウントID</option>
 									</select>
 								{/if}
 								{#if (selVal === '__literal__' || !hasRefs) && field.type !== 'select'}
@@ -516,6 +547,10 @@
 						{#each itemOpts as opt (opt.foreachStepId + ':' + opt.field.key)}
 							<option value={itemSelectValue(opt)}>{itemOptionLabel(opt)}</option>
 						{/each}
+						{#each triggerFields as f (f.key)}
+							<option value={triggerSelectValue(f)}>{f.label}（トリガーレコード）</option>
+						{/each}
+						<option value={SELF_SELECT_VALUE}>自分のアカウントID</option>
 					</select>
 					<select
 						value={step.operator}
@@ -538,6 +573,10 @@
 						{#each itemOpts as opt (opt.foreachStepId + ':' + opt.field.key)}
 							<option value={itemSelectValue(opt)}>{itemOptionLabel(opt)}</option>
 						{/each}
+						{#each triggerFields as f (f.key)}
+							<option value={triggerSelectValue(f)}>{f.label}（トリガーレコード）</option>
+						{/each}
+						<option value={SELF_SELECT_VALUE}>自分のアカウントID</option>
 					</select>
 					{#if rightSel === '__literal__'}
 						<input
@@ -577,6 +616,7 @@
 						{editable}
 						{entityTypes}
 						{slackIntegrations}
+						{triggerFields}
 						depth={depth + 1}
 					/>
 				</div>
@@ -594,6 +634,7 @@
 						{editable}
 						{entityTypes}
 						{slackIntegrations}
+						{triggerFields}
 						depth={depth + 1}
 					/>
 				</div>

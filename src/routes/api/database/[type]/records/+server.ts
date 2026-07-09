@@ -24,7 +24,7 @@ export const POST: RequestHandler = async ({ params, url, request, platform, loc
 		const data = await request.json() as Record<string, unknown>;
 		const record = await createRecord(db, params.type, data, locals.account?.id, appId);
 		if (platform.env.QUEUE && info.entityTypeId) {
-			const msg: WorkflowEventMessage = { type: 'workflow-event', entityTypeId: info.entityTypeId, event: 'create', recordId: record.id as string };
+			const msg: WorkflowEventMessage = { type: 'workflow-event', entityTypeId: info.entityTypeId, event: 'create', recordId: record.id as string, data: record };
 			await platform.env.QUEUE.send(msg);
 		}
 		return json(record, { status: 201 });
