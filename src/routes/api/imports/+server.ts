@@ -2,19 +2,27 @@ import { json } from '@sveltejs/kit';
 import { errors } from '$lib/server/errors';
 import { createDb } from '$lib/server/db';
 import { createImportJob } from '$lib/server/db/import-job-service';
+import { extractExcelContent } from '$lib/server/imports/excel';
 import type { ImportJobMessage } from '$lib/server/imports/types';
 import type { RequestHandler } from './$types';
 
-// テキスト系ファイルの取り込み。アップロードを受け取りドラフトを作成し、
+// テキスト系/Excelファイルの取り込み。アップロードを受け取りドラフトを作成し、
 // 設計（読み取り＋AIプラン生成）を Queue で非同期に行う。
-// Excel/CSV/PDF/画像は別フェーズで対応する。
-const MAX_BYTES = 1024 * 1024; // 1MB
+// CSV/PDF/画像は別フェーズで対応する。
+const MAX_BYTES = 5 * 1024 * 1024; // 5MB
 
-const ALLOWED_EXT = ['.txt', '.md', '.markdown'];
+const TEXT_EXT = ['.txt', '.md', '.markdown'];
+const EXCEL_EXT = ['.xlsx'];
 
-function isAllowed(name: string, type: string): boolean {
+function isText(name: string, type: string): boolean {
 	const lower = name.toLowerCase();
-	return ALLOWED_EXT.some((ext) => lower.endsWith(ext)) || type.startsWith('text/');
+	return TEXT_EXT.some((ext) => lower.endsWith(ext)) || type.startsWith('text/');
+}
+
+function isExcel(name: string, type: string): boolean {
+	const lower = name.toLowerCase();
+	return EXCEL_EXT.some((ext) => lower.endsWith(ext)) ||
+		type === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
 }
 
 export const POST: RequestHandler = async ({ request, platform, locals }) => {
@@ -33,14 +41,17 @@ export const POST: RequestHandler = async ({ request, platform, locals }) => {
 	const file = form.get('file');
 	if (!(file instanceof File)) return errors.badRequest('ファイルが添付されていません');
 	if (file.size === 0) return errors.badRequest('空のファイルです');
-	if (file.size > MAX_BYTES) return errors.badRequest('ファイルサイズが大きすぎます（最大1MB）');
-	if (!isAllowed(file.name, file.type)) {
-		return errors.badRequest('現在はテキスト/Markdown（.txt, .md）のみ対応しています');
+	if (file.size > MAX_BYTES) return errors.badRequest('ファイルサイズが大きすぎます（最大5MB）');
+
+	const text = isText(file.name, file.type);
+	const excel = !text && isExcel(file.name, file.type);
+	if (!text && !excel) {
+		return errors.badRequest('現在はテキスト/Markdown（.txt, .md）、Excel（.xlsx）のみ対応しています');
 	}
 
 	let content: string;
 	try {
-		content = await file.text();
+		content = text ? await file.text() : await extractExcelContent(await file.arrayBuffer(), file.name);
 	} catch {
 		return errors.badRequest('ファイルを読み取れませんでした');
 	}

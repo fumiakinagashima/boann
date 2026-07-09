@@ -58,11 +58,12 @@
 	<div class="dialog-body">
 		<FileUpload
 			label="仕様メモやドキュメントをアップロード"
-			accept=".txt,.md,.markdown"
+			accept=".txt,.md,.markdown,.xlsx"
 			disabled={uploading}
 			onchange={handleFiles}
 		/>
-		<p class="hint">現在はテキスト/Markdown（.txt, .md）のみ対応。最大1MB。</p>
+		<p class="hint">現在はテキスト/Markdown（.txt, .md）、Excel（.xlsx）のみ対応。最大5MB。</p>
+		<p class="hint">Excelは見出し行とサンプル行から構造を設計します（データそのものは登録されません）。</p>
 		<p class="hint">アップロード後、AIがアプリ構造を設計します（完了は通知でもお知らせします）。</p>
 
 		{#if uploading}<p class="status">アップロード中…</p>{/if}
