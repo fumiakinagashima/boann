@@ -36,7 +36,7 @@
 	}
 </script>
 
-<div class="builder-layout" style="grid-template-columns: 1fr 5px {chatWidth}px" class:resizing>
+<div class="builder-layout" style="grid-template-columns: 1fr 3px {chatWidth}px" class:resizing>
 	<div class="main-col">
 		{@render main()}
 	</div>
@@ -75,20 +75,19 @@
 	}
 
 	.resizer {
-		width: 5px;
+		width: 3px;
 		cursor: col-resize;
 		background: var(--color-border);
 		transition: background 0.15s;
 		position: relative;
 
-		&::after { content: ''; position: absolute; inset: 0 -2px; }
+		&::after { content: ''; position: absolute; inset: 0 -3px; }
 		&:hover { background: var(--color-primary); }
 	}
 
 	.chat-col {
 		display: flex;
 		flex-direction: column;
-		border-left: 1px solid var(--color-border);
 		overflow: hidden;
 		min-width: 0;
 	}
