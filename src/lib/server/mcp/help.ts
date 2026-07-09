@@ -11,7 +11,7 @@ export const tools: Tool[] = [
 			properties: {
 				topic: {
 					type: 'string',
-					enum: ['overview', 'apps', 'tables', 'records', 'workflows', 'documents', 'reminders', 'email'],
+					enum: ['overview', 'apps', 'tables', 'records', 'workflows', 'documents', 'email'],
 					description: '知りたいトピック（省略時は全体概要）'
 				}
 			}
@@ -20,20 +20,19 @@ export const tools: Tool[] = [
 ];
 
 const getHelpInputSchema = z.object({
-	topic: z.enum(['overview', 'apps', 'tables', 'records', 'workflows', 'documents', 'reminders', 'email']).optional()
+	topic: z.enum(['overview', 'apps', 'tables', 'records', 'workflows', 'documents', 'email']).optional()
 });
 
 const HELP: Record<string, object> = {
 	overview: {
 		title: 'Boann 使い方ガイド',
-		description: 'チャットで業務指示を出すだけで、カスタムアプリの作成・データ管理・ワークフロー自動化などが完結するAIファーストなノーコードプラットフォームです',
+		description: 'アプリ作成はUIから、テーブル設計・データ管理・ワークフロー自動化などはチャットで業務指示を出すだけで完結するAIファーストなノーコードプラットフォームです',
 		features: [
-			{ name: 'ノーコードアプリ生成', topic: 'apps', examples: ['在庫管理アプリを作って', '採用候補者を管理するテーブルが欲しい', '問い合わせ管理アプリを作って'] },
+			{ name: 'ノーコードアプリ生成', topic: 'apps', examples: ['どんなテーブルがある？', 'アプリの作り方を教えて'] },
 			{ name: 'テーブル管理', topic: 'tables', examples: ['どんなテーブルがある？', '商品管理テーブルにカテゴリフィールドを追加して'] },
 			{ name: 'レコード操作', topic: 'records', examples: ['在庫管理に新しい商品を登録して', '商品一覧を見せて', '〇〇の在庫数を更新して'] },
 			{ name: 'ワークフロー自動化', topic: 'workflows', examples: ['毎日9時に在庫数が少ない商品を通知して', 'ワークフローを作りたい'] },
 			{ name: '資料生成（CSV/Markdownデータ）', topic: 'documents', examples: ['商品一覧をExcel用にまとめて', 'データをCSVで出力して'] },
-			{ name: 'リマインダー', topic: 'reminders', examples: ['明日の10時にフォローアップをリマインドして'] },
 			{ name: 'メール送信', topic: 'email', examples: ['〇〇にお知らせメールを送って'] }
 		],
 		tips: [
@@ -49,20 +48,21 @@ const HELP: Record<string, object> = {
 	},
 	apps: {
 		title: 'ノーコードアプリ生成',
-		description: 'チャットで業務内容を伝えるだけで、カスタムテーブル・アプリをAIが自動設計して作成します',
+		description: '新しいアプリの作成はアプリ一覧画面の「アプリを作成」ボタン（空から作成、またはファイルから取り込み）から行う。作成後のテーブル追加・フィールド設計はチャットでも依頼できる',
 		operations: [
-			{ action: '新しいアプリを作成する', examples: ['在庫管理アプリを作って', '採用候補者のトラッキングテーブルが欲しい', '問い合わせ管理を作りたい', '社内の備品管理アプリを作って'] },
+			{ action: '新しいアプリを作成する', description: 'アプリ一覧画面の「アプリを作成」ボタンから行う（チャットでは作成できない）', examples: ['アプリの作り方を教えて'] },
+			{ action: 'テーブルを追加する', examples: ['このアプリに在庫管理用のテーブルを追加して'] },
 			{ action: 'フィールドを追加する', examples: ['在庫管理テーブルに「担当者」フィールドを追加して', '商品管理に「カテゴリ」列を追加して'] },
 			{ action: '他テーブルと関連付ける', examples: ['案件管理テーブルを顧客テーブルと紐付けたい', '注文テーブルに商品を選択するフィールドを追加して'] }
 		],
 		tips: [
-			'AIがフィールド構成を提案して確認を求めてから作成します',
+			'テーブル追加・フィールド設計はアプリ画面内のチャットで依頼できます（AIが構成を提案して確認を求めてから作成します）',
 			'テーブル同士を recordSelect フィールドで関連付けたり、account フィールドでアカウント（担当者）と紐付けたりできます',
 			'作成後はデータ管理画面から直接データ操作ができます',
 			'フィールド構成の変更はデータ管理のスキーマ編集画面からも行えます'
 		],
 		relatedPages: [
-			{ label: 'アプリ一覧', href: '/', description: '作成したアプリのテーブル一覧・スキーマ編集ができます' }
+			{ label: 'アプリ一覧', href: '/', description: 'アプリの作成・テーブル一覧・スキーマ編集ができます' }
 		]
 	},
 	tables: {
@@ -75,7 +75,7 @@ const HELP: Record<string, object> = {
 		],
 		tips: [
 			'テーブル名（識別名）は英小文字・数字・アンダースコアのみ使用できます',
-			'システム予約語（accounts, reminders, workflows 等）はテーブル名として使用できません'
+			'システム予約語（accounts, workflows 等）はテーブル名として使用できません'
 		],
 		relatedPages: [
 			{ label: 'アプリ一覧', href: '/', description: 'テーブル一覧・スキーマ編集ができます' }
@@ -126,20 +126,6 @@ const HELP: Record<string, object> = {
 			'生成したファイルはダウンロードリンクから取得できます',
 			'Excel・ChatGPT・Copilotなどの外部ツールで加工するための素材ファイルです',
 			'具体的な加工内容を伝えると、外部AIツール向けのプロンプトも一緒に生成します'
-		]
-	},
-	reminders: {
-		title: 'リマインダー',
-		description: '指定した日時に通知センター・メール・Slack（連携設定済みの場合）へ通知を送ります',
-		operations: [
-			{ action: 'リマインダーを設定する', examples: ['明日の10時にフォローアップをリマインドして', '来週月曜に〇〇を通知して', '今日の15:00に会議の連絡をして'] }
-		],
-		tips: [
-			'通知先はフォーム送信時に選択できます（通知センター・メール・Slack）',
-			'Slack通知は外部API連携画面でWebhook URLの設定が必要です'
-		],
-		relatedPages: [
-			{ label: '外部API連携', href: '/settings/integrations', description: 'Slack Webhook URLの設定ができます' }
 		]
 	},
 	email: {

@@ -61,23 +61,6 @@ export const POST: RequestHandler = async ({ request, platform, locals }) => {
 		try {
 			const result = await dispatchTool(db, body.tool as never, body.data, toolEnv, platform.ctx);
 
-			if (body.tool === 'create_reminder') {
-				const reminder = result as { remindAt: Date; content: string; channelLabels: string[] };
-				const contents: MessageContent[] = [
-					{ type: 'text', text: 'リマインダーを登録しました。' },
-					{
-						type: 'values',
-						title: 'リマインダー',
-						items: [
-							{ label: '日時', value: reminder.remindAt.toISOString(), format: 'datetime' },
-							{ label: '内容', value: reminder.content, format: 'text' },
-							{ label: '通知先', value: reminder.channelLabels.join(' / '), format: 'text' }
-						]
-					}
-				];
-				return json({ contents });
-			}
-
 			if (body.tool === 'send_email') {
 				const sent = result as { to: string; subject: string };
 				const contents: MessageContent[] = [

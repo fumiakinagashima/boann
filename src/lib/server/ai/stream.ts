@@ -15,8 +15,7 @@ const mainChatTools = allTools.filter(
 const APP_BUILDER_BLOCKED = new Set([
 	'create_entity', 'update_entity',
 	'create_app', 'create_entity_type',
-	'create_reminder', 'create_reminders_bulk',
-	'delete_sent_reminders', 'delete_read_notifications'
+	'delete_read_notifications'
 ]);
 const appBuilderTools = allTools.filter((t) => !APP_BUILDER_BLOCKED.has(t.name));
 

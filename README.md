@@ -1,7 +1,7 @@
 # Boann
 
 AI-first, chat-based no-code app builder and business management platform.
-Users type something like "Build me a customer management app" and the AI designs and creates custom tables, fields, pages, and workflows on the fly.
+Users create an app from the UI, then chat with the AI inside it — "add a table for X", "add a field for Y" — to design tables, fields, pages, and workflows on the fly.
 
 ## Features
 
@@ -13,8 +13,8 @@ Users type something like "Build me a customer management app" and the AI design
 - **Event Triggers** — Record mutations (create/update/delete) enqueue a Cloudflare Queue message. The Queue consumer matches enabled event-trigger workflows and runs them with `@trigger:id` / `@trigger:event` references resolved at runtime.
 - **File Import** (`/imports/[id]`) — From the app list, "Create App" → "From a file": upload a text/Markdown/Excel (`.xlsx`) file, AI designs a table schema and import plan (structure only — row data is not imported as records), user reviews and can refine it via chat before applying.
 - **External Integrations** (`/settings/integrations`) — Register external API connections (API key, Bearer, Basic auth). Used by AI chat and workflows via `call_external_api`.
-- **Email** (`/settings/email`) — Configure an email provider (Resend, AWS SES, or SMTP). Used by workflows, reminders, and password reset.
-- **Notifications & Reminders** — In-app notification center with unread count polling. Reminders fire via Cloudflare Cron Trigger and deliver to notification center, email, or Slack.
+- **Email** (`/settings/email`) — Configure an email provider (Resend, AWS SES, or SMTP). Used by workflows and password reset.
+- **Notifications** — In-app notification center with unread count polling.
 - **Auth** — Session-based auth (Cloudflare KV, 7-day TTL). Rate-limited sign-in. Password reset via email token. `general` / `admin` permission roles with route-level enforcement.
 - **Accounts** (`/accounts`) — Admin-only user management.
 
@@ -28,7 +28,7 @@ Users type something like "Build me a customer management app" and the AI design
 | ORM | DrizzleORM |
 | Infrastructure | Cloudflare (Workers, D1, R2, KV, Queue, Cron Triggers) |
 | AI | Claude API (Anthropic) |
-| Protocol | MCP (Model Context Protocol) |
+| Tool use | Anthropic tool use / function calling (organized under `src/lib/server/mcp/` — see note below; not the actual MCP protocol) |
 | i18n | Paraglide-JS (`messages/ja.json`) |
 | Testing | Vitest (unit), Playwright (E2E) |
 
@@ -129,16 +129,15 @@ All application data is stored in a small set of core tables:
 | `integrations` | External API connection settings |
 | `accounts` | User accounts |
 | `notifications` | In-app notification center |
-| `reminders` | Scheduled reminders (delivery infra only — see note below) |
 | `chats` / `chat_messages` | Chat history |
 | `ai_settings` | AI model override |
 | `email_providers` | Email provider config |
 
-> **Note**: `reminders` has a Cron-driven delivery path (`processDueReminders`), but there is currently no UI or MCP tool that creates rows in it — the feature is effectively dormant until a creation path is added back.
+### MCP-style tools
 
-### MCP tools
+> **Note**: despite the directory name, this is **not** the actual Model Context Protocol — there is no `@modelcontextprotocol` SDK dependency, no separate server process, and no JSON-RPC/stdio/SSE transport. `dispatchTool()` is a plain in-process TypeScript function called directly from `src/lib/server/ai/stream.ts` within the same Worker. Tool definitions use the Anthropic SDK's native tool-use (function calling) schema; they're organized under an `mcp/`-named directory as a legacy label (an early architecture doc envisioned a real MCP server; it was simplified to direct function calls).
 
-The AI interacts with the system via MCP tools defined in `src/lib/server/mcp/` (see `src/lib/server/mcp/index.ts` for the authoritative registry):
+The AI interacts with the system via tools defined in `src/lib/server/mcp/` (see `src/lib/server/mcp/index.ts` for the authoritative registry):
 
 - **entities**: `create_app`, `create_entity_type`, `create_table`, `create_page`, `add_entity_field`, `list_entity_types`, `get_entity_fields`, `get_entities`, `create_entity`, `update_entity`
 - **communication**: `send_email`, `send_notification`, `send_slack_notification`, `delete_read_notifications`
@@ -149,7 +148,7 @@ The AI interacts with the system via MCP tools defined in `src/lib/server/mcp/` 
 
 There is no `delete_entity` MCP tool — record deletion happens only through the REST API (form submissions) or a workflow's `delete_entity` action step (a separate, workflow-only tool catalog in `src/lib/workflow-tools.ts`, not part of this MCP registry).
 
-The main top-level chat (`/`) additionally excludes every `create_*`/`update_*`/`delete_*`-prefixed tool (`src/lib/server/ai/stream.ts`), including `create_app` — despite the system prompt instructing the AI to call `create_app` for "build me an X app" requests. In practice, apps are created via the explicit "Create App" button (blank or from-file) rather than by asking the top-level chat to build one from scratch; the `create_app`-driven natural-language flow only works from within an app-scoped chat context that itself blocks `create_app` (`APP_BUILDER_BLOCKED`), so it is not currently reachable from any chat context. Record writes (`create_entity`, `update_entity`) are excluded from the main chat context by the same prefix rule — they execute only through validated form submissions — but remain available inside an app-scoped builder chat where relevant.
+The main top-level chat (`/`) additionally excludes every `create_*`/`update_*`/`delete_*`-prefixed tool (`src/lib/server/ai/stream.ts`), including `create_app`, and an app-scoped builder chat blocks it too (`APP_BUILDER_BLOCKED`) — so `create_app` is not reachable from any chat context by design: **new apps are created by the user through the "Create App" button** (blank or from-file), not by asking the AI to build one from scratch. The `create_app` tool implementation itself is still there (and dispatchable), it's just not exposed to any chat context. Record writes (`create_entity`, `update_entity`) are excluded from the main chat context by the same prefix rule — they execute only through validated form submissions — but remain available inside an app-scoped builder chat for schema changes (adding tables/fields to an app that already exists).
 
 ### Workflow execution
 

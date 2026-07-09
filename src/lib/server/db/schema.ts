@@ -162,18 +162,6 @@ export const importJobs = sqliteTable('import_jobs', {
 		.default(sql`(unixepoch())`)
 });
 
-export const reminders = sqliteTable('reminders', {
-	id: text('id').primaryKey(),
-	remindAt: integer('remind_at', { mode: 'timestamp' }).notNull(),
-	content: text('content').notNull(),
-	channels: text('channels').notNull().default('[]'),
-	status: text('status', { enum: ['pending', 'sent', 'failed'] }).notNull().default('pending'),
-	accountId: text('account_id'),
-	createdAt: integer('created_at', { mode: 'timestamp' })
-		.notNull()
-		.default(sql`(unixepoch())`)
-});
-
 export const chats = sqliteTable('chats', {
 	id: text('id').primaryKey(),
 	title: text('title').notNull().default(''),
@@ -264,8 +252,6 @@ export type Integration = typeof integrations.$inferSelect;
 export type NewIntegration = typeof integrations.$inferInsert;
 export type Notification = typeof notifications.$inferSelect;
 export type NewNotification = typeof notifications.$inferInsert;
-export type Reminder = typeof reminders.$inferSelect;
-export type NewReminder = typeof reminders.$inferInsert;
 export type Workflow = typeof workflows.$inferSelect;
 export type NewWorkflow = typeof workflows.$inferInsert;
 export type WorkflowRun = typeof workflowRuns.$inferSelect;

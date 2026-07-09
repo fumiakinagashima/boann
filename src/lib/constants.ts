@@ -28,13 +28,6 @@ export const APPROVAL_STATUS_COLORS: Record<string, string> = {
 	cancelled: '#6b7280'
 };
 
-// ── Reminder statuses ─────────────────────────────────────────────────────
-export const REMINDER_STATUS_COLORS: Record<string, string> = {
-	pending: '#d97706',
-	sent: '#16a34a',
-	failed: '#dc2626'
-};
-
 // ── Session / KV ──────────────────────────────────────────────────────────
 export const SESSION_TTL_SECONDS = 60 * 60 * 24 * 7; // 7 days
 export const DOCUMENT_JOB_TTL_SECONDS = 3600;

@@ -138,7 +138,7 @@ export const CORE_TABLE_NAMES: string[] = [];
 
 // 固定ルート・サブルートと衝突する予約済みテーブル名
 const RESERVED_NAMES = new Set([
-	'accounts', 'reminders', 'workflows', // 固定ルート
+	'accounts', 'workflows', // 固定ルート
 	'entity_types', 'entity_fields', 'entities',
 	'integrations',
 	'new', 'schema', // サブルート名

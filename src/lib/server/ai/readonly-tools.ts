@@ -4,7 +4,6 @@ import { tools } from '$lib/server/mcp';
 // データの登録・更新・削除を行わせたくない補助チャットで共有する。
 export const READONLY_TOOL_NAMES = new Set([
 	'list_integrations',
-	'list_reminders',
 	'list_entity_types',
 	'get_entity_fields',
 	'get_entities',

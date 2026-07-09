@@ -118,13 +118,5 @@
   "approval_status_pending": "審査中",
   "approval_status_approved": "承認済",
   "approval_status_rejected": "否決",
-  "approval_status_cancelled": "取消",
-  "reminder_status_pending": "未送信",
-  "reminder_status_sent": "送信済",
-  "reminder_status_failed": "失敗",
-  "reminder_run_button": "配信を実行",
-  "reminder_run_running": "実行中...",
-  "reminder_run_result_none": "送信対象のリマインダーはありません",
-  "reminder_run_result_sent": "{count}件のリマインダーを送信しました",
-  "reminder_run_result_failed": "{count}件のリマインダーの送信に失敗しました"
+  "approval_status_cancelled": "取消"
 }
