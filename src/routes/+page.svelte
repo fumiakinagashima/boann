@@ -42,20 +42,14 @@
 		<div>
 			<h1>アプリ一覧</h1>
 		</div>
-		{#if data.account?.permission === 'admin'}
-			{@render createMenu()}
-		{/if}
+		{@render createMenu()}
 	</div>
 
 	{#if s.apps.length === 0}
 		<div class="empty">
 			<p class="empty-title">アプリがまだありません</p>
-			{#if data.account?.permission === 'admin'}
-				<p class="empty-desc">「アプリを作成」からはじめて、AIに仕様を伝えましょう。</p>
-				{@render createMenu()}
-			{:else}
-				<p class="empty-desc">管理者にアプリの作成を依頼してください。</p>
-			{/if}
+			<p class="empty-desc">「アプリを作成」からはじめて、AIに仕様を伝えましょう。</p>
+			{@render createMenu()}
 		</div>
 	{:else}
 		<div class="app-grid">

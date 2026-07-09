@@ -444,7 +444,7 @@ export type AppInput = {
 	icon?: string;
 };
 
-export async function createApp(db: Db, input: AppInput): Promise<{ id: string; name: string }> {
+export async function createApp(db: Db, input: AppInput, accountId?: string | null): Promise<{ id: string; name: string }> {
 	if (RESERVED_NAMES.has(input.name)) {
 		throw new Error(`アプリ名 "${input.name}" はシステムで予約されています。`);
 	}
@@ -453,7 +453,7 @@ export async function createApp(db: Db, input: AppInput): Promise<{ id: string; 
 		throw new Error(`アプリ名 "${input.name}" はすでに使用されています。`);
 	}
 	const id = crypto.randomUUID();
-	await db.insert(apps).values({ id, name: input.name, label: input.label, icon: input.icon ?? 'layout-grid' });
+	await db.insert(apps).values({ id, name: input.name, label: input.label, icon: input.icon ?? 'layout-grid', accountId: accountId ?? null });
 	return { id, name: input.name };
 }
 
@@ -541,8 +541,8 @@ export async function updateAppMeta(db: Db, id: string, input: { label?: string;
 	await db.update(apps).set(set).where(eq(apps.id, id));
 }
 
-export async function getAppById(db: Db, id: string): Promise<{ id: string; name: string; label: string; icon: string | null } | null> {
-	const [a] = await db.select({ id: apps.id, name: apps.name, label: apps.label, icon: apps.icon })
+export async function getAppById(db: Db, id: string): Promise<{ id: string; name: string; label: string; icon: string | null; accountId: string | null } | null> {
+	const [a] = await db.select({ id: apps.id, name: apps.name, label: apps.label, icon: apps.icon, accountId: apps.accountId })
 		.from(apps).where(eq(apps.id, id));
 	return a ?? null;
 }
@@ -660,8 +660,9 @@ export async function listRecordsByRefField(
 // アプリ設定のページタブ: ドラッグ&ドロップ後の並び順を sortOrder に反映する。
 export async function reorderPages(db: Db, appId: string, orderedIds: string[]): Promise<void> {
 	if (orderedIds.length === 0) return;
+	// appId でも絞り込み、他アプリの id を混入されても他アプリのページを書き換えないようにする
 	const queries: BatchItem<'sqlite'>[] = orderedIds.map((id, i) =>
-		db.update(appPages).set({ sortOrder: i }).where(eq(appPages.id, id))
+		db.update(appPages).set({ sortOrder: i }).where(and(eq(appPages.id, id), eq(appPages.appId, appId)))
 	);
 	await db.batch(queries as [BatchItem<'sqlite'>, ...BatchItem<'sqlite'>[]]);
 }
@@ -669,8 +670,9 @@ export async function reorderPages(db: Db, appId: string, orderedIds: string[]):
 // アプリ設定のテーブルタブ: ドラッグ&ドロップ後の並び順を sortOrder に反映する。
 export async function reorderTables(db: Db, appId: string, orderedIds: string[]): Promise<void> {
 	if (orderedIds.length === 0) return;
+	// appId でも絞り込み、他アプリの id を混入されても他アプリのテーブルを書き換えないようにする
 	const queries: BatchItem<'sqlite'>[] = orderedIds.map((id, i) =>
-		db.update(entityTypes).set({ sortOrder: i }).where(eq(entityTypes.id, id))
+		db.update(entityTypes).set({ sortOrder: i }).where(and(eq(entityTypes.id, id), eq(entityTypes.appId, appId)))
 	);
 	await db.batch(queries as [BatchItem<'sqlite'>, ...BatchItem<'sqlite'>[]]);
 }

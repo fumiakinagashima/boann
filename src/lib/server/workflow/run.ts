@@ -51,11 +51,16 @@ function consumeBudget(budget: Budget): void {
 }
 
 /**
- * data フィールド（JSON テキスト）内のクォートされていない @trigger:xxx / @step:xxx / @item:xxx 参照を
+ * data フィールド（JSON テキスト）内のクォートされていない @trigger:xxx / @step:xxx / @item:xxx / @self:xxx 参照を
  * クォートで囲んでから JSON.parse できるようにする。すでにクォート済みの場合は冪等。
+ * JSON値の位置（`:` の直後〜`,`/`}` の直前）にある場合のみ対象とし、既存の文字列値の中に
+ * 地の文として "@self:account_id" 等が含まれるケースを誤って壊さないようにする。
  */
-function preQuoteReferences(jsonStr: string): string {
-	return jsonStr.replace(/"?(@(?:trigger|step|item|self):[a-zA-Z0-9_]+(?::[a-zA-Z0-9_]+)*)"?/g, '"$1"');
+export function preQuoteReferences(jsonStr: string): string {
+	return jsonStr.replace(
+		/:(\s*)(@(?:trigger|step|item|self):[a-zA-Z0-9_]+(?::[a-zA-Z0-9_]+)*)(\s*)([,}])/g,
+		':$1"$2"$3$4'
+	);
 }
 
 /** JSON.parse 済みの data オブジェクト内の文字列値に含まれる @参照を解決する。 */
@@ -120,26 +125,35 @@ function resolveOperand(
 	return found;
 }
 
-function compare(left: StepResult, operator: string, right: StepResult): boolean {
+export function compare(left: StepResult, operator: string, right: StepResult): boolean {
 	let rv: boolean | number | string = right.value;
 	if (left.type === 'number') rv = typeof rv === 'number' ? rv : Number(rv);
-	else if (left.type === 'boolean') rv = typeof rv === 'boolean' ? rv : rv === 'true';
+	else if (left.type === 'boolean') {
+		rv = typeof rv === 'boolean' ? rv : typeof rv === 'number' ? rv !== 0 : rv === 'true';
+	}
 	const lv = left.value;
+	if (operator === '==') return lv === rv;
+	if (operator === '!=') return lv !== rv;
+	if (operator !== '>' && operator !== '<' && operator !== '>=' && operator !== '<=') {
+		throw new WorkflowAbortError(`未対応の演算子です: ${operator}`);
+	}
+	// 順序比較: left.type が 'string' でも、両辺が数値として解釈できれば数値比較する。
+	// CSV取り込みや create_entity の JSON data 等で数値が文字列化されているケースを
+	// 素のJS文字列比較（辞書順、例: "10" > "9" が false になる）で誤判定しないため。
+	const ln = typeof lv === 'number' ? lv : Number(lv);
+	const rn = typeof rv === 'number' ? rv : Number(rv);
+	const numeric = !Number.isNaN(ln) && !Number.isNaN(rn);
+	const lc: number | string | boolean = numeric ? ln : lv;
+	const rc: number | string | boolean = numeric ? rn : rv;
 	switch (operator) {
-		case '==':
-			return lv === rv;
-		case '!=':
-			return lv !== rv;
 		case '>':
-			return (lv as number) > (rv as number);
+			return lc > rc;
 		case '<':
-			return (lv as number) < (rv as number);
+			return lc < rc;
 		case '>=':
-			return (lv as number) >= (rv as number);
-		case '<=':
-			return (lv as number) <= (rv as number);
+			return lc >= rc;
 		default:
-			throw new WorkflowAbortError(`未対応の演算子です: ${operator}`);
+			return lc <= rc;
 	}
 }
 
@@ -282,9 +296,18 @@ async function runSteps(
 				throw e;
 			}
 		} else if (step.kind === 'condition') {
-			const left = resolveOperand(step.left, results, itemStack, triggerContext, self);
-			const right = resolveOperand(step.right, results, itemStack, triggerContext, self);
-			if (compare(left, step.operator, right)) {
+			const start = Date.now();
+			let matched: boolean;
+			try {
+				const left = resolveOperand(step.left, results, itemStack, triggerContext, self);
+				const right = resolveOperand(step.right, results, itemStack, triggerContext, self);
+				matched = compare(left, step.operator, right);
+			} catch (e) {
+				const error = e instanceof Error ? e.message : String(e);
+				logs.push({ id: step.id, label: step.label, ok: false, error, ms: Date.now() - start });
+				throw e;
+			}
+			if (matched) {
 				await runSteps(db, step.then, results, listResults, env, self, itemStack, budget, logs, triggerContext);
 			}
 		} else {
@@ -296,8 +319,12 @@ async function runSteps(
 export type WorkflowRunResult = { id: string; name: string; ok: boolean; error?: string };
 
 const WORKFLOW_RUN_LOCK_PREFIX = 'workflow-run-lock:';
-/** ロックの取り忘れ（異常終了等）に備えたフェイルセーフのTTL。通常は実行完了時にreleaseRunLockで即時解放する。 */
-const WORKFLOW_RUN_LOCK_TTL_SECONDS = 90;
+/**
+ * ロックの取り忘れ（異常終了等）に備えたフェイルセーフのTTL。通常は実行完了時にreleaseRunLockで即時解放する。
+ * WORKFLOW_MAX_ACTIONS_PER_RUN（外部API呼び出し等を含みうる）を余裕を持ってカバーできる値にする
+ * （短すぎると、正常実行中でもTTL満了により別プロセスがロックを取得できてしまう）。
+ */
+const WORKFLOW_RUN_LOCK_TTL_SECONDS = 600;
 
 /**
  * 「今すぐ実行」とCron tickが同じワークフローを同時に実行してしまう（通知の重複送信等）のを防ぐ、

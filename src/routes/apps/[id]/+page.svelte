@@ -9,6 +9,13 @@
 
 	let { data }: { data: PageData } = $props();
 	const s = createAppBuilderState(() => data);
+
+	// アプリ自体の名称・アイコン変更／削除は、作成者本人か管理者のみ許可する
+	// （accountId が null の既存データは所有者不明の共有アプリとして誰でも操作可）。
+	// テーブル・ページ・ワークフローの追加はこれとは別に全員に開放したまま。
+	const canManageApp = $derived(
+		!data.app.accountId || data.account?.permission === 'admin' || data.app.accountId === data.account?.id
+	);
 </script>
 
 <BuilderLayout>
@@ -16,13 +23,15 @@
 		<div class="panel-header">
 			<div class="header-top">
 				<a href="/" class="back-link"><ChevronLeft size={15} />アプリ一覧</a>
-				<div class="header-actions">
-					{#if s.saved}<span class="saved-msg">✓ 保存しました</span>{/if}
-					<button class="btn-danger-ghost" onclick={s.deleteApp} disabled={s.deleting}>削除</button>
-					<button class="btn-save" onclick={s.save} disabled={s.saving || !s.dirty}>
-						{s.saving ? '保存中…' : '保存'}
-					</button>
-				</div>
+				{#if canManageApp}
+					<div class="header-actions">
+						{#if s.saved}<span class="saved-msg">✓ 保存しました</span>{/if}
+						<button class="btn-danger-ghost" onclick={s.deleteApp} disabled={s.deleting}>削除</button>
+						<button class="btn-save" onclick={s.save} disabled={s.saving || !s.dirty}>
+							{s.saving ? '保存中…' : '保存'}
+						</button>
+					</div>
+				{/if}
 			</div>
 			<div class="app-meta-edit">
 				<div class="icon-grid">
@@ -32,6 +41,7 @@
 							class="icon-opt"
 							class:selected={s.appIcon === opt.name}
 							onclick={() => { s.appIcon = opt.name; s.markDirty(); }}
+							disabled={!canManageApp}
 							title={opt.name}
 						><AppIcon icon={opt.name} size={15} /></button>
 					{/each}
@@ -42,6 +52,7 @@
 						type="text"
 						bind:value={s.appLabel}
 						oninput={s.markDirty}
+						disabled={!canManageApp}
 						placeholder="アプリ名"
 					/>
 				</div>
@@ -199,12 +210,13 @@
 		color: var(--color-text-muted);
 		cursor: pointer;
 		transition: border-color 0.12s, color 0.12s, background 0.12s;
-		&:hover { border-color: var(--color-primary); color: var(--color-primary); }
+		&:hover:not(:disabled) { border-color: var(--color-primary); color: var(--color-primary); }
 		&.selected {
 			border-color: var(--color-primary);
 			background: color-mix(in srgb, var(--color-primary) 10%, transparent);
 			color: var(--color-primary);
 		}
+		&:disabled { opacity: 0.5; cursor: not-allowed; }
 	}
 
 	.app-name-row {
@@ -226,6 +238,7 @@
 		outline: none;
 		transition: border-color 0.15s;
 		&:focus { border-color: var(--color-primary); }
+		&:disabled { opacity: 0.6; cursor: not-allowed; }
 	}
 
 	.back-link {

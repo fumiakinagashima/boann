@@ -6,6 +6,8 @@ export const apps = sqliteTable('apps', {
 	name: text('name').notNull(),
 	label: text('label').notNull(),
 	icon: text('icon'),
+	// 作成者のアカウントID。null は既存データ（移行前）または所有者を問わない共有アプリを表す。
+	accountId: text('account_id'),
 	createdAt: integer('created_at', { mode: 'timestamp' })
 		.notNull()
 		.default(sql`(unixepoch())`),

@@ -85,6 +85,13 @@
       "when": 1751500000000,
       "tag": "0019_bookmarks_app_scoped",
       "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "6",
+      "when": 1751600000000,
+      "tag": "0020_apps_account_id",
+      "breakpoints": true
     }
   ]
 }
