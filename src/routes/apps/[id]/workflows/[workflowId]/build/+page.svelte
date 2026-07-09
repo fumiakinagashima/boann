@@ -118,7 +118,8 @@
 	}
 
 	.editor-header {
-		padding: 12px 24px 8px;
+		padding: 0 24px;
+		height: 50px;
 		border-bottom: 1px solid var(--color-border);
 		flex-shrink: 0;
 		display: flex;
