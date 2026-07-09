@@ -461,15 +461,14 @@ export async function deleteApp(db: Db, id: string): Promise<void> {
 	const queries: BatchItem<'sqlite'>[] = [];
 	// FK 参照を成立させる順序で削除する:
 	//   app_pages.table_id → entity_types.id,
-	//   entity_types.app_id / app_pages.app_id / workflows.app_id → apps.id,
-	//   bookmarks.entity_type_id / entity_fields / entities → entity_types.id
+	//   entity_types.app_id / app_pages.app_id / workflows.app_id / bookmarks.app_id → apps.id,
+	//   entity_fields / entities → entity_types.id
 	// 1. app_pages を削除（entity_types を参照しているため先に消す）
 	queries.push(db.delete(appPages).where(eq(appPages.appId, id)));
 	// 2. テーブルに紐づく子レコードを削除してから entity_types を削除
 	for (const table of tables) {
 		queries.push(db.delete(entities).where(eq(entities.entityTypeId, table.id)));
 		queries.push(db.delete(entityFields).where(eq(entityFields.entityTypeId, table.id)));
-		queries.push(db.delete(bookmarks).where(eq(bookmarks.entityTypeId, table.id)));
 		queries.push(db.delete(entityTypes).where(eq(entityTypes.id, table.id)));
 	}
 	// 3. workflow_runs（実行ログ）→ workflows を削除（apps を参照しているため apps より先に消す）
@@ -477,7 +476,9 @@ export async function deleteApp(db: Db, id: string): Promise<void> {
 		queries.push(db.delete(workflowRuns).where(inArray(workflowRuns.workflowId, wfRows.map((w) => w.id))));
 	}
 	queries.push(db.delete(workflows).where(eq(workflows.appId, id)));
-	// 4. apps を削除
+	// 4. bookmarks を削除
+	queries.push(db.delete(bookmarks).where(eq(bookmarks.appId, id)));
+	// 5. apps を削除
 	queries.push(db.delete(apps).where(eq(apps.id, id)));
 	await db.batch(queries as [BatchItem<'sqlite'>, ...BatchItem<'sqlite'>[]]);
 }

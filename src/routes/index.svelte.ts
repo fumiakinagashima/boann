@@ -28,7 +28,7 @@ export function createAppListState(getData: () => PageData) {
 		const res = await fetch('/api/bookmarks', {
 			method: 'POST',
 			headers: { 'Content-Type': 'application/json' },
-			body: JSON.stringify({ entityTypeId: app.id })
+			body: JSON.stringify({ appId: app.id })
 		});
 		if (res.ok) {
 			const { bookmarked } = (await res.json()) as { bookmarked: boolean };

@@ -60,7 +60,11 @@
 	{:else}
 		<div class="app-grid">
 			{#each s.apps as app (app.id)}
-				<AppCard {app} />
+				<AppCard
+					{app}
+					bookmarked={s.bookmarkedIds.includes(app.id)}
+					onToggleBookmark={(e) => s.toggleBookmark(app, e)}
+				/>
 			{/each}
 		</div>
 	{/if}

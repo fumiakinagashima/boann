@@ -3,8 +3,12 @@
 	import Star from '@lucide/svelte/icons/star';
 	import type { AppCard } from '$lib/server/db/table-service';
 
-	type Props = { app: AppCard };
-	let { app }: Props = $props();
+	type Props = {
+		app: AppCard;
+		bookmarked: boolean;
+		onToggleBookmark: (e: MouseEvent) => void;
+	};
+	let { app, bookmarked, onToggleBookmark }: Props = $props();
 
 </script>
 
@@ -13,14 +17,14 @@
 		<span class="card-icon">
 			<AppIcon icon={app.icon} size={22} />
 		</span>
-		<!--<button
+		<button
 			class="bookmark-btn"
-			class:bookmarked={s.bookmarkedIds.includes(app.id)}
-			onclick={(e) => s.toggleBookmark(app, e)}
-			aria-label={s.bookmarkedIds.includes(app.id) ? 'ブックマーク解除' : 'ブックマーク'}
+			class:bookmarked
+			onclick={onToggleBookmark}
+			aria-label={bookmarked ? 'ブックマーク解除' : 'ブックマーク'}
 		>
-			<Star size={15} fill={s.bookmarkedIds.includes(app.id) ? 'currentColor' : 'none'} />
-		</button>-->
+			<Star size={15} fill={bookmarked ? 'currentColor' : 'none'} />
+		</button>
 	</div>
 	<div class="card-body">
 		<h2 class="card-title">{app.label}</h2>
@@ -60,6 +64,28 @@
 		border-radius: 8px;
 		background: color-mix(in srgb, var(--color-primary) 8%, var(--color-background));
 		color: var(--color-primary);
+	}
+
+	.bookmark-btn {
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		width: 28px;
+		height: 28px;
+		border: none;
+		border-radius: 6px;
+		background: transparent;
+		color: var(--color-text-muted);
+		cursor: pointer;
+		transition: background 0.15s, color 0.15s;
+
+		&:hover {
+			background: color-mix(in srgb, var(--color-text) 6%, transparent);
+			color: var(--color-text);
+		}
+		&.bookmarked {
+			color: var(--color-primary);
+		}
 	}
 
 	.card-body {

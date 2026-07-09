@@ -230,9 +230,9 @@ export const workflowRuns = sqliteTable('workflow_runs', {
 export const bookmarks = sqliteTable('bookmarks', {
 	id: text('id').primaryKey(),
 	accountId: text('account_id').notNull(),
-	entityTypeId: text('entity_type_id')
+	appId: text('app_id')
 		.notNull()
-		.references(() => entityTypes.id),
+		.references(() => apps.id),
 	createdAt: integer('created_at', { mode: 'timestamp' })
 		.notNull()
 		.default(sql`(unixepoch())`)
