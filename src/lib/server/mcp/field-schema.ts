@@ -23,7 +23,8 @@ function fieldToZod(f: FieldDef): z.ZodTypeAny {
 			break;
 		default:
 			// text / tel / textarea
-			base = z.string();
+			// 必須の場合は空文字も拒否する（キーの存在だけでなく値の有無も検証する）
+			base = f.required ? z.string().min(1) : z.string();
 	}
 	if (f.description || f.label) base = base.describe(f.description || f.label);
 	return f.required ? base : base.optional();

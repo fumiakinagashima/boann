@@ -40,6 +40,12 @@ describe('buildEntityDataSchema', () => {
 		const result = schema.safeParse({ age: 25 });
 		expect(result.success).toBe(true);
 	});
+
+	it('rejects an empty string for a required text field', () => {
+		const schema = buildEntityDataSchema(fields, 'create');
+		const result = schema.safeParse({ name: '', status: 'open', customer: 'cust-1' });
+		expect(result.success).toBe(false);
+	});
 });
 
 describe('toJsonSchema', () => {

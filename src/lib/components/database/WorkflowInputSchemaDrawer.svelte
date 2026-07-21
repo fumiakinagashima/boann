@@ -38,7 +38,7 @@
 			<p class="panel-desc">
 				このワークフローを呼び出す側が渡す値を定義する。ステップ内で <code>@input:&lt;key&gt;</code> として参照できる。
 			</p>
-			<FieldEditor bind:fields fieldTypes={FIELD_TYPES} />
+			<FieldEditor bind:fields fieldTypes={FIELD_TYPES} nullableCheckbox />
 		</div>
 	</aside>
 {/if}

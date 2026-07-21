@@ -85,10 +85,18 @@
 		const inputArgs: Record<string, unknown> = {};
 		for (const f of inputSchema) {
 			const optionsHint = f.type === 'select' && f.options?.length ? `\n選択肢: ${f.options.map((o) => o.value).join(', ')}` : '';
-			const raw = prompt(
-				`${f.label}${f.required ? '（必須）' : '（任意）'}を入力してください${f.description ? `\n${f.description}` : ''}${optionsHint}`
-			);
-			if (raw === null) return null; // キャンセル
+			let raw: string | null;
+			for (;;) {
+				raw = prompt(
+					`${f.label}${f.required ? '（必須）' : '（任意）'}を入力してください${f.description ? `\n${f.description}` : ''}${optionsHint}`
+				);
+				if (raw === null) return null; // キャンセル
+				if (raw === '' && f.required) {
+					alert(`${f.label}は必須です。入力してください。`);
+					continue;
+				}
+				break;
+			}
 			if (raw === '' && !f.required) continue;
 			inputArgs[f.key] = f.type === 'number' ? Number(raw) : raw;
 		}

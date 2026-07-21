@@ -9,6 +9,8 @@
 		fields?: LocalField[];
 		availableTables?: { value: string; label: string }[];
 		fieldTypes?: { value: CustomFieldType | 'recordSelect' | 'account'; label: string }[];
+		/** true の場合、「必須」の代わりに「未設定を許容する」チェックボックスを表示する（チェックを外すのがデフォルト＝必須がデフォルト）。 */
+		nullableCheckbox?: boolean;
 	};
 
 	const FIELD_TYPES: { value: CustomFieldType | 'recordSelect' | 'account'; label: string }[] = [
@@ -23,7 +25,7 @@
 		{ value: 'account', label: 'アカウント' }
 	];
 
-	let { fields = $bindable([]), availableTables = [], fieldTypes = FIELD_TYPES }: Props = $props();
+	let { fields = $bindable([]), availableTables = [], fieldTypes = FIELD_TYPES, nullableCheckbox = false }: Props = $props();
 
 	function addField() {
 		fields = [...fields, {
@@ -31,7 +33,8 @@
 			key: '',
 			label: '',
 			type: 'text',
-			required: false,
+			// nullableCheckboxモードでは「未設定を許容する」がデフォルトOFF＝必須がデフォルト
+			required: nullableCheckbox,
 			options: []
 		}];
 	}
@@ -91,10 +94,13 @@
 							<input
 								id="req-{field._id}"
 								type="checkbox"
-								checked={field.required}
-								onchange={(e) => updateField(field._id, { required: (e.target as HTMLInputElement).checked })}
+								checked={nullableCheckbox ? !field.required : field.required}
+								onchange={(e) => {
+									const checked = (e.target as HTMLInputElement).checked;
+									updateField(field._id, { required: nullableCheckbox ? !checked : checked });
+								}}
 							/>
-							必須
+							{nullableCheckbox ? '未設定を許容する' : '必須'}
 						</label>
 						<button type="button" class="remove-btn" onclick={() => removeField(field._id)} aria-label="フィールドを削除">
 							<X size={14} />
