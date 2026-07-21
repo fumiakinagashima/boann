@@ -77,15 +77,6 @@
 	let steps = $state<WorkflowStep[]>(untrack(() => cloneSteps(initSteps)));
 	let inputSchemaDrawerOpen = $state(false);
 
-	const HOURS = Array.from({ length: 24 }, (_, i) => i);
-	const MINUTES = Array.from({ length: 60 }, (_, i) => i);
-
-	const EVENT_OPTIONS: { value: 'create' | 'update' | 'delete'; label: string }[] = [
-		{ value: 'create', label: '作成時' },
-		{ value: 'update', label: '更新時' },
-		{ value: 'delete', label: '削除時' }
-	];
-
 	export function getState(): WorkflowState {
 		return { name, description: description || null, triggerType, triggerHour, triggerMinute, triggerEvent, triggerEntityTypeId, inputSchema: stripLocalId(inputSchema), steps };
 	}
@@ -124,49 +115,7 @@
 		{:else}
 			<span class="wf-name">{name}</span>
 		{/if}
-		<span class="wf-trigger">
-			{#if triggerType === 'mcp_tool'}
-				<span class="wf-trigger-type">MCPツールとして公開</span>
-			{:else}
-				{#if editable}
-					<select bind:value={triggerType}>
-						<option value="schedule">スケジュール</option>
-						<option value="event">イベント</option>
-					</select>
-				{:else}
-					<span class="wf-trigger-type">{triggerType === 'event' ? 'イベント' : 'スケジュール'}</span>
-				{/if}
-				{#if triggerType === 'schedule'}
-					毎日
-					<select bind:value={triggerHour} disabled={!editable}>
-						{#each HOURS as h (h)}
-							<option value={h}>{String(h).padStart(2, '0')}</option>
-						{/each}
-					</select>
-					:
-					<select bind:value={triggerMinute} disabled={!editable}>
-						{#each MINUTES as m (m)}
-							<option value={m}>{String(m).padStart(2, '0')}</option>
-						{/each}
-					</select>
-					に実行
-				{:else}
-					<select bind:value={triggerEntityTypeId} disabled={!editable}>
-						<option value={null}>テーブルを選択</option>
-						{#each entityTypes as et (et.id)}
-							<option value={et.id}>{et.label}</option>
-						{/each}
-					</select>
-					<select bind:value={triggerEvent} disabled={!editable}>
-						<option value={null}>イベントを選択</option>
-						{#each EVENT_OPTIONS as opt (opt.value)}
-							<option value={opt.value}>{opt.label}</option>
-						{/each}
-					</select>
-					にトリガー
-				{/if}
-			{/if}
-		</span>
+		<!-- MCP専用フェーズのためトリガー設定UIは非表示（triggerType自体のデータ・ロジックはそのまま維持） -->
 		{#if onsave}
 			<button class="btn-save" onclick={() => onsave?.(getState())}>保存</button>
 		{/if}
@@ -248,26 +197,6 @@
 		font-size: 0.9375rem;
 		font-weight: 600;
 		color: var(--color-text);
-	}
-
-	.wf-trigger {
-		display: flex;
-		align-items: center;
-		gap: 4px;
-		font-size: 0.8125rem;
-		color: var(--color-text-muted);
-
-		select {
-			padding: 3px 6px;
-			border: 1px solid var(--color-border);
-			border-radius: 5px;
-			background: var(--color-surface);
-			color: var(--color-text);
-			&:focus {
-				outline: none;
-				border-color: var(--color-primary);
-			}
-		}
 	}
 
 	.wf-description-row {

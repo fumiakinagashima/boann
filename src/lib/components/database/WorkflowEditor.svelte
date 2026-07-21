@@ -4,7 +4,6 @@
 	import { toast } from '$lib/stores/toast.svelte';
 	import Workflow, { type WorkflowState } from '$lib/components/chat/Workflow.svelte';
 	import WorkflowChatPanel from './WorkflowChatPanel.svelte';
-	import Toggle from '$lib/components/ui/Toggle.svelte';
 	import { formatJstDateTime } from '$lib/datetime';
 	import type { WorkflowStep } from '$lib/types/chat';
 	import type { WorkflowRunRow, StepLog } from '$lib/server/db/workflow-run-service';
@@ -49,9 +48,10 @@
 		noChatPanel = false
 	}: Props = $props();
 
-	// 保存後も画面遷移しないため、新規作成時に発行されたidを保持する（今すぐ実行・有効化の切替に使用）
+	// 保存後も画面遷移しないため、新規作成時に発行されたidを保持する
 	let currentId = $state(untrack(() => id));
-	let enabled = $state(untrack(() => initialEnabled));
+	// MCP専用フェーズのため常に有効化する（トグルUIは非表示、initialEnabledは無視）
+	let enabled = $state(true);
 
 	type WorkflowInstance = {
 		getState: () => WorkflowState;
@@ -198,16 +198,10 @@
 
 <div class="editor-wrap">
 	<div class="editor-row1">
-		<Toggle bind:checked={enabled} label="有効化" />
 		<div class="editor-row1-actions">
 			<button class="btn-input-schema" onclick={() => wfRef?.openInputSchemaDrawer()}>
 				⚙ 入力パラメータ
 			</button>
-			{#if currentId}
-				<button class="btn-run-now" onclick={runNow} disabled={runningNow}>
-					{runningNow ? '実行中...' : '▶ 今すぐ実行'}
-				</button>
-			{/if}
 			<button class="btn-ai-review" onclick={runAiReview} disabled={aiReviewLoading}>
 				{#if aiReviewLoading}
 					レビュー中...
