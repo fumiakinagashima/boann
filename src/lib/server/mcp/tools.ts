@@ -11,13 +11,22 @@ import {
 	getRecordOwnerEntityTypeId,
 	type TableInfo
 } from '../db/table-service';
-import { buildEntityDataSchema, toJsonSchema } from './field-schema';
+import { buildEntityDataSchema, buildRecordOutputSchema, toJsonSchema } from './field-schema';
 import { listWorkflowsByAppId, type WorkflowRow } from '../db/workflow-service';
 import { runWorkflowNow } from '../workflow/run';
 import type { ToolEnv } from '../tools/shared';
 
-export type McpTool = { name: string; description: string; inputSchema: Record<string, unknown> };
-export type McpToolResult = { content: { type: 'text'; text: string }[]; isError?: true };
+export type McpTool = {
+	name: string;
+	description: string;
+	inputSchema: Record<string, unknown>;
+	outputSchema?: Record<string, unknown>;
+};
+export type McpToolResult = {
+	content: { type: 'text'; text: string }[];
+	structuredContent?: unknown;
+	isError?: true;
+};
 
 const LIST_ARGS_SCHEMA = z.object({ limit: z.number().int().positive().max(200).optional() });
 const ID_ARGS_SCHEMA = z.object({ id: z.string().min(1) });
@@ -46,40 +55,46 @@ export async function listAppMcpTools(db: Db, appId: string): Promise<McpTool[]>
 	const workflowTools: McpTool[] = workflows.map((w) => ({
 		name: `run_workflow_${w.id.slice(0, 8)}`,
 		description: `ワークフロー「${w.name}」を実行する。`,
-		inputSchema: toJsonSchema(buildEntityDataSchema(w.inputSchema, 'create'))
+		inputSchema: toJsonSchema(buildEntityDataSchema(w.inputSchema, 'create')),
+		outputSchema: toJsonSchema(z.object({ ok: z.boolean(), name: z.string() }))
 	}));
 	const tableTools = tables.flatMap((t) => [
 		{
 			name: `list_${t.id}`,
 			description: `${t.label}のレコード一覧を取得する。`,
-			inputSchema: toJsonSchema(LIST_ARGS_SCHEMA)
+			inputSchema: toJsonSchema(LIST_ARGS_SCHEMA),
+			outputSchema: toJsonSchema(z.array(buildRecordOutputSchema(t.fields)))
 		},
 		{
 			name: `get_${t.id}`,
 			description: `${t.label}のレコードを1件取得する。`,
-			inputSchema: toJsonSchema(ID_ARGS_SCHEMA)
+			inputSchema: toJsonSchema(ID_ARGS_SCHEMA),
+			outputSchema: toJsonSchema(buildRecordOutputSchema(t.fields))
 		},
 		{
 			name: `create_${t.id}`,
 			description: `${t.label}にレコードを登録する。`,
-			inputSchema: toJsonSchema(buildEntityDataSchema(t.fields, 'create'))
+			inputSchema: toJsonSchema(buildEntityDataSchema(t.fields, 'create')),
+			outputSchema: toJsonSchema(buildRecordOutputSchema(t.fields))
 		},
 		{
 			name: `update_${t.id}`,
 			description: `${t.label}のレコードを更新する（指定したフィールドのみ既存データにマージ）。`,
-			inputSchema: toJsonSchema(z.object({ id: z.string().min(1) }).extend(buildEntityDataSchema(t.fields, 'update').shape))
+			inputSchema: toJsonSchema(z.object({ id: z.string().min(1) }).extend(buildEntityDataSchema(t.fields, 'update').shape)),
+			outputSchema: toJsonSchema(buildRecordOutputSchema(t.fields))
 		},
 		{
 			name: `delete_${t.id}`,
 			description: `${t.label}のレコードを削除する。`,
-			inputSchema: toJsonSchema(ID_ARGS_SCHEMA)
+			inputSchema: toJsonSchema(ID_ARGS_SCHEMA),
+			outputSchema: toJsonSchema(z.object({ deleted: z.boolean(), id: z.string() }))
 		}
 	]);
 	return [...tableTools, ...workflowTools];
 }
 
 function toolOk(data: unknown): McpToolResult {
-	return { content: [{ type: 'text', text: JSON.stringify(data, null, 2) }] };
+	return { content: [{ type: 'text', text: JSON.stringify(data, null, 2) }], structuredContent: data };
 }
 
 function toolError(message: string): McpToolResult {

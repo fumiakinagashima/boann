@@ -44,6 +44,26 @@ export function buildEntityDataSchema(fields: FieldDef[], mode: 'create' | 'upda
 	return z.object(shape).strict();
 }
 
+/**
+ * entity_fields の定義から、MCPツールのtools/call結果（outputSchema）を説明するZodスキーマを組み立てる。
+ * 入力検証用の buildEntityDataSchema とは異なり、既存レコードの実データを説明するものなので
+ * 全フィールドoptional（データ欠損があり得る）にし、.strict()ではなく.passthrough()にする
+ * （フィールド定義から削除された古いキーが実データに残っている場合があるため、追加プロパティを許容する）。
+ */
+export function buildRecordOutputSchema(fields: FieldDef[]) {
+	const dataShape = buildEntityDataSchema(fields, 'update').shape;
+	return z
+		.object({
+			id: z.string(),
+			...dataShape,
+			createdAt: z.number().nullable(),
+			updatedAt: z.number().nullable(),
+			createdBy: z.string().nullable(),
+			updatedBy: z.string().nullable()
+		})
+		.passthrough();
+}
+
 /** tools/list の inputSchema として渡す素のJSON Schemaに変換する（$schemaフィールドは除去）。 */
 export function toJsonSchema(schema: z.ZodTypeAny): Record<string, unknown> {
 	const { $schema: _drop, ...rest } = z.toJSONSchema(schema) as Record<string, unknown>;
