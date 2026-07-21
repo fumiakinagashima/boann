@@ -160,7 +160,7 @@ export const RECORD_VIEW_HTML = `<!DOCTYPE html>
       root.appendChild(pre);
       return;
     }
-    if (Array.isArray(data)) renderTable(data); else renderDetail(data || {});
+    if (data && Array.isArray(data.records)) renderTable(data.records); else renderDetail(data || {});
   }
 
   sendRequest('ui/initialize', {

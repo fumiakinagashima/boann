@@ -68,7 +68,9 @@ export async function listAppMcpTools(db: Db, appId: string): Promise<McpTool[]>
 			name: `list_${t.id}`,
 			description: `${t.label}のレコード一覧を取得する。`,
 			inputSchema: toJsonSchema(LIST_ARGS_SCHEMA),
-			outputSchema: toJsonSchema(z.array(buildRecordOutputSchema(t.fields))),
+			// structuredContentはMCP仕様上オブジェクトである必要がある（配列は一部クライアントのバリデーションで拒否される。
+			// 実機確認: Pydantic系クライアントで"structuredContent Input should be a valid dictionary"エラーになった）。
+			outputSchema: toJsonSchema(z.object({ records: z.array(buildRecordOutputSchema(t.fields)) })),
 			_meta: RECORD_VIEW_META
 		}, {
 			name: `get_${t.id}`,
@@ -173,7 +175,7 @@ export async function callAppMcpTool(
 			if (!table.mcpRead) return toolError(`Unknown tool: ${toolName}`);
 			const parsed = LIST_ARGS_SCHEMA.safeParse(rawArgs);
 			if (!parsed.success) return toolError(formatZodError(parsed.error));
-			return toolOk(await listRecordsByEntityTypeId(db, table.entityTypeId, parsed.data.limit ?? 50));
+			return toolOk({ records: await listRecordsByEntityTypeId(db, table.entityTypeId, parsed.data.limit ?? 50) });
 		}
 		case 'get': {
 			if (!table.mcpRead) return toolError(`Unknown tool: ${toolName}`);
