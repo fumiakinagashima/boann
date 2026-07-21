@@ -27,6 +27,6 @@ export const POST: RequestHandler = async ({ params, request, platform }) => {
 		return json(rpcError(null, RpcErrorCode.ParseError, 'Parse error'), { status: 200 });
 	}
 
-	const { httpStatus, body: resBody } = await handleMcpMessage(db, params.id, body);
+	const { httpStatus, body: resBody } = await handleMcpMessage(db, params.id, body, platform.env);
 	return resBody === null ? new Response(null, { status: httpStatus }) : json(resBody, { status: httpStatus });
 };

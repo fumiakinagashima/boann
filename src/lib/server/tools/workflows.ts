@@ -43,7 +43,7 @@ const workflowInputFieldSchema = z.object({
 const saveWorkflowInputSchema = z.object({
 	id: z.string().optional(),
 	name: z.string().min(1),
-	triggerType: z.enum(['schedule', 'event']).optional(),
+	triggerType: z.enum(['schedule', 'event', 'mcp_tool']).optional(),
 	triggerHour: z.number().int().min(0).max(23),
 	triggerMinute: z.number().int().min(0).max(59),
 	triggerEvent: z.enum(['create', 'update', 'delete']).nullable().optional(),
@@ -62,7 +62,7 @@ export const tools: Tool[] = [
 			properties: {
 				id: { type: 'string', description: '既存ワークフローを更新する場合のID（get_workflowで取得した値）。新規作成時は指定しない' },
 				name: { type: 'string', description: 'ワークフロー名' },
-				triggerType: { type: 'string', enum: ['schedule', 'event'], description: 'トリガー種別。schedule=毎日指定時刻、event=レコード操作時。省略時はschedule' },
+				triggerType: { type: 'string', enum: ['schedule', 'event', 'mcp_tool'], description: 'トリガー種別。schedule=毎日指定時刻、event=レコード操作時、mcp_tool=外部MCPエージェントからの呼び出し時（スケジュール・イベントの設定は不要）。省略時はmcp_tool' },
 				triggerHour: { type: 'number', description: '実行時刻（時、0-23、JST）。schedule時のみ有効' },
 				triggerMinute: { type: 'number', description: '実行時刻（分、0-59、JST）。schedule時のみ有効' },
 				triggerEvent: { type: 'string', enum: ['create', 'update', 'delete'], description: 'event時のみ。対象操作（create=作成、update=更新、delete=削除）' },

@@ -9,7 +9,7 @@
 
 	export type WorkflowState = {
 		name: string;
-		triggerType?: 'schedule' | 'event';
+		triggerType?: 'schedule' | 'event' | 'mcp_tool';
 		triggerHour: number;
 		triggerMinute: number;
 		triggerEvent?: 'create' | 'update' | 'delete' | null;
@@ -20,7 +20,7 @@
 
 	type Props = {
 		name: string;
-		triggerType?: 'schedule' | 'event';
+		triggerType?: 'schedule' | 'event' | 'mcp_tool';
 		triggerHour: number;
 		triggerMinute: number;
 		triggerEvent?: 'create' | 'update' | 'delete' | null;
@@ -64,7 +64,7 @@
 	}
 
 	let name = $state(untrack(() => initName));
-	let triggerType = $state<'schedule' | 'event'>(untrack(() => initTriggerType));
+	let triggerType = $state<'schedule' | 'event' | 'mcp_tool'>(untrack(() => initTriggerType));
 	let triggerHour = $state(untrack(() => initHour));
 	let triggerMinute = $state(untrack(() => initMinute));
 	let triggerEvent = $state<'create' | 'update' | 'delete' | null>(untrack(() => initTriggerEvent));
@@ -120,42 +120,46 @@
 			<span class="wf-name">{name}</span>
 		{/if}
 		<span class="wf-trigger">
-			{#if editable}
-				<select bind:value={triggerType}>
-					<option value="schedule">スケジュール</option>
-					<option value="event">イベント</option>
-				</select>
+			{#if triggerType === 'mcp_tool'}
+				<span class="wf-trigger-type">MCPツールとして公開</span>
 			{:else}
-				<span class="wf-trigger-type">{triggerType === 'event' ? 'イベント' : 'スケジュール'}</span>
-			{/if}
-			{#if triggerType === 'schedule'}
-				毎日
-				<select bind:value={triggerHour} disabled={!editable}>
-					{#each HOURS as h (h)}
-						<option value={h}>{String(h).padStart(2, '0')}</option>
-					{/each}
-				</select>
-				:
-				<select bind:value={triggerMinute} disabled={!editable}>
-					{#each MINUTES as m (m)}
-						<option value={m}>{String(m).padStart(2, '0')}</option>
-					{/each}
-				</select>
-				に実行
-			{:else}
-				<select bind:value={triggerEntityTypeId} disabled={!editable}>
-					<option value={null}>テーブルを選択</option>
-					{#each entityTypes as et (et.id)}
-						<option value={et.id}>{et.label}</option>
-					{/each}
-				</select>
-				<select bind:value={triggerEvent} disabled={!editable}>
-					<option value={null}>イベントを選択</option>
-					{#each EVENT_OPTIONS as opt (opt.value)}
-						<option value={opt.value}>{opt.label}</option>
-					{/each}
-				</select>
-				にトリガー
+				{#if editable}
+					<select bind:value={triggerType}>
+						<option value="schedule">スケジュール</option>
+						<option value="event">イベント</option>
+					</select>
+				{:else}
+					<span class="wf-trigger-type">{triggerType === 'event' ? 'イベント' : 'スケジュール'}</span>
+				{/if}
+				{#if triggerType === 'schedule'}
+					毎日
+					<select bind:value={triggerHour} disabled={!editable}>
+						{#each HOURS as h (h)}
+							<option value={h}>{String(h).padStart(2, '0')}</option>
+						{/each}
+					</select>
+					:
+					<select bind:value={triggerMinute} disabled={!editable}>
+						{#each MINUTES as m (m)}
+							<option value={m}>{String(m).padStart(2, '0')}</option>
+						{/each}
+					</select>
+					に実行
+				{:else}
+					<select bind:value={triggerEntityTypeId} disabled={!editable}>
+						<option value={null}>テーブルを選択</option>
+						{#each entityTypes as et (et.id)}
+							<option value={et.id}>{et.label}</option>
+						{/each}
+					</select>
+					<select bind:value={triggerEvent} disabled={!editable}>
+						<option value={null}>イベントを選択</option>
+						{#each EVENT_OPTIONS as opt (opt.value)}
+							<option value={opt.value}>{opt.label}</option>
+						{/each}
+					</select>
+					にトリガー
+				{/if}
 			{/if}
 		</span>
 		{#if onsave}

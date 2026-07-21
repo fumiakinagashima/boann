@@ -14,7 +14,7 @@ export const POST: RequestHandler = async ({ request, platform, locals }) => {
 		const db = createDb(platform.env.DB);
 		const body = (await request.json()) as {
 			name?: string;
-			triggerType?: 'schedule' | 'event';
+			triggerType?: 'schedule' | 'event' | 'mcp_tool';
 			triggerHour?: number;
 			triggerMinute?: number;
 			triggerEvent?: 'create' | 'update' | 'delete' | null;
@@ -25,7 +25,7 @@ export const POST: RequestHandler = async ({ request, platform, locals }) => {
 		};
 		const name = body.name?.trim();
 		if (!name) return json({ error: 'ワークフロー名を入力してください' }, { status: 422 });
-		const triggerType = body.triggerType ?? 'schedule';
+		const triggerType = body.triggerType ?? 'mcp_tool';
 		const triggerHour = body.triggerHour ?? 9;
 		const triggerMinute = body.triggerMinute ?? 0;
 		const steps = body.steps ?? [];

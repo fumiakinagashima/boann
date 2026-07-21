@@ -2,6 +2,7 @@ import { z } from 'zod';
 import type { Db } from '../db';
 import { RpcErrorCode, rpcError, rpcResult, type JsonRpcId } from './jsonrpc';
 import { listAppMcpTools, callAppMcpTool } from './tools';
+import type { ToolEnv } from '../tools/shared';
 
 export const SUPPORTED_PROTOCOL_VERSIONS = ['2025-06-18', '2025-03-26', '2024-11-05'];
 const SERVER_INFO = { name: 'boann', version: '0.1.0' };
@@ -24,14 +25,14 @@ function handleInitialize(params: unknown) {
 	return { protocolVersion, capabilities: { tools: {} }, serverInfo: SERVER_INFO };
 }
 
-async function handleToolsCall(db: Db, appId: string, params: unknown) {
+async function handleToolsCall(db: Db, appId: string, params: unknown, env?: ToolEnv) {
 	const p = params as { name?: string; arguments?: unknown } | undefined;
 	if (!p?.name) return { content: [{ type: 'text' as const, text: 'tool name is required' }], isError: true as const };
-	return callAppMcpTool(db, appId, p.name, p.arguments ?? {});
+	return callAppMcpTool(db, appId, p.name, p.arguments ?? {}, env);
 }
 
 /** 1件のJSON-RPCメッセージを処理する。SvelteKit非依存の純関数（vitestからも直接呼べる）。 */
-export async function handleMcpMessage(db: Db, appId: string, msg: unknown): Promise<McpResponse> {
+export async function handleMcpMessage(db: Db, appId: string, msg: unknown, env?: ToolEnv): Promise<McpResponse> {
 	const parsed = jsonRpcMessageSchema.safeParse(msg);
 	if (!parsed.success) {
 		return { httpStatus: 200, body: rpcError(null, RpcErrorCode.InvalidRequest, 'Invalid JSON-RPC request') };
@@ -56,7 +57,7 @@ export async function handleMcpMessage(db: Db, appId: string, msg: unknown): Pro
 				result = { tools: await listAppMcpTools(db, appId) };
 				break;
 			case 'tools/call':
-				result = await handleToolsCall(db, appId, params);
+				result = await handleToolsCall(db, appId, params, env);
 				break;
 			default:
 				if (isNotification) return { httpStatus: 202, body: null };

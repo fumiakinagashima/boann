@@ -340,7 +340,7 @@ function renderInputSchemaForAI(inputSchema: { key: string; label: string; type:
 
 export function buildWorkflowReviewPrompt(input: {
 	name: string;
-	triggerType?: 'schedule' | 'event';
+	triggerType?: 'schedule' | 'event' | 'mcp_tool';
 	triggerHour: number;
 	triggerMinute: number;
 	triggerEvent?: 'create' | 'update' | 'delete' | null;
@@ -369,7 +369,7 @@ ${input.steps.length > 0 ? renderWorkflowStepsForAI(input.steps) : '（ステッ
 
 export function buildWorkflowChatSystemPrompt(current: {
 	name: string;
-	triggerType?: 'schedule' | 'event';
+	triggerType?: 'schedule' | 'event' | 'mcp_tool';
 	triggerHour: number;
 	triggerMinute: number;
 	triggerEvent?: 'create' | 'update' | 'delete' | null;

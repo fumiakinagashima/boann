@@ -172,7 +172,7 @@ export type WorkflowContent = {
 	type: 'workflow';
 	id?: string;
 	name: string;
-	triggerType: 'schedule' | 'event';
+	triggerType: 'schedule' | 'event' | 'mcp_tool';
 	triggerHour: number;
 	triggerMinute: number;
 	triggerEvent: 'create' | 'update' | 'delete' | null;

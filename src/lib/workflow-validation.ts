@@ -151,7 +151,7 @@ function resolveOperandType(
 }
 
 export function validateWorkflow(
-	triggerType: 'schedule' | 'event' = 'schedule',
+	triggerType: 'schedule' | 'event' | 'mcp_tool' = 'schedule',
 	triggerHour: number,
 	triggerMinute: number,
 	triggerEntityTypeId: string | null | undefined,

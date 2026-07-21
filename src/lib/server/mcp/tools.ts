@@ -12,6 +12,9 @@ import {
 	type TableInfo
 } from '../db/table-service';
 import { buildEntityDataSchema, toJsonSchema } from './field-schema';
+import { listWorkflowsByAppId, type WorkflowRow } from '../db/workflow-service';
+import { runWorkflowNow } from '../workflow/run';
+import type { ToolEnv } from '../tools/shared';
 
 export type McpTool = { name: string; description: string; inputSchema: Record<string, unknown> };
 export type McpToolResult = { content: { type: 'text'; text: string }[]; isError?: true };
@@ -25,9 +28,27 @@ async function getAppTablesWithFields(db: Db, appId: string): Promise<TableInfo[
 	return tables.filter((t): t is TableInfo => !!t);
 }
 
+/**
+ * MCPツールとして呼び出し可能なワークフロー（triggerType: 'mcp_tool' かつ enabled）を返す。
+ * workflow.name はアプリ内一意でも英数字制限もないため、ツール名にはそのまま使えない
+ * （entity_types.name のようなスラッグが存在しない）。代わりに id 先頭8文字（hex、衝突確率は無視できる）を使う。
+ */
+async function getAppWorkflowTools(db: Db, appId: string): Promise<WorkflowRow[]> {
+	const rows = await listWorkflowsByAppId(db, appId);
+	return rows.filter((w) => w.triggerType === 'mcp_tool' && w.enabled);
+}
+
+const WORKFLOW_TOOL_RE = /^run_workflow_([a-f0-9]{8})$/;
+
 export async function listAppMcpTools(db: Db, appId: string): Promise<McpTool[]> {
 	const tables = await getAppTablesWithFields(db, appId);
-	return tables.flatMap((t) => [
+	const workflows = await getAppWorkflowTools(db, appId);
+	const workflowTools: McpTool[] = workflows.map((w) => ({
+		name: `run_workflow_${w.id.slice(0, 8)}`,
+		description: `ワークフロー「${w.name}」を実行する。`,
+		inputSchema: toJsonSchema(buildEntityDataSchema(w.inputSchema, 'create'))
+	}));
+	const tableTools = tables.flatMap((t) => [
 		{
 			name: `list_${t.id}`,
 			description: `${t.label}のレコード一覧を取得する。`,
@@ -54,6 +75,7 @@ export async function listAppMcpTools(db: Db, appId: string): Promise<McpTool[]>
 			inputSchema: toJsonSchema(ID_ARGS_SCHEMA)
 		}
 	]);
+	return [...tableTools, ...workflowTools];
 }
 
 function toolOk(data: unknown): McpToolResult {
@@ -80,12 +102,39 @@ async function assertOwnedByTable(db: Db, table: TableInfo, id: string): Promise
 	return (await getRecordOwnerEntityTypeId(db, id)) === table.entityTypeId;
 }
 
+async function callWorkflowMcpTool(
+	db: Db,
+	appId: string,
+	toolName: string,
+	rawArgs: unknown,
+	env?: ToolEnv
+): Promise<McpToolResult | null> {
+	const m = WORKFLOW_TOOL_RE.exec(toolName);
+	if (!m) return null;
+	const [, idPrefix] = m;
+
+	const workflows = await getAppWorkflowTools(db, appId);
+	const workflow = workflows.find((w) => w.id.startsWith(idPrefix));
+	if (!workflow) return toolError(`Unknown tool: ${toolName}`);
+
+	const parsed = buildEntityDataSchema(workflow.inputSchema, 'create').safeParse(rawArgs);
+	if (!parsed.success) return toolError(formatZodError(parsed.error));
+
+	const result = await runWorkflowNow(db, workflow.id, env, undefined, parsed.data);
+	if (!result.ok) return toolError(result.error ?? '実行に失敗しました');
+	return toolOk({ ok: true, name: result.name });
+}
+
 export async function callAppMcpTool(
 	db: Db,
 	appId: string,
 	toolName: string,
-	rawArgs: unknown
+	rawArgs: unknown,
+	env?: ToolEnv
 ): Promise<McpToolResult> {
+	const workflowResult = await callWorkflowMcpTool(db, appId, toolName, rawArgs, env);
+	if (workflowResult) return workflowResult;
+
 	const m = TOOL_NAME_RE.exec(toolName);
 	if (!m) return toolError(`Unknown tool: ${toolName}`);
 	const [, action, tableId] = m;

@@ -10,7 +10,7 @@ export type WorkflowRow = {
 	name: string;
 	steps: WorkflowStep[];
 	inputSchema: FieldDef[];
-	triggerType: 'schedule' | 'event';
+	triggerType: 'schedule' | 'event' | 'mcp_tool';
 	triggerHour: number;
 	triggerMinute: number;
 	triggerEvent: 'create' | 'update' | 'delete' | null;
@@ -28,7 +28,7 @@ function toRow(r: typeof workflows.$inferSelect): WorkflowRow {
 		name: r.name,
 		steps: JSON.parse(r.steps) as WorkflowStep[],
 		inputSchema: JSON.parse(r.inputSchema) as FieldDef[],
-		triggerType: (r.triggerType ?? 'schedule') as 'schedule' | 'event',
+		triggerType: (r.triggerType ?? 'schedule') as 'schedule' | 'event' | 'mcp_tool',
 		triggerHour: r.triggerHour,
 		triggerMinute: r.triggerMinute,
 		triggerEvent: (r.triggerEvent ?? null) as 'create' | 'update' | 'delete' | null,
@@ -47,7 +47,7 @@ export async function createWorkflow(
 		name: string;
 		steps: WorkflowStep[];
 		inputSchema?: FieldDef[];
-		triggerType?: 'schedule' | 'event';
+		triggerType?: 'schedule' | 'event' | 'mcp_tool';
 		triggerHour: number;
 		triggerMinute: number;
 		triggerEvent?: 'create' | 'update' | 'delete' | null;
@@ -72,7 +72,7 @@ export async function createWorkflow(
 		name: input.name,
 		steps: JSON.stringify(input.steps),
 		inputSchema: JSON.stringify(input.inputSchema ?? []),
-		triggerType: input.triggerType ?? 'schedule',
+		triggerType: input.triggerType ?? 'mcp_tool',
 		triggerHour: input.triggerHour,
 		triggerMinute: input.triggerMinute,
 		triggerEvent: input.triggerEvent ?? null,
@@ -134,7 +134,7 @@ export async function updateWorkflow(
 		name: string;
 		steps: WorkflowStep[];
 		inputSchema?: FieldDef[];
-		triggerType?: 'schedule' | 'event';
+		triggerType?: 'schedule' | 'event' | 'mcp_tool';
 		triggerHour: number;
 		triggerMinute: number;
 		triggerEvent?: 'create' | 'update' | 'delete' | null;

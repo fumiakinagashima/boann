@@ -16,7 +16,7 @@
 	type Props = {
 		id?: string;
 		initialName?: string;
-		initialTriggerType?: 'schedule' | 'event';
+		initialTriggerType?: 'schedule' | 'event' | 'mcp_tool';
 		initialTriggerHour?: number;
 		initialTriggerMinute?: number;
 		initialTriggerEvent?: 'create' | 'update' | 'delete' | null;

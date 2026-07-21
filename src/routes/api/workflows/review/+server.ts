@@ -17,7 +17,7 @@ export const POST: RequestHandler = async ({ request, platform }) => {
 
 	const body = (await request.json()) as {
 		name?: string;
-		triggerType?: 'schedule' | 'event';
+		triggerType?: 'schedule' | 'event' | 'mcp_tool';
 		triggerHour?: number;
 		triggerMinute?: number;
 		triggerEvent?: 'create' | 'update' | 'delete' | null;
