@@ -690,7 +690,7 @@
 		display: grid;
 		grid-template-columns: 1fr auto;
 		gap: 12px;
-		align-items: start;
+		align-items: center;
 	}
 
 	.form-row-check {

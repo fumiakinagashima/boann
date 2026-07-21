@@ -156,7 +156,11 @@ export function createTableBuildState(getData: () => PageData) {
 	}
 
 	function onLabelInput(row: FieldRow, val: string) {
+		const prevSlug = slugify(row.label);
 		row.label = val;
+		if (!row.key || row.key === prevSlug) {
+			row.key = slugify(val) || val;
+		}
 		markDirty();
 	}
 
