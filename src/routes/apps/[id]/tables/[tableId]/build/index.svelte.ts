@@ -40,12 +40,20 @@ function slugify(s: string): string {
 export function createTableBuildState(getData: () => PageData) {
 	// ── Meta ─────────────────────────────────────────────────────
 	let appLabel = $state(getData().app.label);
+	let mcpCreate = $state(getData().app.mcpCreate);
+	let mcpRead = $state(getData().app.mcpRead);
+	let mcpUpdate = $state(getData().app.mcpUpdate);
+	let mcpDelete = $state(getData().app.mcpDelete);
 
-	// サーバーデータが変わったとき、未保存変更がなければラベルを同期する
+	// サーバーデータが変わったとき、未保存変更がなければラベル・MCP設定を同期する
 	$effect(() => {
-		const serverLabel = getData().app.label;
+		const server = getData().app;
 		if (!untrack(() => dirty) && !untrack(() => saving)) {
-			appLabel = serverLabel;
+			appLabel = server.label;
+			mcpCreate = server.mcpCreate;
+			mcpRead = server.mcpRead;
+			mcpUpdate = server.mcpUpdate;
+			mcpDelete = server.mcpDelete;
 		}
 	});
 
@@ -97,6 +105,7 @@ export function createTableBuildState(getData: () => PageData) {
 				headers: { 'Content-Type': 'application/json' },
 				body: JSON.stringify({
 					label: appLabel.trim(),
+					mcpCreate, mcpRead, mcpUpdate, mcpDelete,
 					fields: validRows.map((r, i) => ({
 						_id: r._id,
 						key: r.key,
@@ -226,6 +235,14 @@ export function createTableBuildState(getData: () => PageData) {
 	return {
 		get appLabel() { return appLabel; },
 		set appLabel(v: string) { appLabel = v; markDirty(); },
+		get mcpCreate() { return mcpCreate; },
+		set mcpCreate(v: boolean) { mcpCreate = v; markDirty(); },
+		get mcpRead() { return mcpRead; },
+		set mcpRead(v: boolean) { mcpRead = v; markDirty(); },
+		get mcpUpdate() { return mcpUpdate; },
+		set mcpUpdate(v: boolean) { mcpUpdate = v; markDirty(); },
+		get mcpDelete() { return mcpDelete; },
+		set mcpDelete(v: boolean) { mcpDelete = v; markDirty(); },
 		get rows() { return rows; },
 		get dirty() { return dirty; },
 		get saving() { return saving; },

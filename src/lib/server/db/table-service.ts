@@ -52,6 +52,11 @@ export type TableInfo = {
 	icon: string;
 	isCore: boolean;
 	fields: FieldDef[];
+	// 外部MCPサーバー経由で許可するCRUD操作（デフォルト全許可）。
+	mcpCreate: boolean;
+	mcpRead: boolean;
+	mcpUpdate: boolean;
+	mcpDelete: boolean;
 };
 
 export type RecordRow = Record<string, string | number | null>;
@@ -81,7 +86,8 @@ export { SYSTEM_DISPLAY_FIELDS } from '$lib/system-fields';
 function accountTableInfo(): TableInfo {
 	return {
 		id: ACCOUNT_REF_TABLE, entityTypeId: '', label: 'アカウント', icon: 'user', isCore: true,
-		fields: [{ key: ACCOUNT_LABEL_KEY, label: '名前', type: 'text', required: true, options: [], listable: true }]
+		fields: [{ key: ACCOUNT_LABEL_KEY, label: '名前', type: 'text', required: true, options: [], listable: true }],
+		mcpCreate: false, mcpRead: true, mcpUpdate: false, mcpDelete: false
 	};
 }
 
@@ -106,6 +112,7 @@ export async function getTableInfo(db: Db, type: string, appId?: string | null):
 
 	return {
 		id: et.name, entityTypeId: et.id, label: et.label, icon: et.icon ?? 'table', isCore: false,
+		mcpCreate: et.mcpCreate, mcpRead: et.mcpRead, mcpUpdate: et.mcpUpdate, mcpDelete: et.mcpDelete,
 		fields: fields.map(f => ({
 			key: f.key, label: f.label, type: f.type, required: f.required,
 			options: JSON.parse(f.options ?? '[]'), listable: true,
@@ -130,6 +137,7 @@ export async function listAllTables(db: Db): Promise<(TableInfo & { count: numbe
 			]);
 			return {
 				id: et.name, entityTypeId: et.id, label: et.label, icon: et.icon ?? 'table', isCore: false, count,
+				mcpCreate: et.mcpCreate, mcpRead: et.mcpRead, mcpUpdate: et.mcpUpdate, mcpDelete: et.mcpDelete,
 				fields: fields.map(f => ({
 					key: f.key, label: f.label, type: f.type, required: f.required,
 					options: JSON.parse(f.options ?? '[]'), listable: true,
@@ -360,6 +368,10 @@ export type EntityTypeInput = {
 	icon?: string;
 	appId: string;
 	fields: EditableField[];
+	mcpCreate?: boolean;
+	mcpRead?: boolean;
+	mcpUpdate?: boolean;
+	mcpDelete?: boolean;
 };
 
 export type AppInput = {
@@ -434,7 +446,10 @@ export async function createEntityType(db: Db, input: EntityTypeInput): Promise<
 	// テーブルは app 内の末尾に追加する。ページはテーブルとは独立して別途作成する（自動生成しない）。
 	const tableSortOrder = await nextSortOrder(db, entityTypes, entityTypes.appId, input.appId ?? null, entityTypes.sortOrder);
 	await db.batch([
-		db.insert(entityTypes).values({ id, name: input.name, label: input.label, icon: input.icon, appId: input.appId, sortOrder: tableSortOrder }),
+		db.insert(entityTypes).values({
+			id, name: input.name, label: input.label, icon: input.icon, appId: input.appId, sortOrder: tableSortOrder,
+			mcpCreate: input.mcpCreate ?? true, mcpRead: input.mcpRead ?? true, mcpUpdate: input.mcpUpdate ?? true, mcpDelete: input.mcpDelete ?? true
+		}),
 		...(() => {
 			const usedKeys = new Set<string>();
 			return input.fields.map((f, i) => {
@@ -488,8 +503,11 @@ export async function reorderTables(db: Db, appId: string, orderedIds: string[])
 	await db.batch(queries as [BatchItem<'sqlite'>, ...BatchItem<'sqlite'>[]]);
 }
 
-export async function getEntityTypeById(db: Db, id: string): Promise<{ id: string; name: string; label: string; icon: string | null; appId: string | null } | null> {
-	const [et] = await db.select({ id: entityTypes.id, name: entityTypes.name, label: entityTypes.label, icon: entityTypes.icon, appId: entityTypes.appId })
+export async function getEntityTypeById(db: Db, id: string): Promise<{ id: string; name: string; label: string; icon: string | null; appId: string | null; mcpCreate: boolean; mcpRead: boolean; mcpUpdate: boolean; mcpDelete: boolean } | null> {
+	const [et] = await db.select({
+		id: entityTypes.id, name: entityTypes.name, label: entityTypes.label, icon: entityTypes.icon, appId: entityTypes.appId,
+		mcpCreate: entityTypes.mcpCreate, mcpRead: entityTypes.mcpRead, mcpUpdate: entityTypes.mcpUpdate, mcpDelete: entityTypes.mcpDelete
+	})
 		.from(entityTypes).where(eq(entityTypes.id, id));
 	return et ?? null;
 }
@@ -503,10 +521,14 @@ export async function updateEntityType(db: Db, name: string, input: Partial<Enti
 
 	const queries: BatchItem<'sqlite'>[] = [];
 
-	if (input.label != null || input.icon != null) {
+	if (input.label != null || input.icon != null || input.mcpCreate != null || input.mcpRead != null || input.mcpUpdate != null || input.mcpDelete != null) {
 		const metaUpdate = {
 			...(input.label != null ? { label: input.label } : {}),
-			...(input.icon != null ? { icon: input.icon } : {})
+			...(input.icon != null ? { icon: input.icon } : {}),
+			...(input.mcpCreate != null ? { mcpCreate: input.mcpCreate } : {}),
+			...(input.mcpRead != null ? { mcpRead: input.mcpRead } : {}),
+			...(input.mcpUpdate != null ? { mcpUpdate: input.mcpUpdate } : {}),
+			...(input.mcpDelete != null ? { mcpDelete: input.mcpDelete } : {})
 		};
 		queries.push(db.update(entityTypes).set(metaUpdate).where(eq(entityTypes.id, et.id)));
 	}

@@ -59,43 +59,42 @@ export async function listAppMcpTools(db: Db, appId: string): Promise<McpTool[]>
 	const workflows = await getAppWorkflowTools(db, appId);
 	const workflowTools: McpTool[] = workflows.map((w) => ({
 		name: `run_workflow_${w.id.slice(0, 8)}`,
-		description: `ワークフロー「${w.name}」を実行する。`,
+		description: w.description?.trim() || `ワークフロー「${w.name}」を実行する。`,
 		inputSchema: toJsonSchema(buildEntityDataSchema(w.inputSchema, 'create')),
 		outputSchema: toJsonSchema(z.object({ ok: z.boolean(), name: z.string() }))
 	}));
 	const tableTools = tables.flatMap((t) => [
-		{
+		...(t.mcpRead ? [{
 			name: `list_${t.id}`,
 			description: `${t.label}のレコード一覧を取得する。`,
 			inputSchema: toJsonSchema(LIST_ARGS_SCHEMA),
 			outputSchema: toJsonSchema(z.array(buildRecordOutputSchema(t.fields))),
 			_meta: RECORD_VIEW_META
-		},
-		{
+		}, {
 			name: `get_${t.id}`,
 			description: `${t.label}のレコードを1件取得する。`,
 			inputSchema: toJsonSchema(ID_ARGS_SCHEMA),
 			outputSchema: toJsonSchema(buildRecordOutputSchema(t.fields)),
 			_meta: RECORD_VIEW_META
-		},
-		{
+		}] : []),
+		...(t.mcpCreate ? [{
 			name: `create_${t.id}`,
 			description: `${t.label}にレコードを登録する。`,
 			inputSchema: toJsonSchema(buildEntityDataSchema(t.fields, 'create')),
 			outputSchema: toJsonSchema(buildRecordOutputSchema(t.fields))
-		},
-		{
+		}] : []),
+		...(t.mcpUpdate ? [{
 			name: `update_${t.id}`,
 			description: `${t.label}のレコードを更新する（指定したフィールドのみ既存データにマージ）。`,
 			inputSchema: toJsonSchema(z.object({ id: z.string().min(1) }).extend(buildEntityDataSchema(t.fields, 'update').shape)),
 			outputSchema: toJsonSchema(buildRecordOutputSchema(t.fields))
-		},
-		{
+		}] : []),
+		...(t.mcpDelete ? [{
 			name: `delete_${t.id}`,
 			description: `${t.label}のレコードを削除する。`,
 			inputSchema: toJsonSchema(ID_ARGS_SCHEMA),
 			outputSchema: toJsonSchema(z.object({ deleted: z.boolean(), id: z.string() }))
-		}
+		}] : [])
 	]);
 	return [...tableTools, ...workflowTools];
 }
@@ -169,22 +168,26 @@ export async function callAppMcpTool(
 
 	switch (action) {
 		case 'list': {
+			if (!table.mcpRead) return toolError(`Unknown tool: ${toolName}`);
 			const parsed = LIST_ARGS_SCHEMA.safeParse(rawArgs);
 			if (!parsed.success) return toolError(formatZodError(parsed.error));
 			return toolOk(await listRecordsByEntityTypeId(db, table.entityTypeId, parsed.data.limit ?? 50));
 		}
 		case 'get': {
+			if (!table.mcpRead) return toolError(`Unknown tool: ${toolName}`);
 			const parsed = ID_ARGS_SCHEMA.safeParse(rawArgs);
 			if (!parsed.success) return toolError(formatZodError(parsed.error));
 			if (!(await assertOwnedByTable(db, table, parsed.data.id))) return toolError(NOT_FOUND);
 			return toolOk(await getRecord(db, table.id, parsed.data.id));
 		}
 		case 'create': {
+			if (!table.mcpCreate) return toolError(`Unknown tool: ${toolName}`);
 			const parsed = buildEntityDataSchema(table.fields, 'create').safeParse(rawArgs);
 			if (!parsed.success) return toolError(formatZodError(parsed.error));
 			return toolOk(await createRecordByEntityTypeId(db, table.entityTypeId, parsed.data));
 		}
 		case 'update': {
+			if (!table.mcpUpdate) return toolError(`Unknown tool: ${toolName}`);
 			const idParsed = ID_ARGS_SCHEMA.safeParse(rawArgs);
 			if (!idParsed.success) return toolError(formatZodError(idParsed.error));
 			const { id, ...rest } = (rawArgs as Record<string, unknown>) ?? {};
@@ -199,6 +202,7 @@ export async function callAppMcpTool(
 			);
 		}
 		case 'delete': {
+			if (!table.mcpDelete) return toolError(`Unknown tool: ${toolName}`);
 			const parsed = ID_ARGS_SCHEMA.safeParse(rawArgs);
 			if (!parsed.success) return toolError(formatZodError(parsed.error));
 			if (!(await assertOwnedByTable(db, table, parsed.data.id))) return toolError(NOT_FOUND);

@@ -8,6 +8,7 @@ import type { FieldDef } from './table-service';
 export type WorkflowRow = {
 	id: string;
 	name: string;
+	description: string | null;
 	steps: WorkflowStep[];
 	inputSchema: FieldDef[];
 	triggerType: 'schedule' | 'event' | 'mcp_tool';
@@ -26,6 +27,7 @@ function toRow(r: typeof workflows.$inferSelect): WorkflowRow {
 	return {
 		id: r.id,
 		name: r.name,
+		description: r.description ?? null,
 		steps: JSON.parse(r.steps) as WorkflowStep[],
 		inputSchema: JSON.parse(r.inputSchema) as FieldDef[],
 		triggerType: (r.triggerType ?? 'schedule') as 'schedule' | 'event' | 'mcp_tool',
@@ -45,6 +47,7 @@ export async function createWorkflow(
 	db: Db,
 	input: {
 		name: string;
+		description?: string | null;
 		steps: WorkflowStep[];
 		inputSchema?: FieldDef[];
 		triggerType?: 'schedule' | 'event' | 'mcp_tool';
@@ -70,6 +73,7 @@ export async function createWorkflow(
 	await db.insert(workflows).values({
 		id,
 		name: input.name,
+		description: input.description ?? null,
 		steps: JSON.stringify(input.steps),
 		inputSchema: JSON.stringify(input.inputSchema ?? []),
 		triggerType: input.triggerType ?? 'mcp_tool',
@@ -132,6 +136,7 @@ export async function updateWorkflow(
 	id: string,
 	input: {
 		name: string;
+		description?: string | null;
 		steps: WorkflowStep[];
 		inputSchema?: FieldDef[];
 		triggerType?: 'schedule' | 'event' | 'mcp_tool';
@@ -146,6 +151,7 @@ export async function updateWorkflow(
 		.update(workflows)
 		.set({
 			name: input.name,
+			description: input.description ?? null,
 			steps: JSON.stringify(input.steps),
 			inputSchema: JSON.stringify(input.inputSchema ?? []),
 			triggerType: input.triggerType ?? 'schedule',

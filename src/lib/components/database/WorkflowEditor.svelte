@@ -16,6 +16,7 @@
 	type Props = {
 		id?: string;
 		initialName?: string;
+		initialDescription?: string | null;
 		initialTriggerType?: 'schedule' | 'event' | 'mcp_tool';
 		initialTriggerHour?: number;
 		initialTriggerMinute?: number;
@@ -33,6 +34,7 @@
 	let {
 		id,
 		initialName = '新規ワークフロー',
+		initialDescription = null,
 		initialTriggerType = 'schedule',
 		initialTriggerHour = 9,
 		initialTriggerMinute = 0,
@@ -59,7 +61,7 @@
 	let wfRef = $state<WorkflowInstance | null>(null);
 
 	function fallbackState(): WorkflowState {
-		return { name: initialName, triggerType: initialTriggerType, triggerHour: initialTriggerHour, triggerMinute: initialTriggerMinute, triggerEvent: initialTriggerEvent, triggerEntityTypeId: initialTriggerEntityTypeId, inputSchema: initialInputSchema, steps: initialSteps };
+		return { name: initialName, description: initialDescription, triggerType: initialTriggerType, triggerHour: initialTriggerHour, triggerMinute: initialTriggerMinute, triggerEvent: initialTriggerEvent, triggerEntityTypeId: initialTriggerEntityTypeId, inputSchema: initialInputSchema, steps: initialSteps };
 	}
 
 	export function getState(): WorkflowState {
@@ -252,6 +254,7 @@
 			<Workflow
 				bind:this={wfRef}
 				name={initialName}
+				description={initialDescription}
 				triggerType={initialTriggerType}
 				triggerHour={initialTriggerHour}
 				triggerMinute={initialTriggerMinute}

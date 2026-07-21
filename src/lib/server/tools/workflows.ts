@@ -43,6 +43,7 @@ const workflowInputFieldSchema = z.object({
 const saveWorkflowInputSchema = z.object({
 	id: z.string().optional(),
 	name: z.string().min(1),
+	description: z.string().optional(),
 	triggerType: z.enum(['schedule', 'event', 'mcp_tool']).optional(),
 	triggerHour: z.number().int().min(0).max(23),
 	triggerMinute: z.number().int().min(0).max(59),
@@ -62,6 +63,7 @@ export const tools: Tool[] = [
 			properties: {
 				id: { type: 'string', description: '既存ワークフローを更新する場合のID（get_workflowで取得した値）。新規作成時は指定しない' },
 				name: { type: 'string', description: 'ワークフロー名' },
+				description: { type: 'string', description: 'このワークフローが何をするかの説明文。外部MCPエージェントがこのワークフローを呼ぶべきか判断する材料になるため、triggerTypeがmcp_toolの場合は具体的に書く（例: 「指定した顧客に見積作成完了の通知を送る」）' },
 				triggerType: { type: 'string', enum: ['schedule', 'event', 'mcp_tool'], description: 'トリガー種別。schedule=毎日指定時刻、event=レコード操作時、mcp_tool=外部MCPエージェントからの呼び出し時（スケジュール・イベントの設定は不要）。省略時はmcp_tool' },
 				triggerHour: { type: 'number', description: '実行時刻（時、0-23、JST）。schedule時のみ有効' },
 				triggerMinute: { type: 'number', description: '実行時刻（分、0-59、JST）。schedule時のみ有効' },
@@ -139,7 +141,7 @@ export const tools: Tool[] = [
 ];
 
 export async function handleSaveWorkflow(db: Db, input: unknown, env?: ToolEnv) {
-	const { id, name, triggerType, triggerHour, triggerMinute, triggerEvent, triggerEntityTypeId, inputSchema, steps } = saveWorkflowInputSchema.parse(input);
+	const { id, name, description, triggerType, triggerHour, triggerMinute, triggerEvent, triggerEntityTypeId, inputSchema, steps } = saveWorkflowInputSchema.parse(input);
 	const [entityTypes, slackIntegrations] = await Promise.all([
 		listEntityTypesForWorkflow(db),
 		listSlackIntegrationsForWorkflow(db)
@@ -155,7 +157,7 @@ export async function handleSaveWorkflow(db: Db, input: unknown, env?: ToolEnv) 
 		if (existing.accountId && existing.accountId !== env?.accountId) {
 			throw new Error('このワークフローを更新する権限がありません。');
 		}
-		const workflow = await updateWorkflow(db, id, { name, steps, inputSchema: inputSchema as FieldDef[] | undefined, triggerType, triggerHour, triggerMinute, triggerEvent, triggerEntityTypeId });
+		const workflow = await updateWorkflow(db, id, { name, description: description ?? existing.description, steps, inputSchema: inputSchema as FieldDef[] | undefined, triggerType, triggerHour, triggerMinute, triggerEvent, triggerEntityTypeId });
 		return {
 			id: workflow.id,
 			name: workflow.name,
@@ -166,6 +168,7 @@ export async function handleSaveWorkflow(db: Db, input: unknown, env?: ToolEnv) 
 
 	const workflow = await createWorkflow(db, {
 		name,
+		description,
 		steps,
 		inputSchema: inputSchema as FieldDef[] | undefined,
 		triggerType,
@@ -212,6 +215,7 @@ function toGetWorkflowResult(row: WorkflowRow) {
 	return {
 		id: row.id,
 		name: row.name,
+		description: row.description,
 		triggerType: row.triggerType,
 		triggerHour: row.triggerHour,
 		triggerMinute: row.triggerMinute,

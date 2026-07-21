@@ -9,6 +9,7 @@
 
 	export type WorkflowState = {
 		name: string;
+		description?: string | null;
 		triggerType?: 'schedule' | 'event' | 'mcp_tool';
 		triggerHour: number;
 		triggerMinute: number;
@@ -20,6 +21,7 @@
 
 	type Props = {
 		name: string;
+		description?: string | null;
 		triggerType?: 'schedule' | 'event' | 'mcp_tool';
 		triggerHour: number;
 		triggerMinute: number;
@@ -35,6 +37,7 @@
 
 	let {
 		name: initName,
+		description: initDescription = null,
 		triggerType: initTriggerType = 'schedule',
 		triggerHour: initHour,
 		triggerMinute: initMinute,
@@ -64,6 +67,7 @@
 	}
 
 	let name = $state(untrack(() => initName));
+	let description = $state(untrack(() => initDescription ?? ''));
 	let triggerType = $state<'schedule' | 'event' | 'mcp_tool'>(untrack(() => initTriggerType));
 	let triggerHour = $state(untrack(() => initHour));
 	let triggerMinute = $state(untrack(() => initMinute));
@@ -83,12 +87,13 @@
 	];
 
 	export function getState(): WorkflowState {
-		return { name, triggerType, triggerHour, triggerMinute, triggerEvent, triggerEntityTypeId, inputSchema: stripLocalId(inputSchema), steps };
+		return { name, description: description || null, triggerType, triggerHour, triggerMinute, triggerEvent, triggerEntityTypeId, inputSchema: stripLocalId(inputSchema), steps };
 	}
 
 	/** 外部（AIアシスタントパネル等）から提案された状態を反映する。 */
 	export function setState(def: WorkflowState) {
 		name = def.name;
+		description = def.description ?? '';
 		triggerType = def.triggerType ?? 'schedule';
 		triggerHour = def.triggerHour;
 		triggerMinute = def.triggerMinute;
@@ -166,6 +171,21 @@
 			<button class="btn-save" onclick={() => onsave?.(getState())}>保存</button>
 		{/if}
 	</div>
+
+	{#if editable || description}
+		<div class="wf-description-row">
+			{#if editable}
+				<textarea
+					class="wf-description-input"
+					bind:value={description}
+					placeholder="このワークフローが何をするか説明する（MCPツールとして呼び出す外部AIエージェントが判断材料に使う）"
+					rows="2"
+				></textarea>
+			{:else}
+				<p class="wf-description">{description}</p>
+			{/if}
+		</div>
+	{/if}
 
 	<div class="wf-body">
 		<WorkflowStepList
@@ -248,6 +268,33 @@
 				border-color: var(--color-primary);
 			}
 		}
+	}
+
+	.wf-description-row {
+		padding-bottom: 4px;
+	}
+
+	.wf-description-input {
+		width: 100%;
+		box-sizing: border-box;
+		padding: 6px 8px;
+		border: 1px solid var(--color-border);
+		border-radius: 5px;
+		background: var(--color-surface);
+		color: var(--color-text);
+		font-size: 0.8125rem;
+		font-family: inherit;
+		resize: vertical;
+		outline: none;
+		&:focus { border-color: var(--color-primary); }
+		&::placeholder { color: var(--color-text-muted); opacity: 0.7; }
+	}
+
+	.wf-description {
+		margin: 0;
+		font-size: 0.8125rem;
+		color: var(--color-text-muted);
+		line-height: 1.6;
 	}
 
 	.btn-save {

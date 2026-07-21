@@ -19,6 +19,7 @@ export const PATCH: RequestHandler = async ({ params, request, platform, locals 
 		}
 		const body = (await request.json()) as {
 			name?: string;
+			description?: string | null;
 			triggerType?: 'schedule' | 'event' | 'mcp_tool';
 			triggerHour?: number;
 			triggerMinute?: number;
@@ -29,6 +30,7 @@ export const PATCH: RequestHandler = async ({ params, request, platform, locals 
 			enabled?: boolean;
 		};
 		const name = body.name?.trim() ?? existing.name;
+		const description = body.description !== undefined ? body.description : existing.description;
 		const triggerType = body.triggerType ?? existing.triggerType;
 		const triggerHour = body.triggerHour ?? existing.triggerHour;
 		const triggerMinute = body.triggerMinute ?? existing.triggerMinute;
@@ -47,6 +49,7 @@ export const PATCH: RequestHandler = async ({ params, request, platform, locals 
 
 		const row = await updateWorkflow(db, params.id, {
 			name,
+			description,
 			steps,
 			inputSchema,
 			triggerType,

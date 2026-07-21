@@ -44,6 +44,11 @@ export const entityTypes = sqliteTable(
 		icon: text('icon'),
 		appId: text('app_id').references(() => apps.id),
 		sortOrder: integer('sort_order').notNull().default(0),
+		// 外部MCPサーバー経由で許可するCRUD操作（デフォルト全許可）。「閲覧」はlist_/get_の両方をまとめて制御する。
+		mcpCreate: integer('mcp_create', { mode: 'boolean' }).notNull().default(true),
+		mcpRead: integer('mcp_read', { mode: 'boolean' }).notNull().default(true),
+		mcpUpdate: integer('mcp_update', { mode: 'boolean' }).notNull().default(true),
+		mcpDelete: integer('mcp_delete', { mode: 'boolean' }).notNull().default(true),
 		createdAt: integer('created_at', { mode: 'timestamp' })
 			.notNull()
 			.default(sql`(unixepoch())`)
@@ -207,6 +212,8 @@ export const chatMessages = sqliteTable('chat_messages', {
 export const workflows = sqliteTable('workflows', {
 	id: text('id').primaryKey(),
 	name: text('name').notNull(),
+	// MCPツールとして公開する際のdescriptionに使う自由記述の説明文（未設定ならフォールバック文言を使う）。
+	description: text('description'),
 	steps: text('steps').notNull().default('[]'),
 	inputSchema: text('input_schema').notNull().default('[]'),
 	triggerType: text('trigger_type').notNull().default('schedule'),

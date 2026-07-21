@@ -51,9 +51,45 @@
 						/>
 						<span class="meta-name-hint">{data.app.name}</span>
 					</div>
-					
+
 				</div>
 				{#if form?.message}<p class="delete-error">{form.message}</p>{/if}
+			</section>
+
+			<!-- MCP permissions -->
+			<section>
+				<h2 class="section-title">MCP公開設定</h2>
+				<p class="section-hint">外部MCPエージェントに許可する操作を選択します。オフにした操作のツールは一覧・実行のいずれからも利用できなくなります。</p>
+				<div class="mcp-toggle-list">
+					<label class="mcp-toggle-row">
+						<span>作成</span>
+						<span class="toggle-wrap">
+							<input type="checkbox" bind:checked={s.mcpCreate} />
+							<span class="toggle"></span>
+						</span>
+					</label>
+					<label class="mcp-toggle-row">
+						<span>閲覧</span>
+						<span class="toggle-wrap">
+							<input type="checkbox" bind:checked={s.mcpRead} />
+							<span class="toggle"></span>
+						</span>
+					</label>
+					<label class="mcp-toggle-row">
+						<span>更新</span>
+						<span class="toggle-wrap">
+							<input type="checkbox" bind:checked={s.mcpUpdate} />
+							<span class="toggle"></span>
+						</span>
+					</label>
+					<label class="mcp-toggle-row">
+						<span>削除</span>
+						<span class="toggle-wrap">
+							<input type="checkbox" bind:checked={s.mcpDelete} />
+							<span class="toggle"></span>
+						</span>
+					</label>
+				</div>
 			</section>
 
 			<!-- Fields -->
@@ -467,6 +503,38 @@
 		margin: 8px 0 0;
 		font-size: 0.8125rem;
 		color: var(--color-danger, var(--color-error));
+	}
+
+	/* ── MCP permissions ────────────────────── */
+	.section-hint {
+		font-size: 0.8125rem;
+		color: var(--color-text-muted);
+		margin: -6px 0 0;
+		line-height: 1.5;
+	}
+
+	.mcp-toggle-list {
+		display: flex;
+		flex-direction: column;
+		gap: 10px;
+		border: 1px solid var(--color-border);
+		border-radius: 8px;
+		padding: 4px 14px;
+		background: var(--color-surface);
+	}
+
+	.mcp-toggle-row {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		padding: 8px 0;
+		font-size: 0.875rem;
+		color: var(--color-text);
+		cursor: pointer;
+
+		& + & {
+			border-top: 1px solid var(--color-border);
+		}
 	}
 
 	/* ── Fields ─────────────────────────────── */

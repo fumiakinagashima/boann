@@ -14,6 +14,7 @@ export const POST: RequestHandler = async ({ request, platform, locals }) => {
 		const db = createDb(platform.env.DB);
 		const body = (await request.json()) as {
 			name?: string;
+			description?: string | null;
 			triggerType?: 'schedule' | 'event' | 'mcp_tool';
 			triggerHour?: number;
 			triggerMinute?: number;
@@ -44,6 +45,7 @@ export const POST: RequestHandler = async ({ request, platform, locals }) => {
 
 		const row = await createWorkflow(db, {
 			name,
+			description: body.description ?? null,
 			steps,
 			inputSchema,
 			triggerType,

@@ -54,6 +54,7 @@
 
 	const defaultState: WorkflowState = {
 		name: data.workflow.name,
+		description: data.workflow.description,
 		triggerType: data.workflow.triggerType,
 		triggerHour: data.workflow.triggerHour,
 		triggerMinute: data.workflow.triggerMinute,
@@ -86,6 +87,7 @@
 			bind:this={editorRef}
 			id={data.workflow.id}
 			initialName={data.workflow.name}
+			initialDescription={data.workflow.description}
 			initialTriggerType={data.workflow.triggerType}
 			initialTriggerHour={data.workflow.triggerHour}
 			initialTriggerMinute={data.workflow.triggerMinute}
