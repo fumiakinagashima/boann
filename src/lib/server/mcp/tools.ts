@@ -17,6 +17,8 @@ import { runWorkflowNow } from '../workflow/run';
 import type { ToolEnv } from '../tools/shared';
 import { RECORD_VIEW_URI } from './ui-resources';
 
+// TODO: Tool Annotations（readOnlyHint/destructiveHint/idempotentHint/openWorldHint）未実装（2026-07-21）。
+// list_はreadOnlyHint:true、update_はidempotentHint:true、delete_はdestructiveHint:trueあたりが素直な候補。
 export type McpTool = {
 	name: string;
 	description: string;
