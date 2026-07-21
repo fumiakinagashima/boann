@@ -3,6 +3,7 @@ import type { Db } from '../db';
 import { RpcErrorCode, rpcError, rpcResult, type JsonRpcId } from './jsonrpc';
 import { listAppMcpTools, callAppMcpTool } from './tools';
 import type { ToolEnv } from '../tools/shared';
+import { RECORD_VIEW_URI, RECORD_VIEW_HTML } from './ui-resources';
 
 export const SUPPORTED_PROTOCOL_VERSIONS = ['2025-06-18', '2025-03-26', '2024-11-05'];
 const SERVER_INFO = { name: 'boann', version: '0.1.0' };
@@ -22,13 +23,21 @@ function handleInitialize(params: unknown) {
 		p?.protocolVersion && SUPPORTED_PROTOCOL_VERSIONS.includes(p.protocolVersion)
 			? p.protocolVersion
 			: SUPPORTED_PROTOCOL_VERSIONS[0];
-	return { protocolVersion, capabilities: { tools: {} }, serverInfo: SERVER_INFO };
+	return { protocolVersion, capabilities: { tools: {}, resources: {} }, serverInfo: SERVER_INFO };
 }
 
 async function handleToolsCall(db: Db, appId: string, params: unknown, env?: ToolEnv) {
 	const p = params as { name?: string; arguments?: unknown } | undefined;
 	if (!p?.name) return { content: [{ type: 'text' as const, text: 'tool name is required' }], isError: true as const };
 	return callAppMcpTool(db, appId, p.name, p.arguments ?? {}, env);
+}
+
+function handleResourcesRead(params: unknown) {
+	const p = params as { uri?: string } | undefined;
+	if (p?.uri === RECORD_VIEW_URI) {
+		return { contents: [{ uri: RECORD_VIEW_URI, mimeType: 'text/html;profile=mcp-app', text: RECORD_VIEW_HTML }] };
+	}
+	throw new Error(`Unknown resource: ${p?.uri ?? ''}`);
 }
 
 /** 1件のJSON-RPCメッセージを処理する。SvelteKit非依存の純関数（vitestからも直接呼べる）。 */
@@ -58,6 +67,9 @@ export async function handleMcpMessage(db: Db, appId: string, msg: unknown, env?
 				break;
 			case 'tools/call':
 				result = await handleToolsCall(db, appId, params, env);
+				break;
+			case 'resources/read':
+				result = handleResourcesRead(params);
 				break;
 			default:
 				if (isNotification) return { httpStatus: 202, body: null };

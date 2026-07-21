@@ -15,13 +15,18 @@ import { buildEntityDataSchema, buildRecordOutputSchema, toJsonSchema } from './
 import { listWorkflowsByAppId, type WorkflowRow } from '../db/workflow-service';
 import { runWorkflowNow } from '../workflow/run';
 import type { ToolEnv } from '../tools/shared';
+import { RECORD_VIEW_URI } from './ui-resources';
 
 export type McpTool = {
 	name: string;
 	description: string;
 	inputSchema: Record<string, unknown>;
 	outputSchema?: Record<string, unknown>;
+	_meta?: { ui: { resourceUri: string; visibility?: ('model' | 'app')[] } };
 };
+
+/** list_<table>/get_<table> の結果をチャット内にテーブル/詳細表示するための共通MCP Appsテンプレート。 */
+const RECORD_VIEW_META = { ui: { resourceUri: RECORD_VIEW_URI } };
 export type McpToolResult = {
 	content: { type: 'text'; text: string }[];
 	structuredContent?: unknown;
@@ -63,13 +68,15 @@ export async function listAppMcpTools(db: Db, appId: string): Promise<McpTool[]>
 			name: `list_${t.id}`,
 			description: `${t.label}のレコード一覧を取得する。`,
 			inputSchema: toJsonSchema(LIST_ARGS_SCHEMA),
-			outputSchema: toJsonSchema(z.array(buildRecordOutputSchema(t.fields)))
+			outputSchema: toJsonSchema(z.array(buildRecordOutputSchema(t.fields))),
+			_meta: RECORD_VIEW_META
 		},
 		{
 			name: `get_${t.id}`,
 			description: `${t.label}のレコードを1件取得する。`,
 			inputSchema: toJsonSchema(ID_ARGS_SCHEMA),
-			outputSchema: toJsonSchema(buildRecordOutputSchema(t.fields))
+			outputSchema: toJsonSchema(buildRecordOutputSchema(t.fields)),
+			_meta: RECORD_VIEW_META
 		},
 		{
 			name: `create_${t.id}`,
