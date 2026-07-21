@@ -7,25 +7,21 @@
 
 	type Props = {
 		fields?: LocalField[];
-		availableTables?: { value: string; label: string }[];
-		fieldTypes?: { value: CustomFieldType | 'recordSelect' | 'account'; label: string }[];
-		/** true の場合、「必須」の代わりに「未設定を許容する」チェックボックスを表示する（チェックを外すのがデフォルト＝必須がデフォルト）。 */
-		nullableCheckbox?: boolean;
 	};
 
-	const FIELD_TYPES: { value: CustomFieldType | 'recordSelect' | 'account'; label: string }[] = [
+	// ワークフローの入力パラメータでは、対象テーブル解決の仕組みが別途必要になる
+	// recordSelect/account は今回対象外（将来ここに追加するだけで拡張できる）。
+	// tel/textareaはfieldToZod（field-schema.ts）でtext同様z.string()にしかならず、
+	// 入力パラメータには専用UIも無い（prompt()収集のみ）ため区別する意味がなく含めない。
+	const FIELD_TYPES: { value: CustomFieldType; label: string }[] = [
 		{ value: 'text', label: 'テキスト' },
 		{ value: 'number', label: '数値' },
 		{ value: 'select', label: '選択' },
 		{ value: 'date', label: '日付' },
-		{ value: 'email', label: 'メール' },
-		{ value: 'tel', label: '電話番号' },
-		{ value: 'textarea', label: '長文テキスト' },
-		{ value: 'recordSelect', label: '関係' },
-		{ value: 'account', label: 'アカウント' }
+		{ value: 'email', label: 'メール' }
 	];
 
-	let { fields = $bindable([]), availableTables = [], fieldTypes = FIELD_TYPES, nullableCheckbox = false }: Props = $props();
+	let { fields = $bindable([]) }: Props = $props();
 
 	function addField() {
 		fields = [...fields, {
@@ -33,8 +29,8 @@
 			key: '',
 			label: '',
 			type: 'text',
-			// nullableCheckboxモードでは「未設定を許容する」がデフォルトOFF＝必須がデフォルト
-			required: nullableCheckbox,
+			// 入力パラメータは基本的に必須であってほしいので、デフォルトで必須にする
+			required: true,
 			options: []
 		}];
 	}
@@ -84,9 +80,9 @@
 						/>
 						<select
 							value={field.type}
-							onchange={(e) => updateField(field._id, { type: (e.target as HTMLSelectElement).value as CustomFieldType | 'recordSelect' | 'account' })}
+							onchange={(e) => updateField(field._id, { type: (e.target as HTMLSelectElement).value as CustomFieldType })}
 						>
-							{#each fieldTypes as t}
+							{#each FIELD_TYPES as t}
 								<option value={t.value}>{t.label}</option>
 							{/each}
 						</select>
@@ -94,13 +90,10 @@
 							<input
 								id="req-{field._id}"
 								type="checkbox"
-								checked={nullableCheckbox ? !field.required : field.required}
-								onchange={(e) => {
-									const checked = (e.target as HTMLInputElement).checked;
-									updateField(field._id, { required: nullableCheckbox ? !checked : checked });
-								}}
+								checked={!field.required}
+								onchange={(e) => updateField(field._id, { required: !(e.target as HTMLInputElement).checked })}
 							/>
-							{nullableCheckbox ? '未設定を許容する' : '必須'}
+							未設定を許容する
 						</label>
 						<button type="button" class="remove-btn" onclick={() => removeField(field._id)} aria-label="フィールドを削除">
 							<X size={14} />
@@ -126,20 +119,6 @@
 								value={formatOptions(field.options)}
 								oninput={(e) => updateField(field._id, { options: parseOptions((e.target as HTMLTextAreaElement).value) })}
 							></textarea>
-						</div>
-					{:else if field.type === 'recordSelect'}
-						<div class="options-row">
-							<label class="options-label" for="ref-{field._id}">関連先テーブル</label>
-							<select
-								id="ref-{field._id}"
-								value={field.refTable ?? ''}
-								onchange={(e) => updateField(field._id, { refTable: (e.target as HTMLSelectElement).value })}
-							>
-								<option value="" disabled>選択してください</option>
-								{#each availableTables as t}
-									<option value={t.value}>{t.label}</option>
-								{/each}
-							</select>
 						</div>
 					{/if}
 				</div>

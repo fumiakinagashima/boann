@@ -1,7 +1,7 @@
 <script lang="ts">
 	import X from '$lib/components/icon/X.svelte';
-	import FieldEditor from './FieldEditor.svelte';
-	import type { CustomFieldType, EditableField } from '$lib/server/db/table-service';
+	import WorkflowInputEditor from './WorkflowInputEditor.svelte';
+	import type { EditableField } from '$lib/server/db/table-service';
 
 	type Props = {
 		open: boolean;
@@ -10,18 +10,6 @@
 	};
 
 	let { open, fields = $bindable([]), onclose }: Props = $props();
-
-	// ワークフローの入力パラメータでは、対象テーブル解決の仕組みが別途必要になる
-	// recordSelect/account は今回対象外（将来ここに追加するだけで拡張できる）。
-	// tel/textareaはfieldToZod（field-schema.ts）でtext同様z.string()にしかならず、
-	// 入力パラメータには専用UIも無い（prompt()収集のみ）ため区別する意味がなく含めない。
-	const FIELD_TYPES: { value: CustomFieldType; label: string }[] = [
-		{ value: 'text', label: 'テキスト' },
-		{ value: 'number', label: '数値' },
-		{ value: 'select', label: '選択' },
-		{ value: 'date', label: '日付' },
-		{ value: 'email', label: 'メール' }
-	];
 </script>
 
 {#if open}
@@ -38,7 +26,7 @@
 			<p class="panel-desc">
 				このワークフローを呼び出す側が渡す値を定義する。ステップ内で <code>@input:&lt;key&gt;</code> として参照できる。
 			</p>
-			<FieldEditor bind:fields fieldTypes={FIELD_TYPES} nullableCheckbox />
+			<WorkflowInputEditor bind:fields />
 		</div>
 	</aside>
 {/if}
