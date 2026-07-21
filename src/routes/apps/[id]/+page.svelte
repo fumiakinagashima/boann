@@ -151,6 +151,52 @@
 					</button>
 				</div>
 			</section>
+
+			<!-- トークン管理 -->
+			<section class="list-section">
+				<h2 class="section-label">トークン管理</h2>
+				{#if s.issuedMcpToken}
+					<div class="mcp-token-reveal">
+						<p class="mcp-token-reveal-note">発行されたトークンです。閉じたら二度と表示されません。</p>
+						<div class="mcp-token-reveal-row">
+							<code class="mcp-token-value">{s.issuedMcpToken}</code>
+							<button class="btn-secondary" onclick={s.copyMcpToken}>
+								{s.mcpTokenCopied ? 'コピーしました' : 'コピーする'}
+							</button>
+						</div>
+						<div class="mcp-panel-actions">
+							<button class="btn-secondary" onclick={s.dismissIssuedMcpToken}>閉じる</button>
+						</div>
+					</div>
+				{/if}
+				<div class="mcp-panel">
+					<div class="mcp-endpoint-row">
+						<span class="mcp-label">エンドポイント</span>
+						<code class="mcp-endpoint">/api/apps/{data.app.id}/mcp</code>
+					</div>
+					<div class="mcp-status-row">
+						{#if s.mcpStatus.issued}
+							<span class="mcp-label">トークン</span>
+							<span class="mcp-token-prefix">{s.mcpStatus.tokenPrefix}</span>
+							<span class="mcp-badge">有効</span>
+						{:else}
+							<span class="empty-hint">まだトークンが発行されていません</span>
+						{/if}
+					</div>
+					<div class="mcp-panel-actions">
+						{#if !s.mcpStatus.issued}
+							<button class="btn-save" onclick={s.issueMcpToken} disabled={s.issuingMcpToken}>
+								{s.issuingMcpToken ? '発行中…' : '発行する'}
+							</button>
+						{:else}
+							<button class="btn-secondary" onclick={s.reissueMcpToken} disabled={s.issuingMcpToken}>
+								再発行する
+							</button>
+							<button class="btn-danger-ghost" onclick={s.deleteMcpToken}>削除する</button>
+						{/if}
+					</div>
+				</div>
+			</section>
 		</div>
 	{/snippet}
 
@@ -376,6 +422,97 @@
 		color: var(--color-text-muted);
 		padding: 8px 2px;
 		margin: 0;
+	}
+
+	/* ── トークン管理 ──────────────────────────────────────────── */
+	.btn-secondary {
+		padding: 5px 12px;
+		border-radius: 6px;
+		font-size: 0.8125rem;
+		border: 1px solid var(--color-border);
+		background: none;
+		color: var(--color-text);
+		cursor: pointer;
+		white-space: nowrap;
+		transition: background 0.15s;
+		&:hover:not(:disabled) { background: var(--color-border); }
+		&:disabled { opacity: 0.45; cursor: not-allowed; }
+	}
+
+	.mcp-panel-actions {
+		display: flex;
+		gap: 8px;
+	}
+
+	.mcp-panel {
+		display: flex;
+		flex-direction: column;
+		gap: 8px;
+		padding: 12px 14px;
+		border-radius: 8px;
+		border: 1px solid var(--color-border);
+		background: var(--color-surface);
+	}
+
+	.mcp-endpoint-row,
+	.mcp-status-row {
+		display: flex;
+		align-items: center;
+		gap: 8px;
+		font-size: 0.8125rem;
+	}
+
+	.mcp-label {
+		color: var(--color-text-muted);
+		flex-shrink: 0;
+	}
+
+	.mcp-endpoint,
+	.mcp-token-prefix {
+		font-family: monospace;
+		font-size: 0.8125rem;
+		color: var(--color-text);
+		word-break: break-all;
+	}
+
+	.mcp-badge {
+		padding: 1px 8px;
+		border-radius: 999px;
+		font-size: 0.75rem;
+		font-weight: 600;
+		background: color-mix(in srgb, var(--color-success, #16a34a) 15%, transparent);
+		color: var(--color-success, #16a34a);
+	}
+
+	.mcp-token-reveal {
+		display: flex;
+		flex-direction: column;
+		gap: 6px;
+		padding: 10px 14px;
+		margin-bottom: 8px;
+		border-radius: 8px;
+		border: 1px solid var(--color-primary);
+		background: color-mix(in srgb, var(--color-primary) 8%, transparent);
+	}
+
+	.mcp-token-reveal-note {
+		margin: 0;
+		font-size: 0.8125rem;
+		color: var(--color-text-muted);
+	}
+
+	.mcp-token-reveal-row {
+		display: flex;
+		align-items: center;
+		gap: 8px;
+	}
+
+	.mcp-token-value {
+		flex: 1;
+		font-family: monospace;
+		font-size: 0.8125rem;
+		word-break: break-all;
+		user-select: all;
 	}
 
 	.btn-add-table {

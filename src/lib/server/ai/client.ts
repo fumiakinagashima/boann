@@ -1,7 +1,7 @@
 import Anthropic from '@anthropic-ai/sdk';
 import type { MessageParam } from '@anthropic-ai/sdk/resources/messages';
 import { SYSTEM_PROMPT } from './prompt';
-import { tools, dispatchTool } from '$lib/server/mcp';
+import { tools, dispatchTool } from '$lib/server/tools';
 import type { Db } from '$lib/server/db';
 import type { MessageContent } from '$lib/types/chat';
 

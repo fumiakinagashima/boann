@@ -1,5 +1,5 @@
 import type { Db } from '../db';
-import type { ToolEnv } from '../mcp/shared';
+import type { ToolEnv } from '../tools/shared';
 import { listEnabledEventWorkflows } from '../db/workflow-service';
 import { runWorkflowNow, type TriggerEvent } from './run';
 

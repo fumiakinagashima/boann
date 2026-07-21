@@ -16,6 +16,24 @@ export const apps = sqliteTable('apps', {
 		.default(sql`(unixepoch())`)
 });
 
+// アプリを外部MCPサーバーとして公開するためのBearerトークン。1アプリにつき1トークン
+// （app_id をPKにして1:1を強制、再発行は既存行をupsert）。平文は保存せずハッシュのみ保持する。
+export const appMcpTokens = sqliteTable('app_mcp_tokens', {
+	appId: text('app_id')
+		.primaryKey()
+		.references(() => apps.id),
+	tokenHash: text('token_hash').notNull(),
+	tokenPrefix: text('token_prefix').notNull(),
+	createdAt: integer('created_at', { mode: 'timestamp' })
+		.notNull()
+		.default(sql`(unixepoch())`),
+	updatedAt: integer('updated_at', { mode: 'timestamp' })
+		.notNull()
+		.default(sql`(unixepoch())`),
+	lastUsedAt: integer('last_used_at', { mode: 'timestamp' }),
+	createdBy: text('created_by')
+});
+
 export const entityTypes = sqliteTable(
 	'entity_types',
 	{

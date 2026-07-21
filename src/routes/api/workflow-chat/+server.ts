@@ -4,7 +4,7 @@ import Anthropic from '@anthropic-ai/sdk';
 import type { MessageParam } from '@anthropic-ai/sdk/resources/messages';
 import { env } from '$env/dynamic/private';
 import { createDb } from '$lib/server/db';
-import { dispatchTool, type ToolEnv } from '$lib/server/mcp';
+import { dispatchTool, type ToolEnv } from '$lib/server/tools';
 import { TextStreamProcessor, type StreamEvent } from '$lib/server/ai/stream';
 import { buildWorkflowChatSystemPrompt } from '$lib/server/ai/prompt';
 import { readonlyTools } from '$lib/server/ai/readonly-tools';

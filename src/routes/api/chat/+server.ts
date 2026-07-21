@@ -6,7 +6,7 @@ import { streamChat, type StreamEvent } from '$lib/server/ai/stream';
 import { getAiModel } from '$lib/server/ai/settings';
 import { mockChat } from '$lib/server/ai/mock';
 import { createDb } from '$lib/server/db';
-import { dispatchTool, type ToolEnv } from '$lib/server/mcp';
+import { dispatchTool, type ToolEnv } from '$lib/server/tools';
 import { checkRateLimit } from '$lib/server/rate-limit';
 import { errors } from '$lib/server/errors';
 import type { Message, MessageContent } from '$lib/types/chat';

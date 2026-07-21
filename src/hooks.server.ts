@@ -6,6 +6,9 @@ import { errors } from '$lib/server/errors';
 
 const PUBLIC_PATHS = new Set(['/signin', '/signin/forgot-password', '/signin/reset-password']);
 const PUBLIC_API_PREFIXES = ['/api/auth/'];
+// アプリを外部MCPサーバーとして公開するエンドポイント。ここだけはセッションCookieを持たない
+// 外部エージェントからアクセスされるため、認証自体はエンドポイント側のBearerトークン検証で行う。
+const MCP_ENDPOINT_RE = /^\/api\/apps\/[^/]+\/mcp$/;
 
 // 認証情報・権限変更を含むページ・APIはadmin権限のみアクセス可能
 const ADMIN_ONLY_PREFIXES = [
@@ -23,6 +26,7 @@ const ADMIN_ONLY_PREFIXES = [
 
 function isPublicPath(pathname: string): boolean {
 	if (PUBLIC_PATHS.has(pathname)) return true;
+	if (MCP_ENDPOINT_RE.test(pathname)) return true;
 	return PUBLIC_API_PREFIXES.some((prefix) => pathname.startsWith(prefix));
 }
 

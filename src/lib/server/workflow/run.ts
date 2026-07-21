@@ -1,6 +1,6 @@
 import type { Db } from '../db';
-import type { ToolEnv } from '../mcp/shared';
-import { dispatchTool, type ToolName } from '../mcp';
+import type { ToolEnv } from '../tools/shared';
+import { dispatchTool, type ToolName } from '../tools';
 import { getEnabledWorkflows, getWorkflow, type WorkflowRow } from '../db/workflow-service';
 import { recordWorkflowRun, type StepLog } from '../db/workflow-run-service';
 import { getAccount } from '../db/account-service';

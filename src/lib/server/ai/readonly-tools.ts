@@ -1,4 +1,4 @@
-import { tools } from '$lib/server/mcp';
+import { tools } from '$lib/server/tools';
 
 // 情報取得のみ許可するツール名のセット。フォーム入力サポート・ワークフロー構築サポートなど、
 // データの登録・更新・削除を行わせたくない補助チャットで共有する。

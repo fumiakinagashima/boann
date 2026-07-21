@@ -359,6 +359,17 @@ export async function getRecord(db: Db, type: string, id: string): Promise<Recor
 	};
 }
 
+/**
+ * レコードが実際にどのテーブル(entity_type)に属するかを返す。
+ * getRecord/updateRecordByEntityTypeId/deleteRecord は id のみで操作し type/entityTypeId との
+ * 一致を検証しないため、外部トークンなど新しい信頼境界をまたぐ呼び出し側は、この関数で
+ * 所有権（意図したテーブルのレコードかどうか）を必ず確認してから実処理に入ること。
+ */
+export async function getRecordOwnerEntityTypeId(db: Db, id: string): Promise<string | null> {
+	const [row] = await db.select({ entityTypeId: entities.entityTypeId }).from(entities).where(eq(entities.id, id));
+	return row?.entityTypeId ?? null;
+}
+
 export async function createRecord(db: Db, type: string, data: Record<string, unknown>, accountId?: string, appId?: string | null): Promise<RecordRow> {
 	const id = crypto.randomUUID();
 

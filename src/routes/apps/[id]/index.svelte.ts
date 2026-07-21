@@ -173,6 +173,53 @@ export function createAppBuilderState(getData: () => PageData) {
 		}
 	}
 
+	// ── トークン管理（MCP連携） ─────────────────────────────────────
+	let mcpStatus = $state(getData().mcpStatus);
+	let issuingMcpToken = $state(false);
+	let issuedMcpToken = $state<string | null>(null); // 発行直後の平文。表示後は破棄する
+	let mcpTokenCopied = $state(false);
+
+	$effect(() => {
+		mcpStatus = getData().mcpStatus;
+	});
+
+	async function issueMcpToken() {
+		issuingMcpToken = true;
+		try {
+			const res = await fetch(`/api/apps/${getData().app.id}/mcp-token`, { method: 'POST' });
+			if (res.ok) {
+				const body = await res.json() as { token: string };
+				issuedMcpToken = body.token;
+				await invalidateAll();
+			}
+		} finally {
+			issuingMcpToken = false;
+		}
+	}
+
+	async function reissueMcpToken() {
+		if (!confirm('トークンを再発行しますか？現在のトークンは無効になります。')) return;
+		await issueMcpToken();
+	}
+
+	async function deleteMcpToken() {
+		if (!confirm('MCPトークンを削除しますか？連携中のエージェントからアクセスできなくなります。')) return;
+		await fetch(`/api/apps/${getData().app.id}/mcp-token`, { method: 'DELETE' });
+		await invalidateAll();
+	}
+
+	function dismissIssuedMcpToken() {
+		issuedMcpToken = null;
+		mcpTokenCopied = false;
+	}
+
+	async function copyMcpToken() {
+		if (!issuedMcpToken) return;
+		await navigator.clipboard.writeText(issuedMcpToken);
+		mcpTokenCopied = true;
+		setTimeout(() => (mcpTokenCopied = false), 2000);
+	}
+
 	const chatContext = $derived({
 		appId: getData().app.id,
 		appLabel: getData().app.label,
@@ -197,6 +244,10 @@ export function createAppBuilderState(getData: () => PageData) {
 		get pages() { return pages; },
 		get workflows() { return workflows; },
 		get dragOverId() { return dragOverId; },
+		get mcpStatus() { return mcpStatus; },
+		get issuingMcpToken() { return issuingMcpToken; },
+		get issuedMcpToken() { return issuedMcpToken; },
+		get mcpTokenCopied() { return mcpTokenCopied; },
 		markDirty,
 		save,
 		deleteApp,
@@ -207,5 +258,10 @@ export function createAppBuilderState(getData: () => PageData) {
 		onDragOver,
 		onDrop,
 		onDragEnd,
+		issueMcpToken,
+		reissueMcpToken,
+		deleteMcpToken,
+		dismissIssuedMcpToken,
+		copyMcpToken,
 	};
 }

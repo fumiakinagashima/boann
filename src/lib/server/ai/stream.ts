@@ -2,7 +2,7 @@ import Anthropic from '@anthropic-ai/sdk';
 import type { MessageParam } from '@anthropic-ai/sdk/resources/messages';
 import { eq } from 'drizzle-orm';
 import { buildSystemBlocks, type AppContext } from './prompt';
-import { tools as allTools, dispatchTool } from '$lib/server/mcp';
+import { tools as allTools, dispatchTool } from '$lib/server/tools';
 import { entityTypes } from '$lib/server/db/schema';
 
 // メインチャットはSELECTのみ。create_* / update_* / delete_* はダイアログ経由でユーザーが実行する。
@@ -32,7 +32,7 @@ const appBuilderToolsCached = withToolCache(appBuilderTools);
 import { DEFAULT_AI_MODEL } from './settings';
 import type { Db } from '$lib/server/db';
 import type { MessageContent, WorkflowStep } from '$lib/types/chat';
-import type { ToolEnv } from '$lib/server/mcp';
+import type { ToolEnv } from '$lib/server/tools';
 
 export type StreamEvent =
 	| { type: 'delta'; text: string }
