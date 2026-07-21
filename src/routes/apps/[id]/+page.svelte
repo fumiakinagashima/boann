@@ -91,37 +91,6 @@
 				</div>
 			</section>
 
-			<!-- ページ -->
-			<section class="list-section">
-				<h2 class="section-label">ページ</h2>
-				<div class="item-list">
-					{#each s.pages as pg (pg.id)}
-						<div
-							class="item-row"
-							class:drag-over={s.dragOverId === pg.id}
-							draggable="true"
-							role="listitem"
-							ondragstart={(e) => s.onDragStart('pages', pg.id, e)}
-							ondragover={(e) => s.onDragOver('pages', pg.id, e)}
-							ondrop={(e) => s.onDrop('pages', pg.id, e)}
-							ondragend={s.onDragEnd}
-						>
-							<div class="item-head">
-								<span class="drag-handle" aria-hidden="true">⠿</span>
-								<p class="item-label">{pg.label}</p>
-							</div>
-							<div class="item-footer">
-								<a href="/apps/{data.app.id}/pages/{pg.id}/build" class="item-action">ページ設定</a>
-								<a href={`/apps/${data.app.id}/pages/${pg.id}`} class="item-action">ページ表示</a>
-							</div>
-						</div>
-					{/each}
-					<button class="btn-add-table" onclick={s.addPage} disabled={s.addingPage}>
-						{s.addingPage ? '作成中…' : '+ ページを追加'}
-					</button>
-				</div>
-			</section>
-
 			<!-- ワークフロー -->
 			<section class="list-section">
 				<h2 class="section-label">ワークフロー</h2>

@@ -106,6 +106,13 @@
       "when": 1751800000000,
       "tag": "0022_app_mcp_tokens",
       "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "6",
+      "when": 1751900000000,
+      "tag": "0023_drop_app_pages",
+      "breakpoints": true
     }
   ]
 }

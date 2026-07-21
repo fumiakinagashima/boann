@@ -31,8 +31,7 @@ export type ToolName =
 	| 'get_workflow'
 	| 'run_workflow'
 	| 'get_workflow_run_logs'
-	| 'create_table'
-	| 'create_page';
+	| 'create_table';
 
 export const tools: Tool[] = [
 	...integrations.tools,
@@ -73,7 +72,6 @@ export async function dispatchTool(
 		case 'run_workflow':                   return workflows.handleRunWorkflow(db, input, env);
 		case 'get_workflow_run_logs':           return workflows.handleGetWorkflowRunLogs(db, input);
 		case 'create_table':                   return entities.handleCreateTable(db, input);
-		case 'create_page':                    return entities.handleCreatePage(db, input);
 		default:
 			throw new Error(`Unknown tool: ${name}`);
 	}

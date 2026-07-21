@@ -14,7 +14,7 @@
 	import Star from '@lucide/svelte/icons/star';
 	import type { AccountRow } from '$lib/server/db/account-service';
 
-	type AppItem = { id: string; name: string; label: string; icon: string | null; firstPageId: string | null };
+	type AppItem = { id: string; name: string; label: string; icon: string | null };
 	type Props = {
 		account: AccountRow;
 		bookmarkedIds: string[];
@@ -79,7 +79,7 @@
 					<div class="section-items">
 						{#each bookmarkedApps as app (app.id)}
 							<a
-								href={app.firstPageId ? `/apps/${app.id}/pages/${app.firstPageId}` : `/apps/${app.id}`}
+								href={`/apps/${app.id}`}
 								class="nav-item nav-sub"
 								class:active={isUnderPath(`/apps/${app.id}`)}
 							>

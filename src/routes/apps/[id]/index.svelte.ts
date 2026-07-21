@@ -1,8 +1,8 @@
 import { goto, invalidateAll } from '$app/navigation';
 import type { PageData } from './$types';
 
-// テーブル／ページ／ワークフローの3種別（D&D並べ替えのキーに使用）
-export type AppTab = 'tables' | 'pages' | 'workflows';
+// テーブル／ワークフローの2種別（D&D並べ替えのキーに使用）
+export type AppTab = 'tables' | 'workflows';
 
 export function createAppBuilderState(getData: () => PageData) {
 	// ── App meta ─────────────────────────────────────────────────
@@ -52,12 +52,10 @@ export function createAppBuilderState(getData: () => PageData) {
 	// ── List ordering (drag & drop) ──────────────────────────────
 	// data からローカルにコピーし、D&D 中は楽観的に並べ替える。保存後 invalidateAll で確定。
 	let tables = $state(getData().tables);
-	let pages = $state(getData().pages);
 	let workflows = $state(getData().workflows);
 
 	$effect(() => {
 		tables = getData().tables;
-		pages = getData().pages;
 		workflows = getData().workflows;
 	});
 
@@ -105,9 +103,6 @@ export function createAppBuilderState(getData: () => PageData) {
 		if (kind === 'tables') {
 			tables = reorderList(tables, srcId, targetId);
 			orderedIds = tables.map((t) => t.id);
-		} else if (kind === 'pages') {
-			pages = reorderList(pages, srcId, targetId);
-			orderedIds = pages.map((p) => p.id);
 		} else {
 			workflows = reorderList(workflows, srcId, targetId);
 			orderedIds = workflows.map((w) => w.id);
@@ -137,23 +132,6 @@ export function createAppBuilderState(getData: () => PageData) {
 			await invalidateAll();
 		}
 		addingTable = false;
-	}
-
-	// ── Add page ──────────────────────────────────────────────────
-	let addingPage = $state(false);
-
-	async function addPage() {
-		addingPage = true;
-		try {
-			const res = await fetch(`/api/apps/${getData().app.id}/pages`, {
-				method: 'POST',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ label: '新しいページ' })
-			});
-			if (res.ok) await invalidateAll();
-		} finally {
-			addingPage = false;
-		}
 	}
 
 	// ── Add workflow ─────────────────────────────────────────────
@@ -237,11 +215,9 @@ export function createAppBuilderState(getData: () => PageData) {
 		get saved() { return saved; },
 		get deleting() { return deleting; },
 		get addingTable() { return addingTable; },
-		get addingPage() { return addingPage; },
 		get addingWorkflow() { return addingWorkflow; },
 		get chatContext() { return chatContext; },
 		get tables() { return tables; },
-		get pages() { return pages; },
 		get workflows() { return workflows; },
 		get dragOverId() { return dragOverId; },
 		get mcpStatus() { return mcpStatus; },
@@ -252,7 +228,6 @@ export function createAppBuilderState(getData: () => PageData) {
 		save,
 		deleteApp,
 		addTable,
-		addPage,
 		addWorkflow,
 		onDragStart,
 		onDragOver,

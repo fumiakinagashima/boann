@@ -2,7 +2,7 @@ import { eq, and, desc, sql, inArray, isNull } from 'drizzle-orm';
 import type { BatchItem } from 'drizzle-orm/batch';
 import type { SQLiteColumn, SQLiteTable } from 'drizzle-orm/sqlite-core';
 import type { Db } from './index';
-import { apps, appPages, entityTypes, entityFields, entities, bookmarks, workflows, workflowRuns, accounts } from './schema';
+import { apps, entityTypes, entityFields, entities, bookmarks, workflows, workflowRuns, accounts } from './schema';
 
 // app スコープ内の末尾に追加するための次の sortOrder（最大値 + 1、無ければ 0）を返す。
 async function nextSortOrder(
@@ -21,81 +21,6 @@ async function nextSortOrder(
 	const max = (row?.s as number | null | undefined) ?? -1;
 	return max + 1;
 }
-
-// ───── Page types ─────────────────────────────────────────────────────────────
-
-/** 詳細ビューに表示する関連テーブル（このページのテーブルを参照しているテーブル）設定 */
-export type DetailRelatedTable = {
-	tableId: string;    // entity_types.id
-	refFieldKey: string; // 参照フィールドのキー（entity_fields.key）
-	label: string;       // セクション表示名
-	fields: string[] | null; // null = 全フィールド
-	actions: ('detail' | 'create' | 'edit' | 'delete')[]; // セクション内で使える機能
-};
-
-/** ページ設定（app_pages.components カラムに JSON で保存） */
-export type PageConfig = {
-	fields: string[] | null;                                      // 一覧表示フィールド（null = 全て）
-	actions: ('detail' | 'create' | 'edit' | 'delete')[];        // 一覧で使える機能
-	detail: {
-		relatedTables: DetailRelatedTable[];                       // 詳細ビューの関連テーブル
-	};
-};
-
-export type AppPageRow = {
-	id: string;
-	appId: string;
-	label: string;
-	tableId: string | null;   // entity_types.id（ページが表示するメインテーブル）
-	config: PageConfig;
-	sortOrder: number;
-};
-
-/** 別テーブルから参照されているテーブル情報（詳細ビューの関連データ候補） */
-export type ReferencingTable = {
-	tableId: string;
-	tableName: string;
-	tableLabel: string;
-	refFieldKey: string;
-	refFieldLabel: string;
-};
-
-function defaultPageConfig(): PageConfig {
-	return { fields: null, actions: ['create', 'edit', 'delete'], detail: { relatedTables: [] } };
-}
-
-function parsePageConfig(raw: string | null | undefined): PageConfig {
-	const def = defaultPageConfig();
-	if (!raw) return def;
-	try {
-		const parsed = JSON.parse(raw);
-		// 旧形式（コンポーネント配列）→ 新形式に変換
-		if (Array.isArray(parsed)) {
-			if (parsed.length === 0) return def;
-			const first = parsed[0] as { fields?: string[] | null; actions?: string[] };
-			return {
-				fields: first.fields ?? null,
-				actions: (first.actions ?? ['create', 'edit', 'delete']) as PageConfig['actions'],
-				detail: { relatedTables: [] }
-			};
-		}
-		const relatedTables = (parsed.detail?.relatedTables ?? []).map(
-			(rt: Partial<DetailRelatedTable>) => ({
-				...rt,
-				actions: rt.actions ?? ['create', 'edit', 'delete']
-			})
-		);
-		return {
-			fields: parsed.fields ?? null,
-			actions: parsed.actions ?? ['create', 'edit', 'delete'],
-			detail: { relatedTables }
-		};
-	} catch {
-		return def;
-	}
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
 
 /** クエリ件数が可変の場合に `db.batch([...])` を呼ぶためのヘルパー。空配列なら何もしない。 */
 async function batchIfNonEmpty<U extends BatchItem<'sqlite'>>(db: Db, queries: U[]): Promise<void> {
@@ -231,8 +156,6 @@ export type AppCard = {
 	name: string;
 	label: string;
 	icon: string | null;
-	firstPageId: string | null;
-	pageCount: number;
 };
 
 export async function listTables(db: Db): Promise<TableCard[]> {
@@ -257,21 +180,11 @@ export async function listTables(db: Db): Promise<TableCard[]> {
 
 export async function listApps(db: Db): Promise<AppCard[]> {
 	const appRows = await db.select().from(apps);
-	return Promise.all(appRows.map(async (app) => {
-		const [pageRow] = await db.select({ count: sql<number>`count(*)` })
-			.from(appPages).where(eq(appPages.appId, app.id));
-		// 画面表示は sortOrder が最小のページ（重複時は取得できた1件）
-		const [firstPage] = await db.select({ id: appPages.id })
-			.from(appPages).where(eq(appPages.appId, app.id))
-			.orderBy(appPages.sortOrder).limit(1);
-		return {
-			id: app.id,
-			name: app.name,
-			label: app.label,
-			icon: app.icon,
-			firstPageId: firstPage?.id ?? null,
-			pageCount: pageRow.count,
-		};
+	return appRows.map((app) => ({
+		id: app.id,
+		name: app.name,
+		label: app.label,
+		icon: app.icon
 	}));
 }
 
@@ -475,25 +388,22 @@ export async function deleteApp(db: Db, id: string): Promise<void> {
 		.from(workflows).where(eq(workflows.appId, id));
 	const queries: BatchItem<'sqlite'>[] = [];
 	// FK 参照を成立させる順序で削除する:
-	//   app_pages.table_id → entity_types.id,
-	//   entity_types.app_id / app_pages.app_id / workflows.app_id / bookmarks.app_id → apps.id,
+	//   entity_types.app_id / workflows.app_id / bookmarks.app_id → apps.id,
 	//   entity_fields / entities → entity_types.id
-	// 1. app_pages を削除（entity_types を参照しているため先に消す）
-	queries.push(db.delete(appPages).where(eq(appPages.appId, id)));
-	// 2. テーブルに紐づく子レコードを削除してから entity_types を削除
+	// 1. テーブルに紐づく子レコードを削除してから entity_types を削除
 	for (const table of tables) {
 		queries.push(db.delete(entities).where(eq(entities.entityTypeId, table.id)));
 		queries.push(db.delete(entityFields).where(eq(entityFields.entityTypeId, table.id)));
 		queries.push(db.delete(entityTypes).where(eq(entityTypes.id, table.id)));
 	}
-	// 3. workflow_runs（実行ログ）→ workflows を削除（apps を参照しているため apps より先に消す）
+	// 2. workflow_runs（実行ログ）→ workflows を削除（apps を参照しているため apps より先に消す）
 	if (wfRows.length > 0) {
 		queries.push(db.delete(workflowRuns).where(inArray(workflowRuns.workflowId, wfRows.map((w) => w.id))));
 	}
 	queries.push(db.delete(workflows).where(eq(workflows.appId, id)));
-	// 4. bookmarks を削除
+	// 3. bookmarks を削除
 	queries.push(db.delete(bookmarks).where(eq(bookmarks.appId, id)));
-	// 5. apps を削除
+	// 4. apps を削除
 	queries.push(db.delete(apps).where(eq(apps.id, id)));
 	await db.batch(queries as [BatchItem<'sqlite'>, ...BatchItem<'sqlite'>[]]);
 }
@@ -568,116 +478,6 @@ export async function getTablesByAppId(db: Db, appId: string): Promise<{ id: str
 	}));
 }
 
-export async function getPageById(db: Db, pageId: string): Promise<AppPageRow | null> {
-	const [row] = await db.select({
-		id: appPages.id,
-		appId: appPages.appId,
-		label: appPages.label,
-		tableId: appPages.tableId,
-		components: appPages.components,
-		sortOrder: appPages.sortOrder
-	}).from(appPages).where(eq(appPages.id, pageId));
-	if (!row) return null;
-	return { ...row, config: parsePageConfig(row.components) };
-}
-
-export async function getPagesByAppId(db: Db, appId: string): Promise<AppPageRow[]> {
-	const rows = await db.select({
-		id: appPages.id,
-		appId: appPages.appId,
-		label: appPages.label,
-		tableId: appPages.tableId,
-		components: appPages.components,
-		sortOrder: appPages.sortOrder
-	}).from(appPages).where(eq(appPages.appId, appId)).orderBy(appPages.sortOrder);
-	return rows.map(row => ({ ...row, config: parsePageConfig(row.components) }));
-}
-
-export type PageInput = {
-	label?: string;
-	tableId?: string | null;
-	config?: PageConfig;
-};
-
-export async function createPage(db: Db, appId: string, input: { label: string; tableId?: string | null }): Promise<{ id: string }> {
-	const [maxRow] = await db.select({ sortOrder: appPages.sortOrder })
-		.from(appPages).where(eq(appPages.appId, appId))
-		.orderBy(desc(appPages.sortOrder)).limit(1);
-	const sortOrder = (maxRow?.sortOrder ?? -1) + 1;
-	const id = crypto.randomUUID();
-	await db.insert(appPages).values({
-		id, appId, label: input.label,
-		tableId: input.tableId ?? null,
-		components: JSON.stringify(defaultPageConfig()),
-		sortOrder
-	});
-	return { id };
-}
-
-export async function updatePage(db: Db, pageId: string, input: PageInput): Promise<void> {
-	const set: Record<string, unknown> = {};
-	if (input.label !== undefined) set.label = input.label;
-	if (input.tableId !== undefined) set.tableId = input.tableId;
-	if (input.config !== undefined) set.components = JSON.stringify(input.config);
-	if (Object.keys(set).length === 0) return;
-	await db.update(appPages).set(set).where(eq(appPages.id, pageId));
-}
-
-export async function deletePage(db: Db, pageId: string): Promise<void> {
-	await db.delete(appPages).where(eq(appPages.id, pageId));
-}
-
-/** このテーブルを recordSelect/account フィールドで参照している他テーブルを返す（詳細ビューの関連データ候補） */
-export async function findTablesReferencingTable(db: Db, tableName: string, appId?: string | null): Promise<ReferencingTable[]> {
-	const fields = await db.select({
-		fieldKey: entityFields.key,
-		fieldLabel: entityFields.label,
-		entityTypeId: entityFields.entityTypeId
-	}).from(entityFields).where(eq(entityFields.refTable, tableName));
-	if (fields.length === 0) return [];
-
-	const etIds = [...new Set(fields.map(f => f.entityTypeId))];
-	const etCond = appId
-		? and(inArray(entityTypes.id, etIds), eq(entityTypes.appId, appId))
-		: inArray(entityTypes.id, etIds);
-	const ets = await db.select({ id: entityTypes.id, name: entityTypes.name, label: entityTypes.label })
-		.from(entityTypes).where(etCond);
-	const etMap = new Map(ets.map(et => [et.id, et]));
-
-	return fields.flatMap(f => {
-		const et = etMap.get(f.entityTypeId);
-		if (!et) return [];
-		return [{ tableId: et.id, tableName: et.name, tableLabel: et.label, refFieldKey: f.fieldKey, refFieldLabel: f.fieldLabel }];
-	});
-}
-
-/** 関連フィールドの値で絞り込んでレコードを返す（詳細ビューの関連データ表示用） */
-export async function listRecordsByRefField(
-	db: Db, entityTypeId: string, refFieldKey: string, refValue: string, limit = 200
-): Promise<RecordRow[]> {
-	const rows = await db.select().from(entities)
-		.where(and(
-			eq(entities.entityTypeId, entityTypeId),
-			sql`json_extract(${entities.data}, ${`$.${refFieldKey}`}) = ${refValue}`
-		))
-		.orderBy(desc(entities.createdAt)).limit(limit);
-	return rows.map(e => ({
-		id: e.id,
-		...(JSON.parse(e.data ?? '{}') as RecordRow),
-		createdAt: toTs(e.createdAt), updatedAt: toTs(e.updatedAt)
-	}));
-}
-
-// アプリ設定のページタブ: ドラッグ&ドロップ後の並び順を sortOrder に反映する。
-export async function reorderPages(db: Db, appId: string, orderedIds: string[]): Promise<void> {
-	if (orderedIds.length === 0) return;
-	// appId でも絞り込み、他アプリの id を混入されても他アプリのページを書き換えないようにする
-	const queries: BatchItem<'sqlite'>[] = orderedIds.map((id, i) =>
-		db.update(appPages).set({ sortOrder: i }).where(and(eq(appPages.id, id), eq(appPages.appId, appId)))
-	);
-	await db.batch(queries as [BatchItem<'sqlite'>, ...BatchItem<'sqlite'>[]]);
-}
-
 // アプリ設定のテーブルタブ: ドラッグ&ドロップ後の並び順を sortOrder に反映する。
 export async function reorderTables(db: Db, appId: string, orderedIds: string[]): Promise<void> {
 	if (orderedIds.length === 0) return;
@@ -744,7 +544,6 @@ export async function deleteEntityType(db: Db, name: string, appId?: string | nu
 	await db.batch([
 		db.delete(entities).where(eq(entities.entityTypeId, et.id)),
 		db.delete(entityFields).where(eq(entityFields.entityTypeId, et.id)),
-		db.delete(appPages).where(eq(appPages.tableId, et.id)),
 		db.delete(entityTypes).where(eq(entityTypes.id, et.id))
 	]);
 }

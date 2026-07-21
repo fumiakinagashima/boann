@@ -2,7 +2,7 @@ import Anthropic from '@anthropic-ai/sdk';
 import type { Tool } from '@anthropic-ai/sdk/resources/messages';
 import { z } from 'zod';
 
-// ファイル（txt/md 等の仕様メモ）から、アプリ構造（テーブル・フィールド・ページ）を
+// ファイル（txt/md 等の仕様メモ）から、アプリ構造（テーブル・フィールド）を
 // 推論してプラン化する。確定（DBへの反映）は import-apply.ts が決定的に行う。
 // LLM はあくまで「設計案」を出すだけで、レコードの一括投入などは決定的コードに任せる。
 
@@ -17,24 +17,11 @@ const fieldSchema = z.object({
 	ref_table: z.string().optional()
 });
 
-const componentSchema = z.object({
-	type: z.enum(['list', 'form']),
-	table_name: z.string(),
-	title: z.string().optional(),
-	fields: z.array(z.string()).optional(),
-	actions: z.array(z.enum(['create', 'edit', 'delete'])).optional()
-});
-
 const tableSchema = z.object({
 	name: z.string().regex(/^[a-z0-9_]+$/),
 	label: z.string().min(1),
 	icon: z.string().optional(),
 	fields: z.array(fieldSchema).min(1)
-});
-
-const pageSchema = z.object({
-	label: z.string().min(1),
-	components: z.array(componentSchema).min(1)
 });
 
 export const importPlanSchema = z.object({
@@ -44,7 +31,6 @@ export const importPlanSchema = z.object({
 		icon: z.string().optional()
 	}),
 	tables: z.array(tableSchema).min(1),
-	pages: z.array(pageSchema).default([]),
 	// ワークフローは現状プランに含めても自動作成しない（情報提示のみ）。
 	workflows: z.array(z.object({ name: z.string(), description: z.string().optional() })).default([])
 });
@@ -53,7 +39,7 @@ export type ImportPlan = z.infer<typeof importPlanSchema>;
 
 const PLAN_TOOL: Tool = {
 	name: 'emit_app_plan',
-	description: 'ファイルの内容から設計したアプリ構造（テーブル・フィールド・ページ）を出力する。',
+	description: 'ファイルの内容から設計したアプリ構造（テーブル・フィールド）を出力する。',
 	input_schema: {
 		type: 'object',
 		properties: {
@@ -103,31 +89,6 @@ const PLAN_TOOL: Tool = {
 					required: ['name', 'label', 'fields']
 				}
 			},
-			pages: {
-				type: 'array',
-				description: '画面（ページ）一覧。各テーブルには最低1つの一覧ページを用意する。',
-				items: {
-					type: 'object',
-					properties: {
-						label: { type: 'string', description: 'ページの表示名（例: 顧客一覧）' },
-						components: {
-							type: 'array',
-							items: {
-								type: 'object',
-								properties: {
-									type: { type: 'string', enum: ['list', 'form'], description: 'list: 一覧表示, form: 登録フォーム' },
-									table_name: { type: 'string', description: '対象テーブルの name（tables の name を指定）' },
-									title: { type: 'string' },
-									fields: { type: 'array', items: { type: 'string' }, description: '表示するフィールドキー（省略時は全フィールド）' },
-									actions: { type: 'array', items: { type: 'string', enum: ['create', 'edit', 'delete'] } }
-								},
-								required: ['type', 'table_name']
-							}
-						}
-					},
-					required: ['label', 'components']
-				}
-			},
 			workflows: {
 				type: 'array',
 				description: 'ファイルに記載があれば、ワークフロー（自動処理）の名称と概要を列挙する（このプランでは作成されず、後で手動追加する）。',
@@ -138,7 +99,7 @@ const PLAN_TOOL: Tool = {
 				}
 			}
 		},
-		required: ['app', 'tables', 'pages']
+		required: ['app', 'tables']
 	}
 };
 
@@ -147,10 +108,9 @@ const SYSTEM_PROMPT = `あなたはノーコードアプリ基盤 Boann の設�
 Excel由来の内容は「--- シート: <名前> ---」「見出し: ...」「例: ...」の形式で渡される。原則シート1つにつきテーブル1つとし、見出しをフィールドとして設計する（サンプル行の値からフィールド型を推測してよい）。
 
 設計ルール:
-- ファイルの内容から必要なテーブル・フィールド・ページを過不足なく設計する。
+- ファイルの内容から必要なテーブル・フィールドを過不足なく設計する。
 - 表示名（label）は日本語、識別名（name/key）は英小文字・数字・アンダースコアのみ。
 - テーブル間の関係は recordSelect 型フィールドで表現し、ref_table に参照先テーブルの name を指定する。
-- 各テーブルには最低1つの一覧ページ（list コンポーネント）を用意する。詳細・登録が必要なら form も追加する。
 - 一般的な業務に必要な基本フィールド（名称・日付・担当者・ステータス等）は文面に明示がなくても適宜補う。
 - ファイルにワークフロー（自動処理）の記載があれば workflows に列挙する（作成はしない）。
 - 必ず emit_app_plan ツールを呼び出して結果を返す。`;
@@ -187,7 +147,6 @@ const REFINE_SYSTEM_PROMPT = `あなたはノーコードアプリ基盤 Boann �
 - 依頼された変更のみを反映し、それ以外の構成・命名は極力維持する。
 - 表示名（label）は日本語、識別名（name/key）は英小文字・数字・アンダースコアのみ。
 - テーブル間の関係は recordSelect 型フィールド（ref_table に参照先テーブルの name）で表現する。
-- 各テーブルには最低1つの一覧ページを保つ。
 - 必ず emit_app_plan ツールでプラン全体を返す（差分ではなく完全な新プラン）。`;
 
 export async function refineImportPlan(opts: {
@@ -259,16 +218,6 @@ export function mockImportPlan(_content: string): ImportPlan {
 					{ key: 'occurred_on', label: '実施日', type: 'date' },
 					{ key: 'memo', label: '内容', type: 'textarea' },
 					{ key: 'shared_with', label: '共有者', type: 'text' }
-				]
-			}
-		],
-		pages: [
-			{ label: '顧客一覧', components: [{ type: 'list', table_name: 'customers' }] },
-			{
-				label: '顧客詳細',
-				components: [
-					{ type: 'form', table_name: 'customers' },
-					{ type: 'list', table_name: 'activities', title: '活動履歴' }
 				]
 			}
 		],

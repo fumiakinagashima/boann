@@ -3,7 +3,7 @@ import { z } from 'zod';
 import type { Tool } from '@anthropic-ai/sdk/resources/messages';
 import type { Db } from '../db';
 import { entityTypes, entityFields, entities } from '../db/schema';
-import { createApp, createEntityType, createRecord, createPage, refColumns } from '../db/table-service';
+import { createApp, createEntityType, createRecord, refColumns } from '../db/table-service';
 import { parseJson, now } from './shared';
 
 export const tools: Tool[] = [
@@ -166,7 +166,7 @@ export const tools: Tool[] = [
 	{
 		name: 'create_table',
 		description:
-			'現在編集中のアプリにテーブルを追加する。テーブル名・フィールド定義を指定して新しいデータテーブルを作成する。ページは自動生成されないため、テーブルを画面表示したい場合は別途 create_page でページを作成する。',
+			'現在編集中のアプリにテーブルを追加する。テーブル名・フィールド定義を指定して新しいデータテーブルを作成する。作成すると自動的にデータ管理画面が使えるようになる。',
 		input_schema: {
 			type: 'object',
 			properties: {
@@ -206,20 +206,6 @@ export const tools: Tool[] = [
 				}
 			},
 			required: ['app_id', 'name', 'label', 'fields']
-		}
-	},
-	{
-		name: 'create_page',
-		description:
-			'現在編集中のアプリに一覧ページを追加する。table_id で表示するテーブルを指定する。create_table 実行後に呼ぶ。',
-		input_schema: {
-			type: 'object',
-			properties: {
-				app_id: { type: 'string', description: 'アプリID' },
-				label: { type: 'string', description: 'ページの表示名（例: 顧客一覧）' },
-				table_id: { type: 'string', description: '表示するテーブルのID（create_table の結果の id）' }
-			},
-			required: ['app_id', 'label', 'table_id']
 		}
 	}
 ];
@@ -279,12 +265,6 @@ const createTableSchema = z.object({
 			ref_table: z.string().optional()
 		})
 	)
-});
-
-const createPageSchema = z.object({
-	app_id: z.string(),
-	label: z.string().min(1),
-	table_id: z.string().optional()
 });
 
 const createAppFieldSchema = z.object({
@@ -453,10 +433,4 @@ export async function handleCreateTable(db: Db, input: unknown) {
 		}))
 	});
 	return { id: result.id, name: result.name, label: data.label, appId: data.app_id, fieldCount: data.fields.length };
-}
-
-export async function handleCreatePage(db: Db, input: unknown) {
-	const data = createPageSchema.parse(input);
-	const result = await createPage(db, data.app_id, { label: data.label, tableId: data.table_id ?? null });
-	return { id: result.id, label: data.label, appId: data.app_id };
 }

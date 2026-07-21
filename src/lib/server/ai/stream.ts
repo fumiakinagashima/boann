@@ -11,7 +11,7 @@ const mainChatTools = allTools.filter(
 	(t) => !WRITE_TOOL_PREFIX.some((prefix) => t.name.startsWith(prefix))
 );
 
-// アプリビルダーモード: スキーマ生成（create_table, create_page, add_entity_field）を許可し、レコード操作のみ禁止
+// アプリビルダーモード: スキーマ生成（create_table, add_entity_field）を許可し、レコード操作のみ禁止
 const APP_BUILDER_BLOCKED = new Set([
 	'create_entity', 'update_entity',
 	'create_app', 'create_entity_type',

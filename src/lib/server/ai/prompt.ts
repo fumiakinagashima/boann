@@ -262,9 +262,8 @@ function buildDynamicContext(appContext?: AppContext): string {
 ${tableList}
 
 ### 操作ルール
-- 新しいテーブルを追加する場合: \`create_table\` を使い \`app_id: "${appContext.appId}"\` を必ず指定する。ページは自動生成されないので、画面表示が必要なら続けて \`create_page\` でページを作成する
+- 新しいテーブルを追加する場合: \`create_table\` を使い \`app_id: "${appContext.appId}"\` を必ず指定する。テーブルを追加すると自動的にデータ管理画面が使えるようになる（別途ページの作成は不要）
 - 既存テーブルにフィールドを追加する場合: \`add_entity_field\` を使い、上記テーブル一覧の id を指定する
-- 追加のビュー（カンバン等）を作りたい場合: \`create_page\` を使い \`app_id: "${appContext.appId}"\` を指定する
 - レコードの登録・編集はフォームUIを通じて行う（create_entity 等は使用不可）
 - create_app は使わない（アプリはすでに存在する）`;
 	}

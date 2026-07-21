@@ -187,20 +187,6 @@
 			{/each}
 		</section>
 
-		{#if plan.pages.length > 0}
-			<section>
-				<h2>ページ（{plan.pages.length}）</h2>
-				{#each plan.pages as p (p.label)}
-					<div class="row">
-						<span class="row-label">{p.label}</span>
-						<span class="muted">
-							{p.components.map((c) => `${c.type === 'list' ? '一覧' : 'フォーム'}: ${tableLabel(c.table_name)}`).join(' / ')}
-						</span>
-					</div>
-				{/each}
-			</section>
-		{/if}
-
 		{#if plan.workflows.length > 0}
 			<section>
 				<h2>ワークフロー（{plan.workflows.length}）</h2>

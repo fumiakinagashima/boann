@@ -1,7 +1,7 @@
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { createDb } from '$lib/server/db';
-import { reorderTables, reorderPages } from '$lib/server/db/table-service';
+import { reorderTables } from '$lib/server/db/table-service';
 import { reorderWorkflows } from '$lib/server/db/workflow-service';
 
 // アプリ設定画面のドラッグ&ドロップ並べ替え。kind ごとに対象テーブルの sortOrder を振り直す。
@@ -15,9 +15,6 @@ export const POST: RequestHandler = async ({ params, request, platform }) => {
 	switch (body.kind) {
 		case 'tables':
 			await reorderTables(db, params.id, orderedIds);
-			break;
-		case 'pages':
-			await reorderPages(db, params.id, orderedIds);
 			break;
 		case 'workflows':
 			await reorderWorkflows(db, params.id, orderedIds);
