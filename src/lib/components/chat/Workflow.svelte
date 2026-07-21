@@ -179,7 +179,7 @@
 					class="wf-description-input"
 					bind:value={description}
 					placeholder="このワークフローが何をするか説明する（MCPツールとして呼び出す外部AIエージェントが判断材料に使う）"
-					rows="2"
+					rows="4"
 				></textarea>
 			{:else}
 				<p class="wf-description">{description}</p>

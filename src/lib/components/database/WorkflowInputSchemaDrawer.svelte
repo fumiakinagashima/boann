@@ -57,7 +57,7 @@
 		top: 0;
 		right: 0;
 		height: 100vh;
-		width: 420px;
+		width: 680px;
 		max-width: 100vw;
 		background: var(--color-background);
 		border-left: 1px solid var(--color-border);

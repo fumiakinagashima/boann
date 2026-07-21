@@ -56,7 +56,7 @@
 	}: Props = $props();
 
 	function makeId(): string {
-		return `s${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
+		return crypto.randomUUID();
 	}
 
 	function addStep(kind: 'action' | 'condition' | 'foreach') {
@@ -404,13 +404,13 @@
 								<code class="wf-help-token">{itemToken(opt)}</code>
 							</li>
 						{/each}
-						{#each triggerFields as f (f.key)}
+						{#each triggerFields as f, tfi (tfi)}
 							<li>
 								<span class="wf-help-name">{f.label}（トリガーレコード）</span>
 								<code class="wf-help-token">{triggerToken(f)}</code>
 							</li>
 						{/each}
-						{#each inputFields as f (f.key)}
+						{#each inputFields as f, ifi (ifi)}
 							<li>
 								<span class="wf-help-name">{f.label}（入力パラメータ）</span>
 								<code class="wf-help-token">{inputToken(f)}</code>
@@ -467,10 +467,10 @@
 										{#each itemOpts as opt (opt.foreachStepId + ':' + opt.field.key)}
 											<option value={itemSelectValue(opt)}>{itemOptionLabel(opt)}</option>
 										{/each}
-										{#each triggerFields as f (f.key)}
+										{#each triggerFields as f, tfi (tfi)}
 											<option value={triggerSelectValue(f)}>{f.label}（トリガーレコード）</option>
 										{/each}
-										{#each inputFields as f (f.key)}
+										{#each inputFields as f, ifi (ifi)}
 											<option value={inputSelectValue(f)}>{f.label}（入力パラメータ）</option>
 										{/each}
 										<option value={SELF_SELECT_VALUE}>自分のアカウントID</option>
@@ -572,10 +572,10 @@
 						{#each itemOpts as opt (opt.foreachStepId + ':' + opt.field.key)}
 							<option value={itemSelectValue(opt)}>{itemOptionLabel(opt)}</option>
 						{/each}
-						{#each triggerFields as f (f.key)}
+						{#each triggerFields as f, tfi (tfi)}
 							<option value={triggerSelectValue(f)}>{f.label}（トリガーレコード）</option>
 						{/each}
-						{#each inputFields as f (f.key)}
+						{#each inputFields as f, ifi (ifi)}
 							<option value={inputSelectValue(f)}>{f.label}（入力パラメータ）</option>
 						{/each}
 						<option value={SELF_SELECT_VALUE}>自分のアカウントID</option>
@@ -601,10 +601,10 @@
 						{#each itemOpts as opt (opt.foreachStepId + ':' + opt.field.key)}
 							<option value={itemSelectValue(opt)}>{itemOptionLabel(opt)}</option>
 						{/each}
-						{#each triggerFields as f (f.key)}
+						{#each triggerFields as f, tfi (tfi)}
 							<option value={triggerSelectValue(f)}>{f.label}（トリガーレコード）</option>
 						{/each}
-						{#each inputFields as f (f.key)}
+						{#each inputFields as f, ifi (ifi)}
 							<option value={inputSelectValue(f)}>{f.label}（入力パラメータ）</option>
 						{/each}
 						<option value={SELF_SELECT_VALUE}>自分のアカウントID</option>
