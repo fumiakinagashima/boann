@@ -8,7 +8,7 @@
 	import { formatJstDateTime } from '$lib/datetime';
 	import type { WorkflowStep } from '$lib/types/chat';
 	import type { WorkflowRunRow, StepLog } from '$lib/server/db/workflow-run-service';
-	import type { EntityTypeForWorkflow } from '$lib/server/db/table-service';
+	import type { EntityTypeForWorkflow, FieldDef } from '$lib/server/db/table-service';
 	import type { SlackIntegrationOption } from '$lib/server/slack';
 
 	type WorkflowReviewResult = { summary: string; issues: string[]; suggestions: string[] };
@@ -21,6 +21,7 @@
 		initialTriggerMinute?: number;
 		initialTriggerEvent?: 'create' | 'update' | 'delete' | null;
 		initialTriggerEntityTypeId?: string | null;
+		initialInputSchema?: FieldDef[];
 		initialSteps?: WorkflowStep[];
 		initialEnabled?: boolean;
 		runs?: WorkflowRunRow[];
@@ -37,6 +38,7 @@
 		initialTriggerMinute = 0,
 		initialTriggerEvent = null,
 		initialTriggerEntityTypeId = null,
+		initialInputSchema = [],
 		initialSteps = [],
 		initialEnabled = false,
 		runs = [],
@@ -49,11 +51,19 @@
 	let currentId = $state(untrack(() => id));
 	let enabled = $state(untrack(() => initialEnabled));
 
-	type WorkflowInstance = { getState: () => WorkflowState; setState: (def: WorkflowState) => void };
+	type WorkflowInstance = {
+		getState: () => WorkflowState;
+		setState: (def: WorkflowState) => void;
+		openInputSchemaDrawer: () => void;
+	};
 	let wfRef = $state<WorkflowInstance | null>(null);
 
+	function fallbackState(): WorkflowState {
+		return { name: initialName, triggerType: initialTriggerType, triggerHour: initialTriggerHour, triggerMinute: initialTriggerMinute, triggerEvent: initialTriggerEvent, triggerEntityTypeId: initialTriggerEntityTypeId, inputSchema: initialInputSchema, steps: initialSteps };
+	}
+
 	export function getState(): WorkflowState {
-		return wfRef?.getState() ?? { name: initialName, triggerType: initialTriggerType, triggerHour: initialTriggerHour, triggerMinute: initialTriggerMinute, triggerEvent: initialTriggerEvent, triggerEntityTypeId: initialTriggerEntityTypeId, steps: initialSteps };
+		return wfRef?.getState() ?? fallbackState();
 	}
 	export function setState(s: WorkflowState) {
 		wfRef?.setState(s);
@@ -69,6 +79,20 @@
 
 	let runningNow = $state(false);
 
+	function collectInputArgs(inputSchema: FieldDef[]): Record<string, unknown> | null {
+		const inputArgs: Record<string, unknown> = {};
+		for (const f of inputSchema) {
+			const optionsHint = f.type === 'select' && f.options?.length ? `\n選択肢: ${f.options.map((o) => o.value).join(', ')}` : '';
+			const raw = prompt(
+				`${f.label}${f.required ? '（必須）' : '（任意）'}を入力してください${f.description ? `\n${f.description}` : ''}${optionsHint}`
+			);
+			if (raw === null) return null; // キャンセル
+			if (raw === '' && !f.required) continue;
+			inputArgs[f.key] = f.type === 'number' ? Number(raw) : raw;
+		}
+		return inputArgs;
+	}
+
 	async function runNow() {
 		if (runningNow || !currentId) return;
 
@@ -83,13 +107,24 @@
 			if (!confirm('保存されている状態で実行されます。よろしいですか？')) return;
 		}
 
+		const inputSchema = wfRef?.getState().inputSchema ?? [];
+		let inputArgs: Record<string, unknown> | undefined;
+		if (inputSchema.length > 0) {
+			const collected = collectInputArgs(inputSchema);
+			if (collected === null) return; // キャンセル
+			inputArgs = collected;
+		}
+
 		runningNow = true;
 		try {
-			const body = triggerRecordId !== undefined ? JSON.stringify({ triggerRecordId }) : undefined;
+			const body: Record<string, unknown> = {};
+			if (triggerRecordId !== undefined) body.triggerRecordId = triggerRecordId;
+			if (inputArgs !== undefined) body.inputArgs = inputArgs;
+			const hasBody = Object.keys(body).length > 0;
 			const res = await fetch(`/api/workflows/${currentId}/run`, {
 				method: 'POST',
-				headers: body ? { 'Content-Type': 'application/json' } : {},
-				body
+				headers: hasBody ? { 'Content-Type': 'application/json' } : {},
+				body: hasBody ? JSON.stringify(body) : undefined
 			});
 			const result = (await res.json()) as { ok?: boolean; name?: string; error?: string };
 			if (!res.ok) {
@@ -155,6 +190,9 @@
 	<div class="editor-row1">
 		<Toggle bind:checked={enabled} label="有効化" />
 		<div class="editor-row1-actions">
+			<button class="btn-input-schema" onclick={() => wfRef?.openInputSchemaDrawer()}>
+				⚙ 入力パラメータ
+			</button>
 			{#if currentId}
 				<button class="btn-run-now" onclick={runNow} disabled={runningNow}>
 					{runningNow ? '実行中...' : '▶ 今すぐ実行'}
@@ -205,7 +243,7 @@
 		{#if !noChatPanel}
 			<div class="chat-embedded">
 				<WorkflowChatPanel
-					getCurrent={() => wfRef?.getState() ?? { name: initialName, triggerType: initialTriggerType, triggerHour: initialTriggerHour, triggerMinute: initialTriggerMinute, triggerEvent: initialTriggerEvent, triggerEntityTypeId: initialTriggerEntityTypeId, steps: initialSteps }}
+					getCurrent={() => wfRef?.getState() ?? fallbackState()}
 					onApply={(state) => wfRef?.setState(state)}
 				/>
 			</div>
@@ -219,6 +257,7 @@
 				triggerMinute={initialTriggerMinute}
 				triggerEvent={initialTriggerEvent}
 				triggerEntityTypeId={initialTriggerEntityTypeId}
+				inputSchema={initialInputSchema}
 				steps={initialSteps}
 				editable={true}
 				{entityTypes}
@@ -321,6 +360,20 @@
 		display: flex;
 		align-items: center;
 		gap: 16px;
+	}
+
+	.btn-input-schema {
+		padding: 6px 14px;
+		background: none;
+		border: 1px solid var(--color-border);
+		color: var(--color-text);
+		border-radius: 6px;
+		font-size: 0.8125rem;
+		cursor: pointer;
+		white-space: nowrap;
+		&:hover {
+			background: color-mix(in srgb, var(--color-text) 8%, transparent);
+		}
 	}
 
 	.btn-run-now {

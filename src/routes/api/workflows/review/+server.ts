@@ -22,6 +22,7 @@ export const POST: RequestHandler = async ({ request, platform }) => {
 		triggerMinute?: number;
 		triggerEvent?: 'create' | 'update' | 'delete' | null;
 		triggerEntityTypeId?: string | null;
+		inputSchema?: { key: string; label: string; type: string; required?: boolean }[];
 		steps?: WorkflowStep[];
 	};
 	if (!body.steps || body.steps.length === 0) {
@@ -45,6 +46,7 @@ export const POST: RequestHandler = async ({ request, platform }) => {
 						triggerMinute: body.triggerMinute ?? 0,
 						triggerEvent: body.triggerEvent,
 						triggerEntityTypeId: body.triggerEntityTypeId,
+						inputSchema: body.inputSchema,
 						steps: body.steps
 					})
 				}

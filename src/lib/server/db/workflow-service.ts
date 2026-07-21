@@ -3,11 +3,13 @@ import type { BatchItem } from 'drizzle-orm/batch';
 import { workflows, workflowRuns } from './schema';
 import type { Db } from '.';
 import type { WorkflowStep } from '$lib/types/chat';
+import type { FieldDef } from './table-service';
 
 export type WorkflowRow = {
 	id: string;
 	name: string;
 	steps: WorkflowStep[];
+	inputSchema: FieldDef[];
 	triggerType: 'schedule' | 'event';
 	triggerHour: number;
 	triggerMinute: number;
@@ -25,6 +27,7 @@ function toRow(r: typeof workflows.$inferSelect): WorkflowRow {
 		id: r.id,
 		name: r.name,
 		steps: JSON.parse(r.steps) as WorkflowStep[],
+		inputSchema: JSON.parse(r.inputSchema) as FieldDef[],
 		triggerType: (r.triggerType ?? 'schedule') as 'schedule' | 'event',
 		triggerHour: r.triggerHour,
 		triggerMinute: r.triggerMinute,
@@ -43,6 +46,7 @@ export async function createWorkflow(
 	input: {
 		name: string;
 		steps: WorkflowStep[];
+		inputSchema?: FieldDef[];
 		triggerType?: 'schedule' | 'event';
 		triggerHour: number;
 		triggerMinute: number;
@@ -67,6 +71,7 @@ export async function createWorkflow(
 		id,
 		name: input.name,
 		steps: JSON.stringify(input.steps),
+		inputSchema: JSON.stringify(input.inputSchema ?? []),
 		triggerType: input.triggerType ?? 'schedule',
 		triggerHour: input.triggerHour,
 		triggerMinute: input.triggerMinute,
@@ -128,6 +133,7 @@ export async function updateWorkflow(
 	input: {
 		name: string;
 		steps: WorkflowStep[];
+		inputSchema?: FieldDef[];
 		triggerType?: 'schedule' | 'event';
 		triggerHour: number;
 		triggerMinute: number;
@@ -141,6 +147,7 @@ export async function updateWorkflow(
 		.set({
 			name: input.name,
 			steps: JSON.stringify(input.steps),
+			inputSchema: JSON.stringify(input.inputSchema ?? []),
 			triggerType: input.triggerType ?? 'schedule',
 			triggerHour: input.triggerHour,
 			triggerMinute: input.triggerMinute,

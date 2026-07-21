@@ -1,10 +1,11 @@
 <script lang="ts">
 	import { untrack } from 'svelte';
 	import type { WorkflowStep } from '$lib/types/chat';
-	import type { EntityTypeForWorkflow } from '$lib/server/db/table-service';
+	import type { EntityTypeForWorkflow, FieldDef, EditableField } from '$lib/server/db/table-service';
 	import type { SlackIntegrationOption } from '$lib/server/slack';
 	import { triggerFieldsFor } from '$lib/workflow-tools';
 	import WorkflowStepList from './WorkflowStepList.svelte';
+	import WorkflowInputSchemaDrawer from '$lib/components/database/WorkflowInputSchemaDrawer.svelte';
 
 	export type WorkflowState = {
 		name: string;
@@ -13,6 +14,7 @@
 		triggerMinute: number;
 		triggerEvent?: 'create' | 'update' | 'delete' | null;
 		triggerEntityTypeId?: string | null;
+		inputSchema?: FieldDef[];
 		steps: WorkflowStep[];
 	};
 
@@ -23,6 +25,7 @@
 		triggerMinute: number;
 		triggerEvent?: 'create' | 'update' | 'delete' | null;
 		triggerEntityTypeId?: string | null;
+		inputSchema?: FieldDef[];
 		steps: WorkflowStep[];
 		onsave?: (def: WorkflowState) => void;
 		editable?: boolean;
@@ -37,12 +40,21 @@
 		triggerMinute: initMinute,
 		triggerEvent: initTriggerEvent = null,
 		triggerEntityTypeId: initTriggerEntityTypeId = null,
+		inputSchema: initInputSchema = [],
 		steps: initSteps,
 		onsave,
 		editable = true,
 		entityTypes = [],
 		slackIntegrations = []
 	}: Props = $props();
+
+	function withLocalId(fields: FieldDef[]): EditableField[] {
+		return fields.map((f) => ({ ...f, _id: crypto.randomUUID() }));
+	}
+
+	function stripLocalId(fields: EditableField[]): FieldDef[] {
+		return fields.map(({ _id: _drop, ...f }) => f);
+	}
 
 	// チャットの $state からの値は深くリアクティブなProxyの場合があり、
 	// ブラウザ native の structuredClone がそれを認識できず DataCloneError になることがあるため、
@@ -57,7 +69,9 @@
 	let triggerMinute = $state(untrack(() => initMinute));
 	let triggerEvent = $state<'create' | 'update' | 'delete' | null>(untrack(() => initTriggerEvent));
 	let triggerEntityTypeId = $state<string | null>(untrack(() => initTriggerEntityTypeId));
+	let inputSchema = $state<EditableField[]>(untrack(() => withLocalId(JSON.parse(JSON.stringify(initInputSchema)))));
 	let steps = $state<WorkflowStep[]>(untrack(() => cloneSteps(initSteps)));
+	let inputSchemaDrawerOpen = $state(false);
 
 	const HOURS = Array.from({ length: 24 }, (_, i) => i);
 	const MINUTES = Array.from({ length: 60 }, (_, i) => i);
@@ -69,7 +83,7 @@
 	];
 
 	export function getState(): WorkflowState {
-		return { name, triggerType, triggerHour, triggerMinute, triggerEvent, triggerEntityTypeId, steps };
+		return { name, triggerType, triggerHour, triggerMinute, triggerEvent, triggerEntityTypeId, inputSchema: stripLocalId(inputSchema), steps };
 	}
 
 	/** 外部（AIアシスタントパネル等）から提案された状態を反映する。 */
@@ -80,7 +94,12 @@
 		triggerMinute = def.triggerMinute;
 		triggerEvent = def.triggerEvent ?? null;
 		triggerEntityTypeId = def.triggerEntityTypeId ?? null;
+		inputSchema = withLocalId(def.inputSchema ?? []);
 		steps = cloneSteps(def.steps);
+	}
+
+	export function openInputSchemaDrawer() {
+		inputSchemaDrawerOpen = true;
 	}
 
 	// イベントトリガー時、ステップ内で @trigger:<field> として参照できるフィールド一覧
@@ -88,6 +107,9 @@
 	const triggerFields = $derived(
 		triggerType === 'event' ? triggerFieldsFor(entityTypes, triggerEntityTypeId) : []
 	);
+
+	// 宣言された入力パラメータ。ステップ内で @input:<key> として参照できる一覧（キー・ラベルのみ）。
+	const inputFields = $derived(inputSchema.map((f) => ({ key: f.key, label: f.label })));
 </script>
 
 <div class="wf-wrap">
@@ -152,9 +174,16 @@
 			{entityTypes}
 			{slackIntegrations}
 			{triggerFields}
+			{inputFields}
 		/>
 	</div>
 </div>
+
+<WorkflowInputSchemaDrawer
+	open={inputSchemaDrawerOpen}
+	bind:fields={inputSchema}
+	onclose={() => (inputSchemaDrawerOpen = false)}
+/>
 
 <style lang="scss">
 	.wf-wrap {

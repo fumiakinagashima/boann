@@ -4,6 +4,7 @@ import {
 	parseStepRef,
 	parseItemRef,
 	parseTriggerRef,
+	parseInputRef,
 	entityListItemFields,
 	triggerFieldsFor,
 	SELF_ACCOUNT_ID_REF,
@@ -112,7 +113,8 @@ function resolveOperandType(
 	operand: string,
 	visible: VisibleStep[],
 	itemScopes: ItemScope[],
-	triggerFields: WorkflowListResultField[] | null
+	triggerFields: WorkflowListResultField[] | null,
+	inputFields: WorkflowListResultField[]
 ): { ok: true; type: WorkflowResultType } | { ok: false; error: string } {
 	const itemRef = parseItemRef(operand);
 	if (itemRef !== null) {
@@ -133,6 +135,13 @@ function resolveOperandType(
 		}
 		return { ok: true, type: 'string' };
 	}
+	const inputField = parseInputRef(operand);
+	if (inputField !== null) {
+		if (!inputFields.some((f) => f.key === inputField)) {
+			return { ok: false, error: `宣言されていない入力パラメータです: ${inputField}` };
+		}
+		return { ok: true, type: 'string' };
+	}
 	if (operand === SELF_ACCOUNT_ID_REF) return { ok: true, type: 'string' };
 	const refId = parseStepRef(operand);
 	if (refId === null) return { ok: true, type: 'string' }; // リテラルは文字列として扱う
@@ -148,7 +157,8 @@ export function validateWorkflow(
 	triggerEntityTypeId: string | null | undefined,
 	steps: WorkflowStep[],
 	entityTypes: EntityTypeForValidation[] = [],
-	slackIntegrations: SlackIntegrationForValidation[] = []
+	slackIntegrations: SlackIntegrationForValidation[] = [],
+	inputSchema: { key: string; label: string }[] = []
 ): ValidationResult {
 	const errors: string[] = [];
 	const entityTypeIds = new Set(entityTypes.map((e) => e.id));
@@ -203,7 +213,7 @@ export function validateWorkflow(
 					continue;
 				}
 				if (value) {
-					const resolved = resolveOperandType(value, visible, itemScopes, triggerFields);
+					const resolved = resolveOperandType(value, visible, itemScopes, triggerFields, inputSchema);
 					if (!resolved.ok) errors.push(`「${step.label}」の「${field.label}」: ${resolved.error}`);
 				}
 			}
@@ -214,17 +224,18 @@ export function validateWorkflow(
 				parseStepRef(step.left) === null &&
 				parseItemRef(step.left) === null &&
 				parseTriggerRef(step.left) === null &&
+				parseInputRef(step.left) === null &&
 				step.left !== SELF_ACCOUNT_ID_REF
 			) {
-				errors.push(`「${step.label}」の判定対象は先行ステップの結果・@item・@trigger・@selfのいずれかを選択してください`);
+				errors.push(`「${step.label}」の判定対象は先行ステップの結果・@item・@trigger・@input・@selfのいずれかを選択してください`);
 			} else {
-				const leftResolved = resolveOperandType(step.left, visible, itemScopes, triggerFields);
+				const leftResolved = resolveOperandType(step.left, visible, itemScopes, triggerFields, inputSchema);
 				if (!leftResolved.ok) errors.push(`「${step.label}」の判定対象: ${leftResolved.error}`);
 			}
 			if (!step.right) {
 				errors.push(`「${step.label}」の比較先が未入力です`);
 			} else {
-				const rightResolved = resolveOperandType(step.right, visible, itemScopes, triggerFields);
+				const rightResolved = resolveOperandType(step.right, visible, itemScopes, triggerFields, inputSchema);
 				if (!rightResolved.ok) errors.push(`「${step.label}」の比較先: ${rightResolved.error}`);
 			}
 			if (step.then.length === 0) {

@@ -11,6 +11,8 @@
 		parseItemRef,
 		makeTriggerRef,
 		parseTriggerRef,
+		makeInputRef,
+		parseInputRef,
 		entityListItemFields,
 		SELF_ACCOUNT_ID_REF,
 		type WorkflowListResultField
@@ -36,6 +38,8 @@
 		slackIntegrations?: SlackIntegrationOption[];
 		/** イベントトリガー時、@trigger:<field> として参照できるフィールド一覧（トリガーがscheduleの場合は空） */
 		triggerFields?: WorkflowListResultField[];
+		/** 宣言された入力パラメータ一覧。@input:<key> として参照できる */
+		inputFields?: WorkflowListResultField[];
 	};
 
 	let {
@@ -47,7 +51,8 @@
 		depth,
 		entityTypes = [],
 		slackIntegrations = [],
-		triggerFields = []
+		triggerFields = [],
+		inputFields = []
 	}: Props = $props();
 
 	function makeId(): string {
@@ -117,6 +122,8 @@
 		}
 		const triggerField = parseTriggerRef(operand);
 		if (triggerField !== null) return `trigger:${triggerField}`;
+		const inputField = parseInputRef(operand);
+		if (inputField !== null) return `input:${inputField}`;
 		if (operand === SELF_ACCOUNT_ID_REF) return 'self:account_id';
 		const stepId = parseStepRef(operand);
 		if (stepId !== null) return stepId;
@@ -132,6 +139,7 @@
 			return makeItemRef(rest.slice(0, sep), rest.slice(sep + 1));
 		}
 		if (value.startsWith('trigger:')) return makeTriggerRef(value.slice('trigger:'.length));
+		if (value.startsWith('input:')) return makeInputRef(value.slice('input:'.length));
 		if (value === 'self:account_id') return SELF_ACCOUNT_ID_REF;
 		return makeStepRef(value);
 	}
@@ -167,6 +175,14 @@
 
 	function triggerToken(field: WorkflowListResultField): string {
 		return makeTriggerRef(field.key);
+	}
+
+	function inputSelectValue(field: WorkflowListResultField): string {
+		return `input:${field.key}`;
+	}
+
+	function inputToken(field: WorkflowListResultField): string {
+		return makeInputRef(field.key);
 	}
 
 	const SELF_SELECT_VALUE = 'self:account_id';
@@ -394,6 +410,12 @@
 								<code class="wf-help-token">{triggerToken(f)}</code>
 							</li>
 						{/each}
+						{#each inputFields as f (f.key)}
+							<li>
+								<span class="wf-help-name">{f.label}（入力パラメータ）</span>
+								<code class="wf-help-token">{inputToken(f)}</code>
+							</li>
+						{/each}
 						<li>
 							<span class="wf-help-name">自分（ワークフロー登録者）のアカウントID</span>
 							<code class="wf-help-token">{SELF_ACCOUNT_ID_REF}</code>
@@ -411,7 +433,7 @@
 						{@const shown = isParamShown(step.id, field.key, hasValue, !!field.required)}
 						{#if shown}
 							{@const selVal = refSelectValue(step.params?.[field.key])}
-							{@const hasRefs = visible.length > 0 || itemOpts.length > 0 || triggerFields.length > 0 || selVal !== '__literal__'}
+							{@const hasRefs = visible.length > 0 || itemOpts.length > 0 || triggerFields.length > 0 || inputFields.length > 0 || selVal !== '__literal__'}
 							<div class="wf-line wf-param" class:wf-param-optional={!field.required}>
 								<label for="wf-param-{step.id}-{field.key}">{field.label}</label>
 								{#if field.type === 'select'}
@@ -447,6 +469,9 @@
 										{/each}
 										{#each triggerFields as f (f.key)}
 											<option value={triggerSelectValue(f)}>{f.label}（トリガーレコード）</option>
+										{/each}
+										{#each inputFields as f (f.key)}
+											<option value={inputSelectValue(f)}>{f.label}（入力パラメータ）</option>
 										{/each}
 										<option value={SELF_SELECT_VALUE}>自分のアカウントID</option>
 									</select>
@@ -550,6 +575,9 @@
 						{#each triggerFields as f (f.key)}
 							<option value={triggerSelectValue(f)}>{f.label}（トリガーレコード）</option>
 						{/each}
+						{#each inputFields as f (f.key)}
+							<option value={inputSelectValue(f)}>{f.label}（入力パラメータ）</option>
+						{/each}
 						<option value={SELF_SELECT_VALUE}>自分のアカウントID</option>
 					</select>
 					<select
@@ -575,6 +603,9 @@
 						{/each}
 						{#each triggerFields as f (f.key)}
 							<option value={triggerSelectValue(f)}>{f.label}（トリガーレコード）</option>
+						{/each}
+						{#each inputFields as f (f.key)}
+							<option value={inputSelectValue(f)}>{f.label}（入力パラメータ）</option>
 						{/each}
 						<option value={SELF_SELECT_VALUE}>自分のアカウントID</option>
 					</select>
@@ -617,6 +648,7 @@
 						{entityTypes}
 						{slackIntegrations}
 						{triggerFields}
+						{inputFields}
 						depth={depth + 1}
 					/>
 				</div>
@@ -635,6 +667,7 @@
 						{entityTypes}
 						{slackIntegrations}
 						{triggerFields}
+						{inputFields}
 						depth={depth + 1}
 					/>
 				</div>

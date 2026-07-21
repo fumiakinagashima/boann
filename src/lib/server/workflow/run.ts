@@ -58,7 +58,7 @@ function consumeBudget(budget: Budget): void {
  */
 export function preQuoteReferences(jsonStr: string): string {
 	return jsonStr.replace(
-		/:(\s*)(@(?:trigger|step|item|self):[a-zA-Z0-9_]+(?::[a-zA-Z0-9_]+)*)(\s*)([,}])/g,
+		/:(\s*)(@(?:trigger|step|item|self|input):[a-zA-Z0-9_]+(?::[a-zA-Z0-9_]+)*)(\s*)([,}])/g,
 		':$1"$2"$3$4'
 	);
 }
@@ -69,12 +69,13 @@ function resolveDataValues(
 	results: Map<string, StepResult>,
 	itemStack: ItemStack,
 	triggerContext?: TriggerContext,
-	self?: SelfContext
+	self?: SelfContext,
+	inputArgs?: Record<string, unknown>
 ): Record<string, unknown> {
 	const out: Record<string, unknown> = {};
 	for (const [k, v] of Object.entries(data)) {
-		if (typeof v === 'string' && (v.startsWith('@trigger:') || v.startsWith('@step:') || v.startsWith('@item:') || v.startsWith('@self:'))) {
-			out[k] = resolveOperand(v, results, itemStack, triggerContext, self).value;
+		if (typeof v === 'string' && (v.startsWith('@trigger:') || v.startsWith('@step:') || v.startsWith('@item:') || v.startsWith('@self:') || v.startsWith('@input:'))) {
+			out[k] = resolveOperand(v, results, itemStack, triggerContext, self, inputArgs).value;
 		} else {
 			out[k] = v;
 		}
@@ -82,12 +83,13 @@ function resolveDataValues(
 	return out;
 }
 
-function resolveOperand(
+export function resolveOperand(
 	operand: string,
 	results: Map<string, StepResult>,
 	itemStack: ItemStack,
 	triggerContext?: TriggerContext,
-	self?: SelfContext
+	self?: SelfContext,
+	inputArgs?: Record<string, unknown>
 ): StepResult {
 	if (operand.startsWith('@trigger:')) {
 		if (!triggerContext) throw new WorkflowAbortError('@trigger参照はイベントトリガーでのみ使用できます');
@@ -106,6 +108,13 @@ function resolveOperand(
 			return { type: 'string', value: self.accountId };
 		}
 		throw new WorkflowAbortError(`未知の@self参照です: ${field}`);
+	}
+	if (operand.startsWith('@input:')) {
+		const key = operand.slice('@input:'.length);
+		const v = inputArgs?.[key];
+		if (v === undefined) throw new WorkflowAbortError(`入力パラメータが指定されていません: ${key}`);
+		const type: WorkflowResultType = typeof v === 'number' ? 'number' : typeof v === 'boolean' ? 'boolean' : 'string';
+		return { type, value: (v as boolean | number | string) ?? '' };
 	}
 	const itemRef = parseItemRef(operand);
 	if (itemRef !== null) {
@@ -166,7 +175,8 @@ async function runAction(
 	self: SelfContext,
 	itemStack: ItemStack,
 	budget: Budget,
-	triggerContext?: TriggerContext
+	triggerContext?: TriggerContext,
+	inputArgs?: Record<string, unknown>
 ): Promise<{ result?: string }> {
 	consumeBudget(budget);
 	const toolDef = getWorkflowActionTool(step.tool);
@@ -176,7 +186,7 @@ async function runAction(
 	for (const field of toolDef.params) {
 		const raw = step.params?.[field.key];
 		if (!raw) continue;
-		const value = resolveOperand(raw, results, itemStack, triggerContext, self).value;
+		const value = resolveOperand(raw, results, itemStack, triggerContext, self, inputArgs).value;
 		if (field.type === 'number') {
 			resolvedParams[field.key] = Number(value);
 		} else if (field.type === 'date' && typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value)) {
@@ -196,7 +206,7 @@ async function runAction(
 		if (!rawDataStr) throw new WorkflowAbortError(`「${step.label}」のデータが指定されていません`);
 		let data: Record<string, unknown>;
 		try { data = JSON.parse(preQuoteReferences(rawDataStr)); } catch { throw new WorkflowAbortError(`「${step.label}」のデータがJSON形式ではありません`); }
-		data = resolveDataValues(data, results, itemStack, triggerContext, self);
+		data = resolveDataValues(data, results, itemStack, triggerContext, self, inputArgs);
 		const record = await createRecordByEntityTypeId(db, entityTypeId, data, env?.accountId);
 		return { result: `レコード作成完了（id: ${record.id}）` };
 	}
@@ -210,7 +220,7 @@ async function runAction(
 		if (!rawDataStr) throw new WorkflowAbortError(`「${step.label}」のデータが指定されていません`);
 		let data: Record<string, unknown>;
 		try { data = JSON.parse(preQuoteReferences(rawDataStr)); } catch { throw new WorkflowAbortError(`「${step.label}」のデータがJSON形式ではありません`); }
-		data = resolveDataValues(data, results, itemStack, triggerContext, self);
+		data = resolveDataValues(data, results, itemStack, triggerContext, self, inputArgs);
 		await updateRecordByEntityTypeId(db, entityTypeId, recordId, data, env?.accountId);
 		return { result: `レコード更新完了（id: ${recordId}）` };
 	}
@@ -261,14 +271,15 @@ async function runForeach(
 	itemStack: ItemStack,
 	budget: Budget,
 	logs: StepLog[],
-	triggerContext?: TriggerContext
+	triggerContext?: TriggerContext,
+	inputArgs?: Record<string, unknown>
 ): Promise<void> {
 	const refId = parseStepRef(step.source);
 	if (!refId) throw new WorkflowAbortError(`「${step.label}」の対象が選択されていません`);
 	const items = listResults.get(refId);
 	if (!items) throw new WorkflowAbortError(`「${step.label}」の参照先のリスト結果が見つかりません: ${refId}`);
 	for (const item of items.slice(0, WORKFLOW_FOREACH_MAX_ITEMS)) {
-		await runSteps(db, step.body, results, listResults, env, self, [...itemStack, { foreachStepId: step.id, item }], budget, logs, triggerContext);
+		await runSteps(db, step.body, results, listResults, env, self, [...itemStack, { foreachStepId: step.id, item }], budget, logs, triggerContext, inputArgs);
 	}
 }
 
@@ -282,13 +293,14 @@ async function runSteps(
 	itemStack: ItemStack = [],
 	budget: Budget = { remaining: WORKFLOW_MAX_ACTIONS_PER_RUN },
 	logs: StepLog[] = [],
-	triggerContext?: TriggerContext
+	triggerContext?: TriggerContext,
+	inputArgs?: Record<string, unknown>
 ): Promise<void> {
 	for (const step of steps) {
 		if (step.kind === 'action') {
 			const start = Date.now();
 			try {
-				const { result } = await runAction(db, step, results, listResults, env, self, itemStack, budget, triggerContext);
+				const { result } = await runAction(db, step, results, listResults, env, self, itemStack, budget, triggerContext, inputArgs);
 				logs.push({ id: step.id, label: step.label, ok: true, result, ms: Date.now() - start });
 			} catch (e) {
 				const error = e instanceof Error ? e.message : String(e);
@@ -299,8 +311,8 @@ async function runSteps(
 			const start = Date.now();
 			let matched: boolean;
 			try {
-				const left = resolveOperand(step.left, results, itemStack, triggerContext, self);
-				const right = resolveOperand(step.right, results, itemStack, triggerContext, self);
+				const left = resolveOperand(step.left, results, itemStack, triggerContext, self, inputArgs);
+				const right = resolveOperand(step.right, results, itemStack, triggerContext, self, inputArgs);
 				matched = compare(left, step.operator, right);
 			} catch (e) {
 				const error = e instanceof Error ? e.message : String(e);
@@ -308,10 +320,10 @@ async function runSteps(
 				throw e;
 			}
 			if (matched) {
-				await runSteps(db, step.then, results, listResults, env, self, itemStack, budget, logs, triggerContext);
+				await runSteps(db, step.then, results, listResults, env, self, itemStack, budget, logs, triggerContext, inputArgs);
 			}
 		} else {
-			await runForeach(db, step, results, listResults, env, self, itemStack, budget, logs, triggerContext);
+			await runForeach(db, step, results, listResults, env, self, itemStack, budget, logs, triggerContext, inputArgs);
 		}
 	}
 }
@@ -344,7 +356,7 @@ async function releaseRunLock(kv: KVNamespace | undefined, workflowId: string): 
 	await kv.delete(`${WORKFLOW_RUN_LOCK_PREFIX}${workflowId}`);
 }
 
-async function executeWorkflow(db: Db, workflow: WorkflowRow, env?: ToolEnv, triggerContext?: TriggerContext): Promise<WorkflowRunResult> {
+async function executeWorkflow(db: Db, workflow: WorkflowRow, env?: ToolEnv, triggerContext?: TriggerContext, inputArgs?: Record<string, unknown>): Promise<WorkflowRunResult> {
 	if (!(await acquireRunLock(env?.KV, workflow.id))) {
 		return {
 			id: workflow.id,
@@ -363,7 +375,7 @@ async function executeWorkflow(db: Db, workflow: WorkflowRow, env?: ToolEnv, tri
 			? { ...(env ?? {}), accountId: workflow.accountId }
 			: env;
 		const self: SelfContext = { email: account?.email ?? null, accountId: workflow.accountId ?? null };
-		await runSteps(db, workflow.steps, new Map(), new Map(), toolEnv, self, [], { remaining: WORKFLOW_MAX_ACTIONS_PER_RUN }, logs, triggerContext);
+		await runSteps(db, workflow.steps, new Map(), new Map(), toolEnv, self, [], { remaining: WORKFLOW_MAX_ACTIONS_PER_RUN }, logs, triggerContext, inputArgs);
 		await recordWorkflowRun(db, { workflowId: workflow.id, ok: true, log: logs, startedAt, finishedAt: new Date() });
 		return { id: workflow.id, name: workflow.name, ok: true };
 	} catch (e) {
@@ -392,8 +404,8 @@ export async function processDueWorkflows(
  * 「今すぐ実行」用。トリガー時刻・有効化フラグを無視し、DBに保存されている内容をそのまま即時実行する
  * （編集中の画面上の未保存の内容ではない）。テスト目的の手動実行またはイベントトリガーによる自動実行。
  */
-export async function runWorkflowNow(db: Db, workflowId: string, env?: ToolEnv, triggerContext?: TriggerContext): Promise<WorkflowRunResult> {
+export async function runWorkflowNow(db: Db, workflowId: string, env?: ToolEnv, triggerContext?: TriggerContext, inputArgs?: Record<string, unknown>): Promise<WorkflowRunResult> {
 	const workflow = await getWorkflow(db, workflowId);
 	if (!workflow) throw new Error('ワークフローが見つかりません');
-	return executeWorkflow(db, workflow, env, triggerContext);
+	return executeWorkflow(db, workflow, env, triggerContext, inputArgs);
 }

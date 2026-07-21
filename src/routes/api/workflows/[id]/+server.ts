@@ -6,6 +6,7 @@ import { listEntityTypesForWorkflow } from '$lib/server/db/table-service';
 import { listSlackIntegrationsForWorkflow } from '$lib/server/slack';
 import { validateWorkflow } from '$lib/workflow-validation';
 import type { WorkflowStep } from '$lib/types/chat';
+import type { FieldDef } from '$lib/server/db/table-service';
 
 export const PATCH: RequestHandler = async ({ params, request, platform, locals }) => {
 	if (!platform?.env?.DB) return json({ error: 'DB not available' }, { status: 500 });
@@ -23,6 +24,7 @@ export const PATCH: RequestHandler = async ({ params, request, platform, locals 
 			triggerMinute?: number;
 			triggerEvent?: 'create' | 'update' | 'delete' | null;
 			triggerEntityTypeId?: string | null;
+			inputSchema?: FieldDef[];
 			steps?: WorkflowStep[];
 			enabled?: boolean;
 		};
@@ -32,12 +34,13 @@ export const PATCH: RequestHandler = async ({ params, request, platform, locals 
 		const triggerMinute = body.triggerMinute ?? existing.triggerMinute;
 		const triggerEntityTypeId = body.triggerEntityTypeId !== undefined ? body.triggerEntityTypeId : existing.triggerEntityTypeId;
 		const steps = body.steps ?? existing.steps;
+		const inputSchema = body.inputSchema ?? existing.inputSchema;
 
 		const [entityTypes, slackIntegrations] = await Promise.all([
 			listEntityTypesForWorkflow(db),
 			listSlackIntegrationsForWorkflow(db)
 		]);
-		const validation = validateWorkflow(triggerType, triggerHour, triggerMinute, triggerEntityTypeId, steps, entityTypes, slackIntegrations);
+		const validation = validateWorkflow(triggerType, triggerHour, triggerMinute, triggerEntityTypeId, steps, entityTypes, slackIntegrations, inputSchema);
 		if (!validation.ok) {
 			return json({ error: validation.errors.join(' / ') }, { status: 422 });
 		}
@@ -45,6 +48,7 @@ export const PATCH: RequestHandler = async ({ params, request, platform, locals 
 		const row = await updateWorkflow(db, params.id, {
 			name,
 			steps,
+			inputSchema,
 			triggerType,
 			triggerHour,
 			triggerMinute,

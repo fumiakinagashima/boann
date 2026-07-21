@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { preQuoteReferences, compare } from './run';
+import { preQuoteReferences, compare, resolveOperand } from './run';
 
 describe('preQuoteReferences', () => {
 	it('quotes a bare reference used as a JSON value', () => {
@@ -7,10 +7,11 @@ describe('preQuoteReferences', () => {
 		expect(JSON.parse(out)).toEqual({ customer_id: '@step:1', note: 'hi' });
 	});
 
-	it('quotes a bare @trigger/@self/@item reference at the end of an object', () => {
+	it('quotes a bare @trigger/@self/@item/@input reference at the end of an object', () => {
 		expect(JSON.parse(preQuoteReferences('{"customer_id": @trigger:id}'))).toEqual({ customer_id: '@trigger:id' });
 		expect(JSON.parse(preQuoteReferences('{"account_id": @self:account_id}'))).toEqual({ account_id: '@self:account_id' });
 		expect(JSON.parse(preQuoteReferences('{"id": @item:abc123:field_key}'))).toEqual({ id: '@item:abc123:field_key' });
+		expect(JSON.parse(preQuoteReferences('{"name": @input:customer_name}'))).toEqual({ name: '@input:customer_name' });
 	});
 
 	it('is idempotent for already-quoted references', () => {
@@ -22,6 +23,26 @@ describe('preQuoteReferences', () => {
 		const input = '{"note":"please refer to @self:account_id for details"}';
 		expect(preQuoteReferences(input)).toBe(input);
 		expect(() => JSON.parse(preQuoteReferences(input))).not.toThrow();
+	});
+});
+
+describe('resolveOperand @input:', () => {
+	it('resolves a declared input argument by key', () => {
+		const result = resolveOperand('@input:customer_name', new Map(), [], undefined, undefined, { customer_name: '田中' });
+		expect(result).toEqual({ type: 'string', value: '田中' });
+	});
+
+	it('infers number/boolean types from the argument value', () => {
+		expect(resolveOperand('@input:amount', new Map(), [], undefined, undefined, { amount: 100 })).toEqual({ type: 'number', value: 100 });
+		expect(resolveOperand('@input:flag', new Map(), [], undefined, undefined, { flag: true })).toEqual({ type: 'boolean', value: true });
+	});
+
+	it('throws when the referenced key was not supplied', () => {
+		expect(() => resolveOperand('@input:missing', new Map(), [], undefined, undefined, { other: '1' })).toThrow('入力パラメータが指定されていません: missing');
+	});
+
+	it('throws when no inputArgs were passed at all', () => {
+		expect(() => resolveOperand('@input:customer_name', new Map(), [], undefined, undefined, undefined)).toThrow('入力パラメータが指定されていません: customer_name');
 	});
 });
 

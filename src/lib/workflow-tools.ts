@@ -271,6 +271,18 @@ export function parseTriggerRef(value: string | undefined): string | null {
 	return value.slice(TRIGGER_REF_PREFIX.length);
 }
 
+const INPUT_REF_PREFIX = '@input:';
+
+/** ワークフローで宣言された入力パラメータ（inputSchema）を参照する記法（`@input:<key>`）。 */
+export function makeInputRef(key: string): string {
+	return `${INPUT_REF_PREFIX}${key}`;
+}
+
+export function parseInputRef(value: string | undefined): string | null {
+	if (!value || !value.startsWith(INPUT_REF_PREFIX)) return null;
+	return value.slice(INPUT_REF_PREFIX.length);
+}
+
 /**
  * イベントトリガーの対象レコードで、テーブルのフィールド定義に関わらず常に参照できるシステムフィールド。
  * キーは RecordRow（table-service.getRecord）が実際に返すキー名（createdBy等のキャメルケース）に合わせる。

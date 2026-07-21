@@ -26,6 +26,7 @@ export const POST: RequestHandler = async ({ request, platform, locals }) => {
 			triggerMinute: number;
 			triggerEvent?: 'create' | 'update' | 'delete' | null;
 			triggerEntityTypeId?: string | null;
+			inputSchema?: { key: string; label: string; type: string; required?: boolean }[];
 			steps: WorkflowStep[];
 		};
 		history: { role: 'user' | 'assistant'; text: string }[];

@@ -3,7 +3,7 @@ import type { Tool } from '@anthropic-ai/sdk/resources/messages';
 import type { Db } from '../db';
 import type { ToolEnv } from './shared';
 import { createWorkflow, updateWorkflow, listWorkflows, listWorkflowsByAppId, getWorkflow, type WorkflowRow } from '../db/workflow-service';
-import { listEntityTypesForWorkflow } from '../db/table-service';
+import { listEntityTypesForWorkflow, type FieldDef } from '../db/table-service';
 import { listSlackIntegrationsForWorkflow } from '../slack';
 import { validateWorkflow } from '$lib/workflow-validation';
 import { runWorkflowNow } from '../workflow/run';
@@ -31,6 +31,15 @@ const workflowStepSchema: z.ZodType<WorkflowStep> = z.lazy(() =>
 	])
 );
 
+const workflowInputFieldSchema = z.object({
+	key: z.string(),
+	label: z.string(),
+	type: z.string(),
+	required: z.boolean().optional(),
+	options: z.array(z.object({ value: z.string(), label: z.string() })).optional(),
+	description: z.string().optional()
+});
+
 const saveWorkflowInputSchema = z.object({
 	id: z.string().optional(),
 	name: z.string().min(1),
@@ -39,6 +48,7 @@ const saveWorkflowInputSchema = z.object({
 	triggerMinute: z.number().int().min(0).max(59),
 	triggerEvent: z.enum(['create', 'update', 'delete']).nullable().optional(),
 	triggerEntityTypeId: z.string().nullable().optional(),
+	inputSchema: z.array(workflowInputFieldSchema).optional(),
 	steps: z.array(workflowStepSchema)
 });
 
@@ -57,9 +67,25 @@ export const tools: Tool[] = [
 				triggerMinute: { type: 'number', description: '実行時刻（分、0-59、JST）。schedule時のみ有効' },
 				triggerEvent: { type: 'string', enum: ['create', 'update', 'delete'], description: 'event時のみ。対象操作（create=作成、update=更新、delete=削除）' },
 				triggerEntityTypeId: { type: 'string', description: 'event時のみ。監視するテーブルのentity_types.id（UUIDキー）' },
+				inputSchema: {
+					type: 'array',
+					description: '宣言する入力パラメータの一覧（呼び出す側が渡す値）。各要素は{key, label, type, required, options, description}。ステップ内で@input:<key>として参照できる',
+					items: {
+						type: 'object',
+						properties: {
+							key: { type: 'string' },
+							label: { type: 'string' },
+							type: { type: 'string', enum: ['text', 'number', 'select', 'date', 'email', 'tel', 'textarea'] },
+							required: { type: 'boolean' },
+							options: { type: 'array', items: { type: 'object', properties: { value: { type: 'string' }, label: { type: 'string' } } } },
+							description: { type: 'string' }
+						},
+						required: ['key', 'label', 'type']
+					}
+				},
 				steps: {
 					type: 'array',
-					description: 'ステップの配列（action または condition）。eventトリガーでは@trigger:idで操作されたレコードのID、@trigger:eventでイベント種別、@trigger:<フィールドキー>（例: @trigger:createdBy）でそのレコードの他のフィールド値を、条件の判定対象（先頭ステップの条件でも）を含め参照できる。@self:account_idはワークフロー登録者自身のアカウントIDを表し、@trigger:createdBy != @self:account_id のように「自分以外が操作したか」を判定できる'
+					description: 'ステップの配列（action または condition）。eventトリガーでは@trigger:idで操作されたレコードのID、@trigger:eventでイベント種別、@trigger:<フィールドキー>（例: @trigger:createdBy）でそのレコードの他のフィールド値を、条件の判定対象（先頭ステップの条件でも）を含め参照できる。@self:account_idはワークフロー登録者自身のアカウントIDを表し、@trigger:createdBy != @self:account_id のように「自分以外が操作したか」を判定できる。inputSchemaで宣言した入力パラメータは@input:<key>で参照できる'
 				}
 			},
 			required: ['name', 'triggerHour', 'triggerMinute', 'steps']
@@ -87,11 +113,12 @@ export const tools: Tool[] = [
 	{
 		name: 'run_workflow',
 		description:
-			'指定したワークフローを今すぐ実行する。「〇〇ワークフローを実行して」「今すぐ動かして」などの依頼に使う。実行結果（成功/失敗・エラー内容）を返す。',
+			'指定したワークフローを今すぐ実行する。「〇〇ワークフローを実行して」「今すぐ動かして」などの依頼に使う。実行結果（成功/失敗・エラー内容）を返す。get_workflowのinputSchemaに入力パラメータがある場合はinputArgsで値を渡す。',
 		input_schema: {
 			type: 'object',
 			properties: {
-				id: { type: 'string', description: '実行するワークフローのID（list_workflows または get_workflow で取得）' }
+				id: { type: 'string', description: '実行するワークフローのID（list_workflows または get_workflow で取得）' },
+				inputArgs: { type: 'object', description: 'get_workflowのinputSchemaで宣言されている入力パラメータのkeyと値のペア（例: {"customer_name": "田中"}）。入力パラメータがないワークフローでは不要' }
 			},
 			required: ['id']
 		}
@@ -112,12 +139,12 @@ export const tools: Tool[] = [
 ];
 
 export async function handleSaveWorkflow(db: Db, input: unknown, env?: ToolEnv) {
-	const { id, name, triggerType, triggerHour, triggerMinute, triggerEvent, triggerEntityTypeId, steps } = saveWorkflowInputSchema.parse(input);
+	const { id, name, triggerType, triggerHour, triggerMinute, triggerEvent, triggerEntityTypeId, inputSchema, steps } = saveWorkflowInputSchema.parse(input);
 	const [entityTypes, slackIntegrations] = await Promise.all([
 		listEntityTypesForWorkflow(db),
 		listSlackIntegrationsForWorkflow(db)
 	]);
-	const validation = validateWorkflow(triggerType ?? 'schedule', triggerHour, triggerMinute, triggerEntityTypeId, steps, entityTypes, slackIntegrations);
+	const validation = validateWorkflow(triggerType ?? 'schedule', triggerHour, triggerMinute, triggerEntityTypeId, steps, entityTypes, slackIntegrations, inputSchema ?? []);
 	if (!validation.ok) {
 		throw new Error(`ワークフローの内容に問題があります: ${validation.errors.join(' / ')}`);
 	}
@@ -128,7 +155,7 @@ export async function handleSaveWorkflow(db: Db, input: unknown, env?: ToolEnv) 
 		if (existing.accountId && existing.accountId !== env?.accountId) {
 			throw new Error('このワークフローを更新する権限がありません。');
 		}
-		const workflow = await updateWorkflow(db, id, { name, steps, triggerType, triggerHour, triggerMinute, triggerEvent, triggerEntityTypeId });
+		const workflow = await updateWorkflow(db, id, { name, steps, inputSchema: inputSchema as FieldDef[] | undefined, triggerType, triggerHour, triggerMinute, triggerEvent, triggerEntityTypeId });
 		return {
 			id: workflow.id,
 			name: workflow.name,
@@ -140,6 +167,7 @@ export async function handleSaveWorkflow(db: Db, input: unknown, env?: ToolEnv) 
 	const workflow = await createWorkflow(db, {
 		name,
 		steps,
+		inputSchema: inputSchema as FieldDef[] | undefined,
 		triggerType,
 		triggerHour,
 		triggerMinute,
@@ -189,6 +217,7 @@ function toGetWorkflowResult(row: WorkflowRow) {
 		triggerMinute: row.triggerMinute,
 		triggerEvent: row.triggerEvent,
 		triggerEntityTypeId: row.triggerEntityTypeId,
+		inputSchema: row.inputSchema,
 		steps: row.steps,
 		enabled: row.enabled
 	};
@@ -222,13 +251,16 @@ export async function handleGetWorkflow(db: Db, input: unknown, env?: ToolEnv) {
 	return toGetWorkflowResult(matches[0]);
 }
 
-const runWorkflowInputSchema = z.object({ id: z.string() });
+const runWorkflowInputSchema = z.object({
+	id: z.string(),
+	inputArgs: z.record(z.string(), z.union([z.string(), z.number(), z.boolean()])).optional()
+});
 
 export async function handleRunWorkflow(db: Db, input: unknown, env?: ToolEnv) {
-	const { id } = runWorkflowInputSchema.parse(input);
+	const { id, inputArgs } = runWorkflowInputSchema.parse(input);
 	const row = await getWorkflow(db, id);
 	if (!row) throw new Error(`ワークフローが見つかりません（id: ${id}）`);
-	const result = await runWorkflowNow(db, id, env);
+	const result = await runWorkflowNow(db, id, env, undefined, inputArgs);
 	return {
 		id: result.id,
 		name: result.name,

@@ -113,6 +113,13 @@
       "when": 1751900000000,
       "tag": "0023_drop_app_pages",
       "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "6",
+      "when": 1752000000000,
+      "tag": "0024_workflow_input_schema",
+      "breakpoints": true
     }
   ]
 }

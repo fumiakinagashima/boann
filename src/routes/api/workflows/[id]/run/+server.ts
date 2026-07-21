@@ -14,10 +14,11 @@ export const POST: RequestHandler = async ({ params, request, platform, locals }
 		return json({ error: '権限がありません' }, { status: 403 });
 	}
 
+	let body: { triggerRecordId?: string; inputArgs?: Record<string, unknown> } = {};
+	try { body = await request.json(); } catch { /* body は省略可 */ }
+
 	let triggerContext: TriggerContext | undefined;
 	if (workflow.triggerType === 'event') {
-		let body: { triggerRecordId?: string } = {};
-		try { body = await request.json(); } catch { /* body は省略可 */ }
 		const recordId = body.triggerRecordId?.trim() ?? '';
 		// @trigger:<field> のテスト実行用に、指定されたレコードIDの現在のフィールド値を読み込む
 		const record = recordId ? await getRecord(db, '', recordId) : null;
@@ -30,7 +31,7 @@ export const POST: RequestHandler = async ({ params, request, platform, locals }
 	}
 
 	try {
-		const result = await runWorkflowNow(db, params.id, platform.env, triggerContext);
+		const result = await runWorkflowNow(db, params.id, platform.env, triggerContext, body.inputArgs);
 		return json(result);
 	} catch (e) {
 		return json({ error: e instanceof Error ? e.message : String(e) }, { status: 400 });

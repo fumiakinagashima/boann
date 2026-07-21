@@ -28,7 +28,7 @@
 			toast.error('ワークフロー名を入力してください');
 			return;
 		}
-		const validation = validateWorkflow(state.triggerType ?? 'schedule', state.triggerHour, state.triggerMinute, state.triggerEntityTypeId, state.steps, data.entityTypes, data.slackIntegrations);
+		const validation = validateWorkflow(state.triggerType ?? 'schedule', state.triggerHour, state.triggerMinute, state.triggerEntityTypeId, state.steps, data.entityTypes, data.slackIntegrations, state.inputSchema ?? []);
 		if (!validation.ok) {
 			for (const msg of validation.errors) toast.error(msg);
 			return;
@@ -59,6 +59,7 @@
 		triggerMinute: data.workflow.triggerMinute,
 		triggerEvent: data.workflow.triggerEvent,
 		triggerEntityTypeId: data.workflow.triggerEntityTypeId,
+		inputSchema: data.workflow.inputSchema,
 		steps: data.workflow.steps
 	};
 
@@ -90,6 +91,7 @@
 			initialTriggerMinute={data.workflow.triggerMinute}
 			initialTriggerEvent={data.workflow.triggerEvent}
 			initialTriggerEntityTypeId={data.workflow.triggerEntityTypeId}
+			initialInputSchema={data.workflow.inputSchema}
 			initialSteps={data.workflow.steps}
 			initialEnabled={data.workflow.enabled}
 			runs={data.runs}

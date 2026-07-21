@@ -8,9 +8,8 @@
 	type Props = {
 		fields?: LocalField[];
 		availableTables?: { value: string; label: string }[];
+		fieldTypes?: { value: CustomFieldType | 'recordSelect' | 'account'; label: string }[];
 	};
-
-	let { fields = $bindable([]), availableTables = [] }: Props = $props();
 
 	const FIELD_TYPES: { value: CustomFieldType | 'recordSelect' | 'account'; label: string }[] = [
 		{ value: 'text', label: 'テキスト' },
@@ -23,6 +22,8 @@
 		{ value: 'recordSelect', label: '関係' },
 		{ value: 'account', label: 'アカウント' }
 	];
+
+	let { fields = $bindable([]), availableTables = [], fieldTypes = FIELD_TYPES }: Props = $props();
 
 	function addField() {
 		fields = [...fields, {
@@ -82,7 +83,7 @@
 							value={field.type}
 							onchange={(e) => updateField(field._id, { type: (e.target as HTMLSelectElement).value as CustomFieldType | 'recordSelect' | 'account' })}
 						>
-							{#each FIELD_TYPES as t}
+							{#each fieldTypes as t}
 								<option value={t.value}>{t.label}</option>
 							{/each}
 						</select>
@@ -98,6 +99,16 @@
 						<button type="button" class="remove-btn" onclick={() => removeField(field._id)} aria-label="フィールドを削除">
 							<X size={14} />
 						</button>
+					</div>
+					<div class="options-row">
+						<label class="options-label" for="desc-{field._id}">補足説明（任意）</label>
+						<input
+							id="desc-{field._id}"
+							type="text"
+							placeholder="このフィールドの用途や値の説明"
+							value={field.description ?? ''}
+							oninput={(e) => updateField(field._id, { description: (e.target as HTMLInputElement).value })}
+						/>
 					</div>
 					{#if field.type === 'select'}
 						<div class="options-row">

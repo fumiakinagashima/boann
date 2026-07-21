@@ -331,6 +331,13 @@ function renderWorkflowStepsForAI(steps: WorkflowStep[], indent = ''): string {
 		.join('\n');
 }
 
+function renderInputSchemaForAI(inputSchema: { key: string; label: string; type: string; required?: boolean }[]): string {
+	if (inputSchema.length === 0) return '（宣言されている入力パラメータはありません）';
+	return inputSchema
+		.map((f) => `- @input:${f.key}（${f.label}、${f.type}${f.required ? '、必須' : '、任意'}）`)
+		.join('\n');
+}
+
 export function buildWorkflowReviewPrompt(input: {
 	name: string;
 	triggerType?: 'schedule' | 'event';
@@ -338,6 +345,7 @@ export function buildWorkflowReviewPrompt(input: {
 	triggerMinute: number;
 	triggerEvent?: 'create' | 'update' | 'delete' | null;
 	triggerEntityTypeId?: string | null;
+	inputSchema?: { key: string; label: string; type: string; required?: boolean }[];
 	steps: WorkflowStep[];
 }): string {
 	const EVENT_LABEL: Record<string, string> = { create: '作成', update: '更新', delete: '削除' };
@@ -352,6 +360,9 @@ ${input.name || '（未入力）'}
 ## トリガー
 ${triggerDesc}
 
+## 宣言された入力パラメータ（ステップ内で@input:<key>として参照可能）
+${renderInputSchemaForAI(input.inputSchema ?? [])}
+
 ## ステップ構成
 ${input.steps.length > 0 ? renderWorkflowStepsForAI(input.steps) : '（ステップが1つもありません）'}`;
 }
@@ -363,6 +374,7 @@ export function buildWorkflowChatSystemPrompt(current: {
 	triggerMinute: number;
 	triggerEvent?: 'create' | 'update' | 'delete' | null;
 	triggerEntityTypeId?: string | null;
+	inputSchema?: { key: string; label: string; type: string; required?: boolean }[];
 	steps: WorkflowStep[];
 }): string {
 	return `あなたはBoannというノーコードアプリプラットフォームの「ワークフロー」（スケジュールまたはイベントで起動する自動化フロー）作成を専門にサポートするAIアシスタントです。画面右側のエディタと連動しており、あなたが提案した内容はそのまま右側に反映されます。
@@ -385,16 +397,20 @@ ${ITEM_REF_SEMANTICS_NOTE}
 
 ## 使用できるアクションツール（tool フィールドに指定。params は各ツールの入力欄）
 ${WORKFLOW_ACTION_TOOLS.map(describeWorkflowActionToolForAI).join('\n')}
-結果（resultType付き）は条件のleft/rightや後続ステップのparamsで参照可能。condition の left は必ず先行アクションの結果（@step:<id> または @item:<field>）、イベントトリガーの場合はトリガーレコードの参照（@trigger:<id|event|フィールドキー>）、または @self:account_id のいずれかを指定する（自由なリテラル不可）。operator は == != > < >= <= のいずれか。
+結果（resultType付き）は条件のleft/rightや後続ステップのparamsで参照可能。condition の left は必ず先行アクションの結果（@step:<id> または @item:<field>）、イベントトリガーの場合はトリガーレコードの参照（@trigger:<id|event|フィールドキー>）、宣言済みの入力パラメータ（@input:<key>）、または @self:account_id のいずれかを指定する（自由なリテラル不可）。operator は == != > < >= <= のいずれか。
 
 ## トリガー種別
 - schedule（スケジュール）: 毎日指定時刻に実行。triggerHour/triggerMinute を指定する
 - event（イベント）: 特定テーブルのレコード作成/更新/削除時に実行。triggerEntityTypeId（entity_types.id）と triggerEvent（create/update/delete）を指定する。ステップ内で @trigger:id = 操作されたレコードID、@trigger:event = イベント種別、@trigger:<フィールドキー>（例: @trigger:createdBy）= そのレコードの他のフィールド値（システムフィールドのcreatedBy/updatedBy/createdAt/updatedAt含む）を参照可能。先頭ステップの条件（1番目のconditionステップ）でも参照できる
 - @self:account_id はトリガー種別によらず常に参照可能で、ワークフロー登録者自身のアカウントIDを表す。「自分以外が操作したレコードか」を判定する場合、\`{"left":"@trigger:createdBy","operator":"!=","right":"@self:account_id"}\` のように使う
 
+## 入力パラメータ（inputSchema、画面右上の「⚙ 入力パラメータ」で宣言する）
+ワークフローの呼び出し側が渡す値。宣言済みのキーはステップ内で @input:<key> として参照できる（下記の現在の編集状態を参照）。あなたはinputSchema自体を提案・変更しない（ユーザーがドロワーで管理する）。
+
 ## 現在の編集状態（画面右側の内容。ユーザーが手動で編集している場合もある）
 - 名前: ${current.name || '（未入力）'}
 - トリガー: ${current.triggerType === 'event' ? `イベント（テーブル: ${current.triggerEntityTypeId ?? '未選択'} / ${current.triggerEvent ?? '未選択'}時）` : `スケジュール（毎日 ${String(current.triggerHour).padStart(2, '0')}:${String(current.triggerMinute).padStart(2, '0')}）`}
+- 入力パラメータ:\n${renderInputSchemaForAI(current.inputSchema ?? [])}
 - ステップ: ${current.steps.length > 0 ? `\n${renderWorkflowStepsForAI(current.steps)}` : '（なし）'}
 
 ## 提案方法

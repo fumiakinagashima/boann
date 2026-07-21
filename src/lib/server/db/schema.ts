@@ -208,6 +208,7 @@ export const workflows = sqliteTable('workflows', {
 	id: text('id').primaryKey(),
 	name: text('name').notNull(),
 	steps: text('steps').notNull().default('[]'),
+	inputSchema: text('input_schema').notNull().default('[]'),
 	triggerType: text('trigger_type').notNull().default('schedule'),
 	triggerHour: integer('trigger_hour').notNull(),
 	triggerMinute: integer('trigger_minute').notNull(),
