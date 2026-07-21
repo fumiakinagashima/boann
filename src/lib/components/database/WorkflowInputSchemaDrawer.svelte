@@ -13,14 +13,14 @@
 
 	// ワークフローの入力パラメータでは、対象テーブル解決の仕組みが別途必要になる
 	// recordSelect/account は今回対象外（将来ここに追加するだけで拡張できる）。
+	// tel/textareaはfieldToZod（field-schema.ts）でtext同様z.string()にしかならず、
+	// 入力パラメータには専用UIも無い（prompt()収集のみ）ため区別する意味がなく含めない。
 	const FIELD_TYPES: { value: CustomFieldType; label: string }[] = [
 		{ value: 'text', label: 'テキスト' },
 		{ value: 'number', label: '数値' },
 		{ value: 'select', label: '選択' },
 		{ value: 'date', label: '日付' },
-		{ value: 'email', label: 'メール' },
-		{ value: 'tel', label: '電話番号' },
-		{ value: 'textarea', label: '長文テキスト' }
+		{ value: 'email', label: 'メール' }
 	];
 </script>
 
