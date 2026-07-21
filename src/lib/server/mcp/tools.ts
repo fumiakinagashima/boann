@@ -146,6 +146,8 @@ async function callWorkflowMcpTool(
 	return toolOk({ ok: true, name: result.name });
 }
 
+// TODO: 全ツール呼び出し（テーブルCRUD含む）のコールログを永続化したい（2026-07-21、ユーザー要望）。
+// 現状はworkflow_runsがrun_workflow_*のみを記録。ここにログ記録フックを足すのが実装候補地。
 export async function callAppMcpTool(
 	db: Db,
 	appId: string,
