@@ -4,7 +4,7 @@ import type { WorkflowStep } from '$lib/types/chat';
 
 // レビューAI・チャットアシスタントAI・メインチャット共通: @step:<id> の解決ルールの説明。記述がズレないよう一箇所にまとめる。
 const STEP_REF_SEMANTICS_NOTE =
-	'`@step:<id>` は、そのステップ（action）の実行結果のうちカタログのresultTypeに従って抽出済みのスカラー値（数値・文字列・真偽値）を直接指す。`@step:<id>.count` のようなプロパティアクセスや、生のAPIレスポンス構造（JOINやネストしたオブジェクト等）を考慮する必要はない。常に抽出済みの単一値に置き換わる。';
+	'`@step:<id>` は、そのステップ（action）の実行結果のうちカタログのresultTypeに従って抽出済みのスカラー値（数値・文字列・真偽値）を直接指す。加えて、call_external_apiの結果（result_pathを指定しない場合はレスポンスボディ全体）に対しては `@step:<id>.<path>` の形式でドット区切りのプロパティアクセスができる（例: `@step:sef.name`、配列の場合は `@step:sfw.0.id` のようにインデックスを指定）。call_external_api以外のツールの結果にはこのパスアクセスは使えない（元々分解不要な単一値のため）。パスで指定したフィールドが存在しない場合は実行時エラーになる。';
 
 // レビューAI・チャットアシスタントAI・メインチャット共通: foreach・@item:<field> の解決ルールの説明。
 const ITEM_REF_SEMANTICS_NOTE =

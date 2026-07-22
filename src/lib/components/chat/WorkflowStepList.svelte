@@ -55,8 +55,38 @@
 		inputFields = []
 	}: Props = $props();
 
+	// ステップidは@step:<id>やmakeItemRef等で手入力することが多いため、UUIDではなく短い英数字にする
+	// （parseStepRefが最初の"."をid/pathの区切りに使うため、idそのものにドットは含めない）。
+	const ID_CHARS = 'abcdefghijklmnopqrstuvwxyz0123456789';
+
+	function randomShortId(length = 4): string {
+		let s = '';
+		for (let i = 0; i < length; i++) s += ID_CHARS[Math.floor(Math.random() * ID_CHARS.length)];
+		return s;
+	}
+
+	function collectAllStepIds(list: WorkflowStep[]): Set<string> {
+		const ids = new Set<string>();
+		function walk(l: WorkflowStep[]) {
+			for (const s of l) {
+				ids.add(s.id);
+				if (s.kind === 'condition') walk(s.then);
+				else if (s.kind === 'foreach') walk(s.body);
+			}
+		}
+		walk(list);
+		return ids;
+	}
+
 	function makeId(): string {
-		return crypto.randomUUID();
+		// このコンポーネントインスタンスが持つのは現在のスコープ（steps）のみだが、ワークフロー全体で
+		// idが一意である必要があるため、呼び出し元のルートまで遡って全ステップidを集める必要がある。
+		// ただしvisibleBefore等から全体を辿る手段が無いため、実用上はこのスコープ内での重複回避に留める
+		// （4文字・36^4通りなので、他スコープとの衝突確率は無視できるレベル）。
+		const existing = collectAllStepIds(steps);
+		let id = randomShortId();
+		while (existing.has(id)) id = randomShortId();
+		return id;
 	}
 
 	function addStep(kind: 'action' | 'condition' | 'foreach') {
@@ -549,7 +579,7 @@
 				</div>
 			{:else}
 				{@const listVisible = visibleListUpTo(i)}
-				{@const sourceVisible = listVisible.find((v) => v.id === parseStepRef(step.source))}
+				{@const sourceVisible = listVisible.find((v) => v.id === parseStepRef(step.source)?.id)}
 				<div class="wf-line wf-foreach-line">
 					<span class="wf-cond-label">対象:</span>
 					<input
@@ -580,7 +610,7 @@
 				</div>
 			{:else if step.kind === 'foreach'}
 				{@const listVisible = visibleListUpTo(i)}
-				{@const sourceVisible = listVisible.find((v) => v.id === parseStepRef(step.source))}
+				{@const sourceVisible = listVisible.find((v) => v.id === parseStepRef(step.source)?.id)}
 				<div class="wf-then">
 					<WorkflowStepList
 						steps={step.body}

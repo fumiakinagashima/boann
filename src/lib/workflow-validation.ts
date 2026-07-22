@@ -153,10 +153,13 @@ function resolveOperandType(
 		return { ok: true, type: 'string' };
 	}
 	if (operand === SELF_ACCOUNT_ID_REF) return { ok: true, type: 'string' };
-	const refId = parseStepRef(operand);
-	if (refId === null) return { ok: true, type: 'string' }; // リテラルは文字列として扱う
-	const found = visible.find((v) => v.id === refId);
-	if (!found) return { ok: false, error: `参照先のステップが見つかりません（または参照できる範囲外です）: ${refId}` };
+	const stepRef = parseStepRef(operand);
+	if (stepRef === null) return { ok: true, type: 'string' }; // リテラルは文字列として扱う
+	const found = visible.find((v) => v.id === stepRef.id);
+	if (!found) return { ok: false, error: `参照先のステップが見つかりません（または参照できる範囲外です）: ${stepRef.id}` };
+	// パス指定（@step:<id>.<path>）は静的に型を決められないためstring扱い(存在チェックもスキップ、
+	// @itemの構成不明ケースと同じ方針)。実行時のエラー（フィールドが無い等）はrun.ts側で検出する。
+	if (stepRef.path !== null) return { ok: true, type: 'string' };
 	return { ok: true, type: found.resultType };
 }
 
@@ -264,9 +267,9 @@ export function validateWorkflow(
 			}
 			for (const child of step.then) checkStep(child, itemScopes);
 		} else {
-			const refId = parseStepRef(step.source);
+			const stepRef = parseStepRef(step.source);
 			const listVisible = listVisibility.get(step.id) ?? [];
-			const sourceStep = refId !== null ? listVisible.find((v) => v.id === refId) : undefined;
+			const sourceStep = stepRef !== null ? listVisible.find((v) => v.id === stepRef.id) : undefined;
 			if (!step.source) {
 				errors.push(`「${step.label}」の対象（一覧）が選択されていません`);
 			} else if (!sourceStep) {

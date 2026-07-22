@@ -28,7 +28,11 @@ export type TriggerContext = {
 /** ワークフロー登録者自身の情報。selfEmail は send_email の宛先、accountId は @self:account_id の解決に使う。 */
 type SelfContext = { email: string | null; accountId: string | null };
 
-type StepResult = { type: WorkflowResultType; value: boolean | number | string };
+/**
+ * raw は「抽出前の生の値」（オブジェクト/配列等）で、`@step:<id>.<path>` によるプロパティアクセス用。
+ * 現状call_external_apiだけが設定する（他アクションの結果はもともとスカラーで分解する意味が無い）。
+ */
+type StepResult = { type: WorkflowResultType; value: boolean | number | string; raw?: unknown };
 type ListResults = Map<string, Record<string, unknown>[]>;
 /** ネストしたforeachの「現在の項目」をforeachのidごとに積んだスタック。配列の末尾が最も内側のforeach。 */
 type ItemStack = { foreachStepId: string; item: Record<string, unknown> }[];
@@ -145,11 +149,19 @@ export function resolveOperand(
 		const type: WorkflowResultType = typeof v === 'number' ? 'number' : typeof v === 'boolean' ? 'boolean' : 'string';
 		return { type, value: (v as boolean | number | string) ?? '' };
 	}
-	const refId = parseStepRef(operand);
-	if (refId === null) return { type: 'string', value: operand };
-	const found = results.get(refId);
-	if (!found) throw new WorkflowAbortError(`参照先のステップ結果が見つかりません: ${refId}`);
-	return found;
+	const stepRef = parseStepRef(operand);
+	if (stepRef === null) return { type: 'string', value: operand };
+	const found = results.get(stepRef.id);
+	if (!found) throw new WorkflowAbortError(`参照先のステップ結果が見つかりません: ${stepRef.id}`);
+	if (stepRef.path === null) return found;
+	// `@step:<id>.<path>` — rawが無いアクション（大半のツール、もともと分解不要なスカラーのみ返す）に
+	// パスを指定した場合はエラーにする（@item参照が存在しないフィールドでエラーになるのと同じ扱い）。
+	if (found.raw === undefined) {
+		throw new WorkflowAbortError(`「${stepRef.id}」の結果はフィールドを指定して参照できません（call_external_api以外は非対応）: ${operand}`);
+	}
+	const resolved = resolveJsonPath(found.raw, stepRef.path);
+	if (resolved === undefined) throw new WorkflowAbortError(`指定したフィールドが見つかりません: ${operand}`);
+	return coerceScalarResult(resolved);
 }
 
 export function compare(left: StepResult, operator: string, right: StepResult): boolean {
@@ -272,12 +284,12 @@ async function performAction(
 		});
 
 		// スカラー結果: result_pathが指定されていればそのフィールド値、無指定なら レスポンスボディ全体を
-		// そのまま返す(coerceScalarResultがオブジェクトはJSON文字列化する。中身を構造化して扱う機能は
-		// まだ無く、まずは「生のレスポンスをそのまま見える」ことを優先した簡易実装 — 2026-07-22)。
+		// そのまま返す(coerceScalarResultがオブジェクトはJSON文字列化する)。rawには分解前の値
+		// （オブジェクト/配列等）を保持し、後続ステップから`@step:<id>.<path>`でさらに辿れるようにする。
 		const resultPath = step.params?.['result_path'];
 		const scalarSource = resultPath ? resolveJsonPath(raw.body, resultPath) : raw.body;
 		const scalar = coerceScalarResult(scalarSource);
-		results.set(step.id, scalar);
+		results.set(step.id, { ...scalar, raw: scalarSource });
 
 		// 一覧結果: list_pathが指定された場合のみforeachのsourceとして使えるようにする
 		const listPath = step.params?.['list_path'];
@@ -387,7 +399,8 @@ async function runForeach(
 	triggerContext?: TriggerContext,
 	inputArgs?: Record<string, unknown>
 ): Promise<void> {
-	const refId = parseStepRef(step.source);
+	// foreachのsourceはステップ全体（一覧）を指す前提で、パス指定（@step:<id>.<path>）は対応しない
+	const refId = parseStepRef(step.source)?.id;
 	if (!refId) throw new WorkflowAbortError(`「${step.label}」の対象が選択されていません`);
 	const items = listResults.get(refId);
 	if (!items) throw new WorkflowAbortError(`「${step.label}」の参照先のリスト結果が見つかりません: ${refId}`);

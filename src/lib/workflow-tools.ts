@@ -303,9 +303,20 @@ export function makeStepRef(id: string): string {
 	return `${STEP_REF_PREFIX}${id}`;
 }
 
-export function parseStepRef(value: string | undefined): string | null {
+export type ParsedStepRef = { id: string; path: string | null };
+
+/**
+ * `@step:<id>`（従来通り、ステップの結果をそのまま参照）または`@step:<id>.<path>`
+ * （例: `@step:sef.name`、`@step:sfw.0.id`）をパースする。pathはcall_external_api等が
+ * 保持する生の値（オブジェクト/配列、StepResult.raw）をresolveJsonPathで辿るために使う。
+ * ステップidはshortId()（ドットを含まない）で生成する前提のため、最初のドットをid/pathの区切りとする。
+ */
+export function parseStepRef(value: string | undefined): ParsedStepRef | null {
 	if (!value || !value.startsWith(STEP_REF_PREFIX)) return null;
-	return value.slice(STEP_REF_PREFIX.length);
+	const rest = value.slice(STEP_REF_PREFIX.length);
+	const dotIdx = rest.indexOf('.');
+	if (dotIdx === -1) return { id: rest, path: null };
+	return { id: rest.slice(0, dotIdx), path: rest.slice(dotIdx + 1) };
 }
 
 const ITEM_REF_PREFIX = '@item:';
