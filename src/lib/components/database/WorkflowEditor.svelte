@@ -204,6 +204,11 @@
 			<button class="btn-input-schema" onclick={() => wfRef?.openInputSchemaDrawer()}>
 				⚙ 入力パラメータ
 			</button>
+			{#if currentId}
+				<button class="btn-run-now" onclick={runNow} disabled={runningNow}>
+					{runningNow ? '実行中...' : '▶ 今すぐ実行'}
+				</button>
+			{/if}
 			<button class="btn-ai-review" onclick={runAiReview} disabled={aiReviewLoading}>
 				{#if aiReviewLoading}
 					レビュー中...

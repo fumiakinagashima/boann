@@ -202,6 +202,14 @@ async function performAction(
 	triggerContext?: TriggerContext,
 	inputArgs?: Record<string, unknown>
 ): Promise<{ result?: string }> {
+	// 検証用（一時的）: 解決済みの値をdevサーバーのターミナルにconsole.logするだけのデバッグアクション。
+	// 本番運用には意味が無い(出力先はローカルdevのターミナルのみ)ため、不要になったら削除して良い。
+	if (step.tool === 'console_log') {
+		const value = resolvedParams['value'];
+		console.log(`[workflow debug] 「${step.label}」:`, value);
+		return { result: String(value) };
+	}
+
 	// エンティティ書き込み操作はMCPツールを介さずDBサービスを直接呼ぶ
 	if (step.tool === 'create_entity') {
 		const entityTypeId = step.params?.entity_type_id;
