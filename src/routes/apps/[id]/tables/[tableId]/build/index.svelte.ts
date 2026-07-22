@@ -36,6 +36,12 @@ function slugify(s: string): string {
 		.replace(/^_+|_+$/g, '');
 }
 
+// 日本語ラベル等、slugify結果が空になる入力に対するフォールバック。
+// 生のラベルをそのままkeyにしてしまうと日本語キーになってしまうため、ランダムな文字列にする。
+function randomSlug(prefix: string): string {
+	return prefix + crypto.randomUUID().replace(/-/g, '').slice(0, 8);
+}
+
 
 export function createTableBuildState(getData: () => PageData) {
 	// ── Meta ─────────────────────────────────────────────────────
@@ -159,7 +165,7 @@ export function createTableBuildState(getData: () => PageData) {
 		const prevSlug = slugify(row.label);
 		row.label = val;
 		if (!row.key || row.key === prevSlug) {
-			row.key = slugify(val) || val;
+			row.key = slugify(val) || randomSlug('field_');
 		}
 		markDirty();
 	}
@@ -174,7 +180,7 @@ export function createTableBuildState(getData: () => PageData) {
 		const prevSlug = slugify(row.options[idx].label);
 		row.options[idx].label = val;
 		if (!row.options[idx].value || row.options[idx].value === prevSlug) {
-			row.options[idx].value = slugify(val) || val;
+			row.options[idx].value = slugify(val) || randomSlug('opt_');
 		}
 		markDirty();
 	}
