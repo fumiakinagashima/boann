@@ -618,7 +618,7 @@
 								disabled={!editable}
 								onchange={(e) => (step.continueOnError = e.currentTarget.checked)}
 							/>
-							失敗しても続行する
+							失敗しても後続処理を続行する
 						</label>
 					</div>
 				{/if}
