@@ -4,6 +4,7 @@ import { createDb } from '$lib/server/db';
 import { getWorkflow, deleteWorkflow, updateWorkflow } from '$lib/server/db/workflow-service';
 import { listEntityTypesForWorkflow } from '$lib/server/db/table-service';
 import { listSlackIntegrationsForWorkflow } from '$lib/server/slack';
+import { listIntegrationsForWorkflow } from '$lib/server/db/integration-service';
 import { validateWorkflow } from '$lib/workflow-validation';
 import type { WorkflowStep } from '$lib/types/chat';
 import type { FieldDef } from '$lib/server/db/table-service';
@@ -38,11 +39,12 @@ export const PATCH: RequestHandler = async ({ params, request, platform, locals 
 		const steps = body.steps ?? existing.steps;
 		const inputSchema = body.inputSchema ?? existing.inputSchema;
 
-		const [entityTypes, slackIntegrations] = await Promise.all([
+		const [entityTypes, slackIntegrations, integrations] = await Promise.all([
 			listEntityTypesForWorkflow(db),
-			listSlackIntegrationsForWorkflow(db)
+			listSlackIntegrationsForWorkflow(db),
+			listIntegrationsForWorkflow(db)
 		]);
-		const validation = validateWorkflow(triggerType, triggerHour, triggerMinute, triggerEntityTypeId, steps, entityTypes, slackIntegrations, inputSchema);
+		const validation = validateWorkflow(triggerType, triggerHour, triggerMinute, triggerEntityTypeId, steps, entityTypes, slackIntegrations, inputSchema, integrations);
 		if (!validation.ok) {
 			return json({ error: validation.errors.join(' / ') }, { status: 422 });
 		}

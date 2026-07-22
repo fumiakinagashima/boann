@@ -47,3 +47,7 @@ export const HEALTH_RANKING_DEFAULT_LIMIT = 5;
 export const WORKFLOW_FOREACH_MAX_ITEMS = 50;
 /** ネストしたforeachの組み合わせ爆発を防ぐため、1回の実行（cron/今すぐ実行）で許容するアクション実行回数の総量上限 */
 export const WORKFLOW_MAX_ACTIONS_PER_RUN = 500;
+/** actionステップに設定できる最大リトライ回数（一時的な障害からの自動回復用。設定不備等の即時中断エラーはリトライしない） */
+export const WORKFLOW_MAX_RETRIES = 5;
+/** リトライ間の待機時間（ミリ秒、固定・バックオフ無し） */
+export const WORKFLOW_RETRY_DELAY_MS = 1000;

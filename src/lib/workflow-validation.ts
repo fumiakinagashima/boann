@@ -10,9 +10,11 @@ import {
 	SELF_ACCOUNT_ID_REF,
 	type WorkflowListResultField
 } from './workflow-tools';
+import { WORKFLOW_MAX_RETRIES } from './constants';
 
 type EntityTypeForValidation = { id: string; fields?: WorkflowListResultField[] };
 type SlackIntegrationForValidation = { id: string };
+type IntegrationForValidation = { id: string };
 
 export type ValidationResult = { ok: true } | { ok: false; errors: string[] };
 
@@ -158,11 +160,13 @@ export function validateWorkflow(
 	steps: WorkflowStep[],
 	entityTypes: EntityTypeForValidation[] = [],
 	slackIntegrations: SlackIntegrationForValidation[] = [],
-	inputSchema: { key: string; label: string }[] = []
+	inputSchema: { key: string; label: string }[] = [],
+	integrations: IntegrationForValidation[] = []
 ): ValidationResult {
 	const errors: string[] = [];
 	const entityTypeIds = new Set(entityTypes.map((e) => e.id));
 	const slackIntegrationIds = new Set(slackIntegrations.map((s) => s.id));
+	const integrationIds = new Set(integrations.map((i) => i.id));
 	const triggerFields =
 		triggerType === 'event'
 			? triggerFieldsFor(
@@ -205,6 +209,15 @@ export function validateWorkflow(
 				if (!integrationId || !slackIntegrationIds.has(integrationId)) {
 					errors.push(`「${step.label}」のSlack連携先が見つかりません（削除された可能性があります）`);
 				}
+			}
+			if (tool.value === 'call_external_api') {
+				const integrationId = step.params?.integration_id;
+				if (!integrationId || !integrationIds.has(integrationId)) {
+					errors.push(`「${step.label}」の外部API連携先が見つかりません（削除された可能性があります）`);
+				}
+			}
+			if (step.maxRetries !== undefined && (!Number.isInteger(step.maxRetries) || step.maxRetries < 0 || step.maxRetries > WORKFLOW_MAX_RETRIES)) {
+				errors.push(`「${step.label}」のリトライ回数は0〜${WORKFLOW_MAX_RETRIES}の範囲で指定してください`);
 			}
 			for (const field of tool.params) {
 				const value = step.params?.[field.key];

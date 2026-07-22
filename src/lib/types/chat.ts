@@ -139,6 +139,11 @@ export type WorkflowActionStep = {
 	 *  toolが複数カテゴリから参照される場合に、再読込時どちらのカテゴリで表示するかを覚えておくため。
 	 *  未設定（AI生成・旧データ）の場合は findWorkflowActionCategory による逆引きにフォールバックする。 */
 	category?: string;
+	/** 失敗時に自動再試行する回数（0または未指定=リトライなし）。WORKFLOW_MAX_RETRIESが上限。
+	 *  設定不備等の即時中断エラー（WorkflowAbortError）はリトライ対象外——一時的な障害のみを想定。 */
+	maxRetries?: number;
+	/** リトライしても最終的に失敗した場合、ワークフロー全体を中断せず次のステップに進む場合true。 */
+	continueOnError?: boolean;
 };
 
 export type WorkflowConditionOperator = '==' | '!=' | '>' | '<' | '>=' | '<=';

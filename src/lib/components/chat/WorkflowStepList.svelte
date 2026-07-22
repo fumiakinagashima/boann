@@ -17,9 +17,11 @@
 		SELF_ACCOUNT_ID_REF,
 		type WorkflowListResultField
 	} from '$lib/workflow-tools';
+	import { WORKFLOW_MAX_RETRIES } from '$lib/constants';
 	import type { VisibleStep, VisibleListStep } from '$lib/workflow-validation';
 	import type { EntityTypeForWorkflow } from '$lib/server/db/table-service';
 	import type { SlackIntegrationOption } from '$lib/server/slack';
+	import type { IntegrationOption } from '$lib/server/db/integration-service';
 	import GripVertical from '$lib/components/icon/GripVertical.svelte';
 	import InfoCircle from '$lib/components/icon/InfoCircle.svelte';
 	import WorkflowStepList from './WorkflowStepList.svelte';
@@ -36,6 +38,7 @@
 		depth: number;
 		entityTypes?: EntityTypeForWorkflow[];
 		slackIntegrations?: SlackIntegrationOption[];
+		integrations?: IntegrationOption[];
 		/** イベントトリガー時、@trigger:<field> として参照できるフィールド一覧（トリガーがscheduleの場合は空） */
 		triggerFields?: WorkflowListResultField[];
 		/** 宣言された入力パラメータ一覧。@input:<key> として参照できる */
@@ -51,6 +54,7 @@
 		depth,
 		entityTypes = [],
 		slackIntegrations = [],
+		integrations = [],
 		triggerFields = [],
 		inputFields = []
 	}: Props = $props();
@@ -221,12 +225,14 @@
 		return pendingCategory[step.id] ?? '';
 	}
 
-	/** カテゴリの対象一覧。includeEntityTargets/includeSlackTargetsの場合、テーブル・Slack連携を顧客・案件等と同じ並びに追加する。 */
+	/** カテゴリの対象一覧。includeEntityTargets/includeSlackTargets/includeIntegrationTargetsの場合、
+	 *  テーブル・Slack連携・外部API連携を顧客・案件等と同じ並びに追加する。 */
 	function effectiveTargets(category: {
 		targets: { value: string; label: string; tool: string }[];
 		includeEntityTargets?: boolean;
 		entityTargetTool?: string;
 		includeSlackTargets?: boolean;
+		includeIntegrationTargets?: boolean;
 	}) {
 		const base = category.targets.map((t) => ({ value: t.tool, label: t.label }));
 		const entityTargets = category.includeEntityTargets
@@ -235,7 +241,10 @@
 		const slackTargets = category.includeSlackTargets
 			? slackIntegrations.map((s) => ({ value: `slack:${s.id}`, label: s.name }))
 			: [];
-		return [...base, ...entityTargets, ...slackTargets];
+		const integrationTargets = category.includeIntegrationTargets
+			? integrations.map((it) => ({ value: `api:${it.id}`, label: it.name }))
+			: [];
+		return [...base, ...entityTargets, ...slackTargets, ...integrationTargets];
 	}
 
 	const ENTITY_WRITE_TOOLS = new Set(['get_entities', 'create_entity', 'update_entity', 'delete_entity']);
@@ -244,6 +253,7 @@
 	function currentTargetValue(step: { tool: string; params?: Record<string, string> }): string {
 		if (ENTITY_WRITE_TOOLS.has(step.tool)) return `entity:${step.params?.entity_type_id ?? ''}`;
 		if (step.tool === 'send_slack_notification') return `slack:${step.params?.integration_id ?? ''}`;
+		if (step.tool === 'call_external_api') return `api:${step.params?.integration_id ?? ''}`;
 		return step.tool;
 	}
 
@@ -259,6 +269,9 @@
 		} else if (value.startsWith('slack:')) {
 			step.tool = 'send_slack_notification';
 			step.params = { integration_id: value.slice('slack:'.length) };
+		} else if (value.startsWith('api:')) {
+			step.tool = 'call_external_api';
+			step.params = { integration_id: value.slice('api:'.length) };
 		} else {
 			step.tool = value;
 			step.params = {};
@@ -555,6 +568,31 @@
 							</div>
 						{/if}
 					{/if}
+
+					<div class="wf-line wf-error-handling">
+						<label for="wf-retry-{step.id}">失敗時リトライ回数</label>
+						<input
+							id="wf-retry-{step.id}"
+							type="number"
+							min="0"
+							max={WORKFLOW_MAX_RETRIES}
+							value={step.maxRetries ?? 0}
+							disabled={!editable}
+							oninput={(e) => {
+								const n = Number(e.currentTarget.value);
+								step.maxRetries = Number.isFinite(n) ? Math.max(0, Math.min(WORKFLOW_MAX_RETRIES, n)) : 0;
+							}}
+						/>
+						<label class="wf-continue-on-error">
+							<input
+								type="checkbox"
+								checked={!!step.continueOnError}
+								disabled={!editable}
+								onchange={(e) => (step.continueOnError = e.currentTarget.checked)}
+							/>
+							失敗しても続行する
+						</label>
+					</div>
 				{/if}
 			{:else if step.kind === 'condition'}
 				{@const rightSel = refSelectValue(step.right)}
@@ -647,6 +685,7 @@
 						{editable}
 						{entityTypes}
 						{slackIntegrations}
+						{integrations}
 						{triggerFields}
 						{inputFields}
 						depth={depth + 1}
@@ -666,6 +705,7 @@
 						{editable}
 						{entityTypes}
 						{slackIntegrations}
+						{integrations}
 						{triggerFields}
 						{inputFields}
 						depth={depth + 1}
@@ -838,6 +878,27 @@
 		&:hover {
 			border-color: var(--color-primary);
 			color: var(--color-primary);
+		}
+	}
+
+	.wf-error-handling {
+		align-items: center;
+		label {
+			font-size: 0.75rem;
+			color: var(--color-text-muted);
+			white-space: nowrap;
+		}
+		input[type='number'] {
+			width: 56px;
+		}
+		.wf-continue-on-error {
+			display: inline-flex;
+			align-items: center;
+			gap: 4px;
+			margin-left: 8px;
+			input[type='checkbox'] {
+				width: auto;
+			}
 		}
 	}
 

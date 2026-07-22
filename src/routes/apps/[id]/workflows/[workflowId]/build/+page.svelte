@@ -28,7 +28,7 @@
 			toast.error('ワークフロー名を入力してください');
 			return;
 		}
-		const validation = validateWorkflow(state.triggerType ?? 'schedule', state.triggerHour, state.triggerMinute, state.triggerEntityTypeId, state.steps, data.entityTypes, data.slackIntegrations, state.inputSchema ?? []);
+		const validation = validateWorkflow(state.triggerType ?? 'schedule', state.triggerHour, state.triggerMinute, state.triggerEntityTypeId, state.steps, data.entityTypes, data.slackIntegrations, state.inputSchema ?? [], data.integrations);
 		if (!validation.ok) {
 			for (const msg of validation.errors) toast.error(msg);
 			return;
@@ -99,6 +99,7 @@
 			runs={data.runs}
 			entityTypes={data.entityTypes}
 			slackIntegrations={data.slackIntegrations}
+			integrations={data.integrations}
 			noChatPanel
 		/>
 	</div>

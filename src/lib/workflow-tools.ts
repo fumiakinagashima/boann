@@ -105,6 +105,31 @@ export const WORKFLOW_ACTION_TOOLS: WorkflowActionToolDef[] = [
 		label: '自作テーブルのレコードを削除',
 		params: [{ key: 'id', label: 'レコードID', type: 'text', required: true }],
 		note: '対象テーブルは「対象」の選択で決まる。idは削除対象のレコードID'
+	},
+	{
+		value: 'call_external_api',
+		label: '外部APIを呼び出す',
+		params: [
+			{ key: 'endpoint', label: 'エンドポイント（パスまたはURL）', type: 'text', required: true },
+			{
+				key: 'method',
+				label: 'HTTPメソッド',
+				type: 'select',
+				required: true,
+				options: [
+					{ value: 'GET', label: 'GET' },
+					{ value: 'POST', label: 'POST' },
+					{ value: 'PUT', label: 'PUT' },
+					{ value: 'PATCH', label: 'PATCH' },
+					{ value: 'DELETE', label: 'DELETE' }
+				]
+			},
+			{ key: 'body', label: 'リクエストボディ（JSON形式、任意）', type: 'textarea' }
+		],
+		resultType: 'boolean',
+		resultDesc: '呼び出しが成功したか（HTTPステータスが2xx）',
+		extractResult: (raw) => !!(raw as { ok?: boolean } | undefined)?.ok,
+		note: '呼び出し先は「対象」の選択で決まる（設定済みの外部API連携。integration_idは対象選択で直接設定されるため、AIがparamsで指定することはできない）'
 	}
 ];
 
@@ -124,6 +149,8 @@ export type WorkflowActionCategory = {
 	entityTargetTool?: string;
 	/** trueの場合、設定済みのSlack連携（Incoming Webhook）が個別の対象選択肢として追加される（send_slack_notification固定） */
 	includeSlackTargets?: boolean;
+	/** trueの場合、設定済みの外部API連携が個別の対象選択肢として追加される（call_external_api固定） */
+	includeIntegrationTargets?: boolean;
 };
 
 /**
@@ -167,6 +194,12 @@ export const WORKFLOW_ACTION_CATEGORIES: WorkflowActionCategory[] = [
 		targets: [],
 		includeEntityTargets: true,
 		entityTargetTool: 'delete_entity'
+	},
+	{
+		key: 'external_api',
+		label: '外部API',
+		targets: [],
+		includeIntegrationTargets: true
 	}
 ];
 
@@ -176,6 +209,7 @@ export function findWorkflowActionCategory(tool: string): WorkflowActionCategory
 	if (tool === 'update_entity') return WORKFLOW_ACTION_CATEGORIES.find((c) => c.entityTargetTool === 'update_entity');
 	if (tool === 'delete_entity') return WORKFLOW_ACTION_CATEGORIES.find((c) => c.entityTargetTool === 'delete_entity');
 	if (tool === 'send_slack_notification') return WORKFLOW_ACTION_CATEGORIES.find((c) => c.includeSlackTargets);
+	if (tool === 'call_external_api') return WORKFLOW_ACTION_CATEGORIES.find((c) => c.includeIntegrationTargets);
 	return WORKFLOW_ACTION_CATEGORIES.find((c) => c.targets.some((t) => t.tool === tool));
 }
 

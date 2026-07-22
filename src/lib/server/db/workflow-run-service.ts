@@ -9,6 +9,10 @@ export type StepLog = {
 	result?: string;
 	error?: string;
 	ms: number;
+	/** 2回以上試行した場合のみ設定（1回で成功/失敗した場合は省略）。 */
+	attempts?: number;
+	/** 最終的に失敗したが continueOnError により実行が続行された場合true。 */
+	continued?: boolean;
 };
 
 export type WorkflowRunRow = {

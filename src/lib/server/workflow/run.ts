@@ -6,7 +6,7 @@ import { recordWorkflowRun, type StepLog } from '../db/workflow-run-service';
 import { getAccount } from '../db/account-service';
 import { getJstHourMinute } from '$lib/datetime';
 import { getWorkflowActionTool, parseStepRef, parseItemRef } from '$lib/workflow-tools';
-import { WORKFLOW_FOREACH_MAX_ITEMS, WORKFLOW_MAX_ACTIONS_PER_RUN } from '$lib/constants';
+import { WORKFLOW_FOREACH_MAX_ITEMS, WORKFLOW_MAX_ACTIONS_PER_RUN, WORKFLOW_MAX_RETRIES, WORKFLOW_RETRY_DELAY_MS } from '$lib/constants';
 import { createRecordByEntityTypeId, updateRecordByEntityTypeId, deleteRecord } from '../db/table-service';
 import type {
 	WorkflowStep,
@@ -44,10 +44,14 @@ type Budget = { remaining: number };
 function consumeBudget(budget: Budget): void {
 	if (budget.remaining <= 0) {
 		throw new WorkflowAbortError(
-			`1回の実行で許容するアクション数の上限（${WORKFLOW_MAX_ACTIONS_PER_RUN}）を超えました。foreachのネストを減らしてください`
+			`1回の実行で許容するアクション数の上限（${WORKFLOW_MAX_ACTIONS_PER_RUN}）を超えました。foreachのネストやリトライ回数を減らしてください`
 		);
 	}
 	budget.remaining--;
+}
+
+function sleep(ms: number): Promise<void> {
+	return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 /**
@@ -166,38 +170,24 @@ export function compare(left: StepResult, operator: string, right: StepResult): 
 	}
 }
 
-async function runAction(
+/**
+ * ステップを1回だけ実行する（リトライの単位）。設定不備（対象未選択・JSON不正等）は
+ * WorkflowAbortErrorを投げてリトライさせない。それ以外の例外（外部API呼び出し失敗等）は
+ * 呼び出し元（runAction）のリトライループが一時的な障害とみなして再試行しうる。
+ */
+async function performAction(
 	db: Db,
 	step: WorkflowActionStep,
+	toolDef: NonNullable<ReturnType<typeof getWorkflowActionTool>>,
+	resolvedParams: Record<string, string | number>,
 	results: Map<string, StepResult>,
 	listResults: ListResults,
 	env: ToolEnv | undefined,
 	self: SelfContext,
 	itemStack: ItemStack,
-	budget: Budget,
 	triggerContext?: TriggerContext,
 	inputArgs?: Record<string, unknown>
 ): Promise<{ result?: string }> {
-	consumeBudget(budget);
-	const toolDef = getWorkflowActionTool(step.tool);
-	if (!toolDef) throw new WorkflowAbortError(`未対応のツールです: ${step.tool}`);
-
-	const resolvedParams: Record<string, string | number> = {};
-	for (const field of toolDef.params) {
-		const raw = step.params?.[field.key];
-		if (!raw) continue;
-		const value = resolveOperand(raw, results, itemStack, triggerContext, self, inputArgs).value;
-		if (field.type === 'number') {
-			resolvedParams[field.key] = Number(value);
-		} else if (field.type === 'date' && typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value)) {
-			// <input type="date"> の "YYYY-MM-DD" は new Date() でUTC深夜と解釈されJSTと9時間ズレるため、
-			// JSTのウォールクロックとして明示的にオフセットを付与する（until は当日いっぱいを含めるため終端時刻にする）
-			resolvedParams[field.key] = `${value}T${field.key === 'until' ? '23:59:59' : '00:00:00'}+09:00`;
-		} else {
-			resolvedParams[field.key] = String(value);
-		}
-	}
-
 	// エンティティ書き込み操作はMCPツールを介さずDBサービスを直接呼ぶ
 	if (step.tool === 'create_entity') {
 		const entityTypeId = step.params?.entity_type_id;
@@ -248,6 +238,18 @@ async function runAction(
 		const integrationId = step.params?.integration_id;
 		if (!integrationId) throw new WorkflowAbortError(`「${step.label}」のSlack連携先が選択されていません`);
 		input = { ...resolvedParams, integration_id: integrationId };
+	} else if (step.tool === 'call_external_api') {
+		// integration_id はカタログのparamsに含めず、エディタの「対象」選択で直接 step.params に設定される
+		const integrationId = step.params?.integration_id;
+		if (!integrationId) throw new WorkflowAbortError(`「${step.label}」の外部API連携先が選択されていません`);
+		const rawBodyStr = step.params?.['body'] ?? '';
+		let body: Record<string, unknown> | undefined;
+		if (rawBodyStr) {
+			let parsedBody: Record<string, unknown>;
+			try { parsedBody = JSON.parse(preQuoteReferences(rawBodyStr)); } catch { throw new WorkflowAbortError(`「${step.label}」のリクエストボディがJSON形式ではありません`); }
+			body = resolveDataValues(parsedBody, results, itemStack, triggerContext, self, inputArgs);
+		}
+		input = { endpoint: resolvedParams['endpoint'], method: resolvedParams['method'], integration_id: integrationId, ...(body ? { body } : {}) };
 	}
 
 	const raw = await dispatchTool(db, step.tool as ToolName, input, env);
@@ -259,6 +261,56 @@ async function runAction(
 		listResults.set(step.id, toolDef.listResult.extractList(raw));
 	}
 	return {};
+}
+
+async function runAction(
+	db: Db,
+	step: WorkflowActionStep,
+	results: Map<string, StepResult>,
+	listResults: ListResults,
+	env: ToolEnv | undefined,
+	self: SelfContext,
+	itemStack: ItemStack,
+	budget: Budget,
+	triggerContext?: TriggerContext,
+	inputArgs?: Record<string, unknown>
+): Promise<{ result?: string; attempts: number }> {
+	const toolDef = getWorkflowActionTool(step.tool);
+	if (!toolDef) throw new WorkflowAbortError(`未対応のツールです: ${step.tool}`);
+
+	const resolvedParams: Record<string, string | number> = {};
+	for (const field of toolDef.params) {
+		const raw = step.params?.[field.key];
+		if (!raw) continue;
+		const value = resolveOperand(raw, results, itemStack, triggerContext, self, inputArgs).value;
+		if (field.type === 'number') {
+			resolvedParams[field.key] = Number(value);
+		} else if (field.type === 'date' && typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value)) {
+			// <input type="date"> の "YYYY-MM-DD" は new Date() でUTC深夜と解釈されJSTと9時間ズレるため、
+			// JSTのウォールクロックとして明示的にオフセットを付与する（until は当日いっぱいを含めるため終端時刻にする）
+			resolvedParams[field.key] = `${value}T${field.key === 'until' ? '23:59:59' : '00:00:00'}+09:00`;
+		} else {
+			resolvedParams[field.key] = String(value);
+		}
+	}
+
+	// maxRetriesはユーザー入力なのでWORKFLOW_MAX_RETRIESで上限をクランプする（validateWorkflowで
+	// 弾いているはずだが、AI生成データ等バリデーションを経由しない経路への防御として二重にチェックする）。
+	const maxAttempts = 1 + Math.min(Math.max(step.maxRetries ?? 0, 0), WORKFLOW_MAX_RETRIES);
+	let lastError: unknown;
+	for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+		consumeBudget(budget);
+		try {
+			const { result } = await performAction(db, step, toolDef, resolvedParams, results, listResults, env, self, itemStack, triggerContext, inputArgs);
+			return { result, attempts: attempt };
+		} catch (e) {
+			lastError = e;
+			// 設定不備（対象未選択・JSON不正等）はリトライしても同じ結果になるだけなので即座に諦める。
+			if (e instanceof WorkflowAbortError) break;
+			if (attempt < maxAttempts) await sleep(WORKFLOW_RETRY_DELAY_MS);
+		}
+	}
+	throw lastError;
 }
 
 async function runForeach(
@@ -300,11 +352,12 @@ async function runSteps(
 		if (step.kind === 'action') {
 			const start = Date.now();
 			try {
-				const { result } = await runAction(db, step, results, listResults, env, self, itemStack, budget, triggerContext, inputArgs);
-				logs.push({ id: step.id, label: step.label, ok: true, result, ms: Date.now() - start });
+				const { result, attempts } = await runAction(db, step, results, listResults, env, self, itemStack, budget, triggerContext, inputArgs);
+				logs.push({ id: step.id, label: step.label, ok: true, result, ms: Date.now() - start, ...(attempts > 1 ? { attempts } : {}) });
 			} catch (e) {
 				const error = e instanceof Error ? e.message : String(e);
-				logs.push({ id: step.id, label: step.label, ok: false, error, ms: Date.now() - start });
+				logs.push({ id: step.id, label: step.label, ok: false, error, ms: Date.now() - start, ...(step.continueOnError ? { continued: true } : {}) });
+				if (step.continueOnError) continue;
 				throw e;
 			}
 		} else if (step.kind === 'condition') {

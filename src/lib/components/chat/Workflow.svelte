@@ -3,6 +3,7 @@
 	import type { WorkflowStep } from '$lib/types/chat';
 	import type { EntityTypeForWorkflow, FieldDef, EditableField } from '$lib/server/db/table-service';
 	import type { SlackIntegrationOption } from '$lib/server/slack';
+	import type { IntegrationOption } from '$lib/server/db/integration-service';
 	import { triggerFieldsFor } from '$lib/workflow-tools';
 	import WorkflowStepList from './WorkflowStepList.svelte';
 	import WorkflowInputSchemaDrawer from '$lib/components/database/WorkflowInputSchemaDrawer.svelte';
@@ -33,6 +34,7 @@
 		editable?: boolean;
 		entityTypes?: EntityTypeForWorkflow[];
 		slackIntegrations?: SlackIntegrationOption[];
+		integrations?: IntegrationOption[];
 	};
 
 	let {
@@ -48,7 +50,8 @@
 		onsave,
 		editable = true,
 		entityTypes = [],
-		slackIntegrations = []
+		slackIntegrations = [],
+		integrations = []
 	}: Props = $props();
 
 	function withLocalId(fields: FieldDef[]): EditableField[] {
@@ -146,6 +149,7 @@
 			depth={0}
 			{entityTypes}
 			{slackIntegrations}
+			{integrations}
 			{triggerFields}
 			{inputFields}
 		/>

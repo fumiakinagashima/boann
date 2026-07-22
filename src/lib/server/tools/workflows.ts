@@ -5,6 +5,7 @@ import type { ToolEnv } from './shared';
 import { createWorkflow, updateWorkflow, listWorkflows, listWorkflowsByAppId, getWorkflow, type WorkflowRow } from '../db/workflow-service';
 import { listEntityTypesForWorkflow, type FieldDef } from '../db/table-service';
 import { listSlackIntegrationsForWorkflow } from '../slack';
+import { listIntegrationsForWorkflow } from '../db/integration-service';
 import { validateWorkflow } from '$lib/workflow-validation';
 import { runWorkflowNow } from '../workflow/run';
 import { listWorkflowRuns } from '../db/workflow-run-service';
@@ -142,11 +143,12 @@ export const tools: Tool[] = [
 
 export async function handleSaveWorkflow(db: Db, input: unknown, env?: ToolEnv) {
 	const { id, name, description, triggerType, triggerHour, triggerMinute, triggerEvent, triggerEntityTypeId, inputSchema, steps } = saveWorkflowInputSchema.parse(input);
-	const [entityTypes, slackIntegrations] = await Promise.all([
+	const [entityTypes, slackIntegrations, integrations] = await Promise.all([
 		listEntityTypesForWorkflow(db),
-		listSlackIntegrationsForWorkflow(db)
+		listSlackIntegrationsForWorkflow(db),
+		listIntegrationsForWorkflow(db)
 	]);
-	const validation = validateWorkflow(triggerType ?? 'schedule', triggerHour, triggerMinute, triggerEntityTypeId, steps, entityTypes, slackIntegrations, inputSchema ?? []);
+	const validation = validateWorkflow(triggerType ?? 'schedule', triggerHour, triggerMinute, triggerEntityTypeId, steps, entityTypes, slackIntegrations, inputSchema ?? [], integrations);
 	if (!validation.ok) {
 		throw new Error(`ワークフローの内容に問題があります: ${validation.errors.join(' / ')}`);
 	}

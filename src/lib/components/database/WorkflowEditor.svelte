@@ -8,6 +8,7 @@
 	import type { WorkflowRunRow, StepLog } from '$lib/server/db/workflow-run-service';
 	import type { EntityTypeForWorkflow, FieldDef } from '$lib/server/db/table-service';
 	import type { SlackIntegrationOption } from '$lib/server/slack';
+	import type { IntegrationOption } from '$lib/server/db/integration-service';
 
 	type WorkflowReviewResult = { summary: string; issues: string[]; suggestions: string[] };
 
@@ -26,6 +27,7 @@
 		runs?: WorkflowRunRow[];
 		entityTypes?: EntityTypeForWorkflow[];
 		slackIntegrations?: SlackIntegrationOption[];
+		integrations?: IntegrationOption[];
 		noChatPanel?: boolean;
 	};
 
@@ -44,6 +46,7 @@
 		runs = [],
 		entityTypes = [],
 		slackIntegrations = [],
+		integrations = [],
 		noChatPanel = false
 	}: Props = $props();
 
@@ -266,6 +269,7 @@
 				editable={true}
 				{entityTypes}
 				{slackIntegrations}
+				{integrations}
 			/>
 		</div>
 	</div>
