@@ -28,13 +28,15 @@ export type VisibleStep = {
 export type VisibleListStep = {
 	id: string;
 	label: string;
-	itemFields: WorkflowListResultField[];
+	/** null = フィールド構成が事前にわからない(call_external_apiのlist_path等)。@item参照の存在チェックをスキップする。 */
+	itemFields: WorkflowListResultField[] | null;
 };
 
 /** ネストしたforeachのうち、いずれか1段の「現在の項目」スコープ。bodyの内側ではこのスタック（祖先のforeach全て）を全て参照できる。 */
 export type ItemScope = {
 	foreachStepId: string;
-	itemFields: WorkflowListResultField[];
+	/** null = フィールド構成が事前にわからない(call_external_apiのlist_path等)。@item参照の存在チェックをスキップする。 */
+	itemFields: WorkflowListResultField[] | null;
 };
 
 /**
@@ -102,6 +104,11 @@ function walkList(
 							)
 						: tool.listResult.itemFields;
 				visible = [...visible, { id: step.id, label: step.label, itemFields }];
+			} else if (step.tool === 'call_external_api' && step.params?.list_path) {
+				// list_resultをツール定義に固定できない(list_pathはステップごとの設定)ため、
+				// ここだけstep.paramsを見て個別に可視性を判定する。フィールド構成は外部APIの
+				// レスポンス次第でBoann側は知り得ないため、itemFieldsはnull(存在チェックをスキップ)。
+				visible = [...visible, { id: step.id, label: step.label, itemFields: null }];
 			}
 		} else if (step.kind === 'condition') {
 			walkList(step.then, visible, out, entityTypes);
@@ -124,7 +131,8 @@ function resolveOperandType(
 			? itemScopes.find((s) => s.foreachStepId === itemRef.foreachStepId)
 			: itemScopes[itemScopes.length - 1];
 		if (!scope) return { ok: false, error: `@item参照はforeachの中でのみ使用できます: ${operand}` };
-		if (!scope.itemFields.some((f) => f.key === itemRef.field)) {
+		// itemFields===null は構成不明(call_external_apiのlist_path等)を意味し、存在チェックをスキップする
+		if (scope.itemFields && !scope.itemFields.some((f) => f.key === itemRef.field)) {
 			return { ok: false, error: `存在しない項目フィールドです: ${itemRef.field}` };
 		}
 		return { ok: true, type: 'string' };

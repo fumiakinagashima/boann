@@ -5,9 +5,10 @@ import { getEnabledWorkflows, getWorkflow, type WorkflowRow } from '../db/workfl
 import { recordWorkflowRun, type StepLog } from '../db/workflow-run-service';
 import { getAccount } from '../db/account-service';
 import { getJstHourMinute } from '$lib/datetime';
-import { getWorkflowActionTool, parseStepRef, parseItemRef } from '$lib/workflow-tools';
+import { getWorkflowActionTool, parseStepRef, parseItemRef, resolveJsonPath } from '$lib/workflow-tools';
 import { WORKFLOW_FOREACH_MAX_ITEMS, WORKFLOW_MAX_ACTIONS_PER_RUN, WORKFLOW_MAX_RETRIES, WORKFLOW_RETRY_DELAY_MS } from '$lib/constants';
 import { createRecordByEntityTypeId, updateRecordByEntityTypeId, deleteRecord } from '../db/table-service';
+import { getExternalApiConnection, callExternalApiConnection } from '../db/external-api-connection-service';
 import type {
 	WorkflowStep,
 	WorkflowActionStep,
@@ -52,6 +53,19 @@ function consumeBudget(budget: Budget): void {
 
 function sleep(ms: number): Promise<void> {
 	return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+/**
+ * call_external_apiのresult_pathで取り出した値(型不明)をStepResultへ変換する。
+ * boolean/number/string以外(オブジェクト・配列・null・undefined)はJSON文字列表現に落とす
+ * (@step:参照で後続ステップから使う際、値が確認できないより文字列化されている方が実用的なため)。
+ */
+function coerceScalarResult(value: unknown): StepResult {
+	if (typeof value === 'boolean') return { type: 'boolean', value };
+	if (typeof value === 'number') return { type: 'number', value };
+	if (typeof value === 'string') return { type: 'string', value };
+	if (value === undefined || value === null) return { type: 'string', value: '' };
+	return { type: 'string', value: JSON.stringify(value) };
 }
 
 /**
@@ -224,6 +238,55 @@ async function performAction(
 		return { result: `レコード削除完了（id: ${recordId}）` };
 	}
 
+	// call_external_apiは`integrations`(Slack通知等、通知目的の連携)テーブルではなく、
+	// 専用のexternal_api_connectionsテーブル(2026-07-22追加)を参照する。dispatchTool経由の
+	// 内部AIツール(tools/integrations.tsのcall_external_api、authType別の認証設定を持つ別システム)
+	// とは実装を完全に分離し、ここで直接HTTP呼び出しを行う。
+	if (step.tool === 'call_external_api') {
+		// connection_id相当。カタログのparamsには含めず、エディタの「対象」選択で直接 step.params に設定される
+		const connectionId = step.params?.integration_id;
+		if (!connectionId) throw new WorkflowAbortError(`「${step.label}」の連携先が選択されていません`);
+		const connection = await getExternalApiConnection(db, connectionId);
+		if (!connection) throw new WorkflowAbortError(`「${step.label}」の連携先が見つかりません（削除された可能性があります）`);
+
+		const rawBodyStr = step.params?.['body'] ?? '';
+		let body: Record<string, unknown> | undefined;
+		if (rawBodyStr) {
+			let parsedBody: Record<string, unknown>;
+			try { parsedBody = JSON.parse(preQuoteReferences(rawBodyStr)); } catch { throw new WorkflowAbortError(`「${step.label}」のリクエストボディがJSON形式ではありません`); }
+			body = resolveDataValues(parsedBody, results, itemStack, triggerContext, self, inputArgs);
+		}
+
+		const raw = await callExternalApiConnection(connection, {
+			endpoint: resolvedParams['endpoint'] as string | undefined,
+			method: resolvedParams['method'] as string,
+			body
+		});
+
+		// スカラー結果: result_pathが指定されていればそのフィールド値、無指定ならok(成功したか)を既定値にする
+		const resultPath = step.params?.['result_path'];
+		const scalarSource = resultPath ? resolveJsonPath(raw.body, resultPath) : raw.ok;
+		const scalar = coerceScalarResult(scalarSource);
+		results.set(step.id, scalar);
+
+		// 一覧結果: list_pathが指定された場合のみforeachのsourceとして使えるようにする
+		const listPath = step.params?.['list_path'];
+		if (listPath) {
+			const listSource = resolveJsonPath(raw.body, listPath);
+			if (Array.isArray(listSource)) {
+				listResults.set(
+					step.id,
+					listSource.map((item) =>
+						item && typeof item === 'object' && !Array.isArray(item) ? (item as Record<string, unknown>) : { value: item }
+					)
+				);
+			}
+		}
+
+		const resultSummary = resultPath ? `外部API呼び出し完了（${resultPath}: ${scalar.value}）` : `外部API呼び出し完了（ステータス: ${raw.status}）`;
+		return { result: resultSummary };
+	}
+
 	let input: Record<string, unknown> = resolvedParams;
 	if (step.tool === 'send_email') {
 		if (!self.email) throw new WorkflowAbortError('送信先（自分のメールアドレス）が特定できません');
@@ -238,18 +301,6 @@ async function performAction(
 		const integrationId = step.params?.integration_id;
 		if (!integrationId) throw new WorkflowAbortError(`「${step.label}」のSlack連携先が選択されていません`);
 		input = { ...resolvedParams, integration_id: integrationId };
-	} else if (step.tool === 'call_external_api') {
-		// integration_id はカタログのparamsに含めず、エディタの「対象」選択で直接 step.params に設定される
-		const integrationId = step.params?.integration_id;
-		if (!integrationId) throw new WorkflowAbortError(`「${step.label}」の外部API連携先が選択されていません`);
-		const rawBodyStr = step.params?.['body'] ?? '';
-		let body: Record<string, unknown> | undefined;
-		if (rawBodyStr) {
-			let parsedBody: Record<string, unknown>;
-			try { parsedBody = JSON.parse(preQuoteReferences(rawBodyStr)); } catch { throw new WorkflowAbortError(`「${step.label}」のリクエストボディがJSON形式ではありません`); }
-			body = resolveDataValues(parsedBody, results, itemStack, triggerContext, self, inputArgs);
-		}
-		input = { endpoint: resolvedParams['endpoint'], method: resolvedParams['method'], integration_id: integrationId, ...(body ? { body } : {}) };
 	}
 
 	const raw = await dispatchTool(db, step.tool as ToolName, input, env);

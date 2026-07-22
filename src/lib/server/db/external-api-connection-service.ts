@@ -97,3 +97,38 @@ export async function listExternalApiConnectionsForWorkflow(db: Db): Promise<Ext
 		.from(externalApiConnections)
 		.orderBy(asc(externalApiConnections.name));
 }
+
+/**
+ * endpointが相対パス/省略なら connection.url を基点に結合する。絶対URLの場合は
+ * connection.url と同一オリジンのものだけ許可する(ヘッダーに認証情報が乗るため、
+ * ワークフローの動的な参照値でendpointが差し替わっても他ホストに秘密が漏れないようにするガード)。
+ */
+export function resolveConnectionUrl(baseUrl: string, endpoint: string | undefined): string {
+	const base = baseUrl.replace(/\/$/, '');
+	if (!endpoint || endpoint === '/') return base;
+	if (endpoint.startsWith('http')) {
+		if (new URL(endpoint).origin !== new URL(base).origin) {
+			throw new Error('endpoint は連携先(url)と同じホストのURLのみ指定できます');
+		}
+		return endpoint;
+	}
+	return `${base}/${endpoint.replace(/^\//, '')}`;
+}
+
+export type ExternalApiCallResult = { status: number; ok: boolean; body: unknown };
+
+/** 連携設定のurl/headersを使って実際に外部APIを呼び出す(ワークフローのcall_external_apiアクション用)。 */
+export async function callExternalApiConnection(
+	connection: { url: string; headers: Record<string, string> },
+	input: { endpoint?: string; method: string; body?: unknown }
+): Promise<ExternalApiCallResult> {
+	const url = resolveConnectionUrl(connection.url, input.endpoint);
+	const res = await fetch(url, {
+		method: input.method,
+		headers: { 'Content-Type': 'application/json', ...connection.headers },
+		body: input.body !== undefined ? JSON.stringify(input.body) : undefined
+	});
+	const ct = res.headers.get('content-type') ?? '';
+	const body = ct.includes('application/json') ? await res.json() : await res.text();
+	return { status: res.status, ok: res.ok, body };
+}

@@ -4,7 +4,7 @@ import { getWorkflow, deleteWorkflow } from '$lib/server/db/workflow-service';
 import { getAppById } from '$lib/server/db/table-service';
 import { listEntityTypesForWorkflow } from '$lib/server/db/table-service';
 import { listSlackIntegrationsForWorkflow } from '$lib/server/slack';
-import { listIntegrationsForWorkflow } from '$lib/server/db/integration-service';
+import { listExternalApiConnectionsForWorkflow } from '$lib/server/db/external-api-connection-service';
 import { listWorkflowRuns } from '$lib/server/db/workflow-run-service';
 import type { PageServerLoad, Actions } from './$types';
 
@@ -16,7 +16,7 @@ export const load: PageServerLoad = async ({ params, platform }) => {
 		getAppById(db, params.id),
 		listEntityTypesForWorkflow(db),
 		listSlackIntegrationsForWorkflow(db),
-		listIntegrationsForWorkflow(db)
+		listExternalApiConnectionsForWorkflow(db)
 	]);
 	if (!workflow) error(404, 'ワークフローが見つかりません');
 	if (!app) error(404, 'アプリが見つかりません');

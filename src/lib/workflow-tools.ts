@@ -124,12 +124,15 @@ export const WORKFLOW_ACTION_TOOLS: WorkflowActionToolDef[] = [
 					{ value: 'DELETE', label: 'DELETE' }
 				]
 			},
-			{ key: 'body', label: 'リクエストボディ（JSON形式、任意）', type: 'textarea' }
+			{ key: 'body', label: 'リクエストボディ（JSON形式、任意）', type: 'textarea' },
+			{ key: 'result_path', label: '結果として取り出すフィールド（例: data.id、任意）', type: 'text' },
+			{ key: 'list_path', label: '一覧として取り出すフィールド（例: data.items、foreachで使う場合、任意）', type: 'text' }
 		],
-		resultType: 'boolean',
-		resultDesc: '呼び出しが成功したか（HTTPステータスが2xx）',
-		extractResult: (raw) => !!(raw as { ok?: boolean } | undefined)?.ok,
-		note: '呼び出し先は「対象」の選択で決まる（設定済みの外部API連携。integration_idは対象選択で直接設定されるため、AIがparamsで指定することはできない）'
+		resultType: 'string',
+		resultDesc: 'result_pathを指定した場合はそのフィールドの値、未指定の場合は呼び出しが成功したか（true/false）',
+		// extractResult/listResultは無し。result_path/list_pathはステップごとの設定でありツール定義時点では
+		// 固定できないため、run.ts側でstep.paramsを見ながら直接results/listResultsに設定している。
+		note: '呼び出し先は「対象」の選択で決まる（設定済みの外部API連携。integration_idは対象選択で直接設定されるため、AIがparamsで指定することはできない）。list_pathで取り出した配列の各要素は、オブジェクトならそのフィールドを@item:<key>で、配列がオブジェクトでない値（文字列等）の並びなら@item:valueで参照する。外部APIのレスポンス構造はテーブルと違いBoann側で事前にわからないため、フィールド名の選択候補は出せない(手入力が必要)'
 	}
 ];
 
@@ -225,6 +228,29 @@ export function entityListItemFields(
 	const idField: WorkflowListResultField = { key: 'id', label: 'ID' };
 	const match = entityTypes.find((e) => e.id === entityTypeId);
 	return match ? [idField, ...match.fields] : [idField];
+}
+
+/**
+ * ドット区切りのパス（例: `data.items.0.id`）でオブジェクト/配列を辿る、簡易的なJSON path resolver。
+ * JSONPathのようなワイルドカード・フィルタ式には対応しない（call_external_apiのresult_path/list_path用）。
+ * パスが空ならvalueをそのまま返す。辿れない場合はundefined。
+ */
+export function resolveJsonPath(value: unknown, path: string): unknown {
+	const trimmed = path.trim();
+	if (!trimmed) return value;
+	let current: unknown = value;
+	for (const segment of trimmed.split('.')) {
+		if (current === null || current === undefined) return undefined;
+		if (Array.isArray(current)) {
+			const idx = Number(segment);
+			current = Number.isInteger(idx) ? current[idx] : undefined;
+		} else if (typeof current === 'object') {
+			current = (current as Record<string, unknown>)[segment];
+		} else {
+			return undefined;
+		}
+	}
+	return current;
 }
 
 const RESULT_TYPE_LABELS: Record<WorkflowResultType, string> = {

@@ -21,13 +21,14 @@
 	import type { VisibleStep, VisibleListStep } from '$lib/workflow-validation';
 	import type { EntityTypeForWorkflow } from '$lib/server/db/table-service';
 	import type { SlackIntegrationOption } from '$lib/server/slack';
-	import type { IntegrationOption } from '$lib/server/db/integration-service';
+	import type { ExternalApiConnectionOption } from '$lib/server/db/external-api-connection-service';
 	import GripVertical from '$lib/components/icon/GripVertical.svelte';
 	import InfoCircle from '$lib/components/icon/InfoCircle.svelte';
 	import WorkflowStepList from './WorkflowStepList.svelte';
 
-	/** ネストしたforeachのうち、いずれか1段の「現在の項目」スコープ。bodyの内側ではこのスタック（祖先のforeach全て）を全て参照できる。 */
-	type ItemScope = { foreachStepId: string; label: string; itemFields: WorkflowListResultField[] };
+	/** ネストしたforeachのうち、いずれか1段の「現在の項目」スコープ。bodyの内側ではこのスタック（祖先のforeach全て）を全て参照できる。
+	 *  itemFields===null はフィールド構成が事前にわからない場合(call_external_apiのlist_path等)。 */
+	type ItemScope = { foreachStepId: string; label: string; itemFields: WorkflowListResultField[] | null };
 
 	type Props = {
 		steps: WorkflowStep[];
@@ -38,7 +39,7 @@
 		depth: number;
 		entityTypes?: EntityTypeForWorkflow[];
 		slackIntegrations?: SlackIntegrationOption[];
-		integrations?: IntegrationOption[];
+		integrations?: ExternalApiConnectionOption[];
 		/** イベントトリガー時、@trigger:<field> として参照できるフィールド一覧（トリガーがscheduleの場合は空） */
 		triggerFields?: WorkflowListResultField[];
 		/** 宣言された入力パラメータ一覧。@input:<key> として参照できる */
@@ -110,6 +111,10 @@
 					const itemFields =
 						s.tool === 'get_entities' ? entityListItemFields(entityTypes, s.params?.entity_type_id) : tool.listResult.itemFields;
 					visible.push({ id: s.id, label: s.label, itemFields });
+				} else if (s.tool === 'call_external_api' && s.params?.list_path) {
+					// list_pathはステップごとの設定でツール定義に固定できないため個別に判定する。
+					// フィールド構成は外部APIのレスポンス次第でBoann側は知り得ないためnull(候補一覧は出せない)。
+					visible.push({ id: s.id, label: s.label, itemFields: null });
 				}
 			}
 		}
@@ -157,8 +162,25 @@
 
 	function flatItemOptions(): ItemOption[] {
 		return itemScopes.flatMap((scope) =>
-			scope.itemFields.map((f) => ({ foreachStepId: scope.foreachStepId, field: f, scopeLabel: scope.label }))
+			(scope.itemFields ?? []).map((f) => ({ foreachStepId: scope.foreachStepId, field: f, scopeLabel: scope.label }))
 		);
+	}
+
+	/** フィールド構成が不明なforeachスコープ(call_external_apiのlist_path等)があるかどうか。
+	 *  その場合、選択候補を出せないので「直接入力」欄で@item:<id>:<key>を手入力してもらう案内を出す。 */
+	function hasUnknownItemScope(): boolean {
+		return itemScopes.some((s) => s.itemFields === null);
+	}
+
+	/** selValが「フィールド構成不明なforeachスコープを指すitem参照」かどうか。
+	 *  この場合、選択肢のselectには対応するoptionが無いため、直接入力欄も併せて表示して編集可能にする。 */
+	function isUnknownItemRefValue(selVal: string): boolean {
+		if (!selVal.startsWith('item:')) return false;
+		const rest = selVal.slice('item:'.length);
+		const sep = rest.indexOf(':');
+		if (sep === -1) return false;
+		const scope = itemScopes.find((s) => s.foreachStepId === rest.slice(0, sep));
+		return !!scope && scope.itemFields === null;
 	}
 
 	function itemSelectValue(opt: ItemOption): string {
@@ -417,6 +439,12 @@
 								<code class="wf-help-token">{itemToken(opt)}</code>
 							</li>
 						{/each}
+						{#each itemScopes.filter((s) => s.itemFields === null) as scope (scope.foreachStepId)}
+							<li>
+								<span class="wf-help-name">{scope.label}の項目（フィールド構成不明、下の形式で「直接入力」欄に手入力）</span>
+								<code class="wf-help-token">@item:{scope.foreachStepId}:&lt;フィールド名&gt;</code>
+							</li>
+						{/each}
 						{#each triggerFields as f, tfi (tfi)}
 							<li>
 								<span class="wf-help-name">{f.label}（トリガーレコード）</span>
@@ -489,7 +517,7 @@
 										<option value={SELF_SELECT_VALUE}>自分のアカウントID</option>
 									</select>
 								{/if}
-								{#if (selVal === '__literal__' || !hasRefs) && field.type !== 'select'}
+								{#if (selVal === '__literal__' || !hasRefs || isUnknownItemRefValue(selVal)) && field.type !== 'select'}
 									{#if field.type === 'textarea'}
 										<textarea
 											value={fieldVal}
@@ -647,7 +675,7 @@
 						{/each}
 						<option value={SELF_SELECT_VALUE}>自分のアカウントID</option>
 					</select>
-					{#if rightSel === '__literal__'}
+					{#if rightSel === '__literal__' || isUnknownItemRefValue(rightSel)}
 						<input
 							type="text"
 							value={step.right}

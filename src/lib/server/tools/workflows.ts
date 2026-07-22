@@ -5,7 +5,7 @@ import type { ToolEnv } from './shared';
 import { createWorkflow, updateWorkflow, listWorkflows, listWorkflowsByAppId, getWorkflow, type WorkflowRow } from '../db/workflow-service';
 import { listEntityTypesForWorkflow, type FieldDef } from '../db/table-service';
 import { listSlackIntegrationsForWorkflow } from '../slack';
-import { listIntegrationsForWorkflow } from '../db/integration-service';
+import { listExternalApiConnectionsForWorkflow } from '../db/external-api-connection-service';
 import { validateWorkflow } from '$lib/workflow-validation';
 import { runWorkflowNow } from '../workflow/run';
 import { listWorkflowRuns } from '../db/workflow-run-service';
@@ -150,7 +150,7 @@ export async function handleSaveWorkflow(db: Db, input: unknown, env?: ToolEnv) 
 	const [entityTypes, slackIntegrations, integrations] = await Promise.all([
 		listEntityTypesForWorkflow(db),
 		listSlackIntegrationsForWorkflow(db),
-		listIntegrationsForWorkflow(db)
+		listExternalApiConnectionsForWorkflow(db)
 	]);
 	const validation = validateWorkflow(triggerType ?? 'schedule', triggerHour, triggerMinute, triggerEntityTypeId, steps, entityTypes, slackIntegrations, inputSchema ?? [], integrations);
 	if (!validation.ok) {

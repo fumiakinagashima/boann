@@ -4,7 +4,7 @@ import { createDb } from '$lib/server/db';
 import { createWorkflow } from '$lib/server/db/workflow-service';
 import { listEntityTypesForWorkflow } from '$lib/server/db/table-service';
 import { listSlackIntegrationsForWorkflow } from '$lib/server/slack';
-import { listIntegrationsForWorkflow } from '$lib/server/db/integration-service';
+import { listExternalApiConnectionsForWorkflow } from '$lib/server/db/external-api-connection-service';
 import { validateWorkflow } from '$lib/workflow-validation';
 import type { WorkflowStep } from '$lib/types/chat';
 import type { FieldDef } from '$lib/server/db/table-service';
@@ -37,7 +37,7 @@ export const POST: RequestHandler = async ({ request, platform, locals }) => {
 			const [entityTypes, slackIntegrations, integrations] = await Promise.all([
 				listEntityTypesForWorkflow(db),
 				listSlackIntegrationsForWorkflow(db),
-				listIntegrationsForWorkflow(db)
+				listExternalApiConnectionsForWorkflow(db)
 			]);
 			const validation = validateWorkflow(triggerType, triggerHour, triggerMinute, body.triggerEntityTypeId, steps, entityTypes, slackIntegrations, inputSchema, integrations);
 			if (!validation.ok) {
