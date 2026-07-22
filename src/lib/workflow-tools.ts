@@ -129,10 +129,10 @@ export const WORKFLOW_ACTION_TOOLS: WorkflowActionToolDef[] = [
 			{ key: 'list_path', label: '一覧として取り出すフィールド（例: data.items、foreachで使う場合、任意）', type: 'text' }
 		],
 		resultType: 'string',
-		resultDesc: 'result_pathを指定した場合はそのフィールドの値、未指定の場合は呼び出しが成功したか（true/false）',
+		resultDesc: 'result_pathを指定した場合はそのフィールドの値、未指定の場合はレスポンスボディ全体（オブジェクトはJSON文字列化）',
 		// extractResult/listResultは無し。result_path/list_pathはステップごとの設定でありツール定義時点では
 		// 固定できないため、run.ts側でstep.paramsを見ながら直接results/listResultsに設定している。
-		note: '呼び出し先は「対象」の選択で決まる（設定済みの外部API連携。integration_idは対象選択で直接設定されるため、AIがparamsで指定することはできない）。list_pathで取り出した配列の各要素は、オブジェクトならそのフィールドを@item:<key>で、配列がオブジェクトでない値（文字列等）の並びなら@item:valueで参照する。外部APIのレスポンス構造はテーブルと違いBoann側で事前にわからないため、フィールド名の選択候補は出せない(手入力が必要)'
+		note: '呼び出し先は「対象」の選択で決まる（設定済みの外部API連携。integration_idは対象選択で直接設定されるため、AIがparamsで指定することはできない）。result_pathを指定しない場合、レスポンスの中身を確認しながらresult_path/list_pathを決めたいときは、この値をconsole_logアクション（検証用）に渡すと生のレスポンスが見られる。list_pathで取り出した配列の各要素は、オブジェクトならそのフィールドを@item:<key>で、配列がオブジェクトでない値（文字列等）の並びなら@item:valueで参照する。外部APIのレスポンス構造はテーブルと違いBoann側で事前にわからないため、フィールド名の選択候補は出せない(手入力が必要)'
 	},
 	{
 		value: 'console_log',

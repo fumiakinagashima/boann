@@ -271,9 +271,11 @@ async function performAction(
 			body
 		});
 
-		// スカラー結果: result_pathが指定されていればそのフィールド値、無指定ならok(成功したか)を既定値にする
+		// スカラー結果: result_pathが指定されていればそのフィールド値、無指定なら レスポンスボディ全体を
+		// そのまま返す(coerceScalarResultがオブジェクトはJSON文字列化する。中身を構造化して扱う機能は
+		// まだ無く、まずは「生のレスポンスをそのまま見える」ことを優先した簡易実装 — 2026-07-22)。
 		const resultPath = step.params?.['result_path'];
-		const scalarSource = resultPath ? resolveJsonPath(raw.body, resultPath) : raw.ok;
+		const scalarSource = resultPath ? resolveJsonPath(raw.body, resultPath) : raw.body;
 		const scalar = coerceScalarResult(scalarSource);
 		results.set(step.id, scalar);
 
