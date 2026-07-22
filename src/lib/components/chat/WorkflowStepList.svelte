@@ -5,14 +5,9 @@
 		WORKFLOW_OPERATORS,
 		getWorkflowActionTool,
 		findWorkflowActionCategory,
-		makeStepRef,
 		parseStepRef,
-		makeItemRef,
-		parseItemRef,
 		makeTriggerRef,
-		parseTriggerRef,
 		makeInputRef,
-		parseInputRef,
 		entityListItemFields,
 		SELF_ACCOUNT_ID_REF,
 		type WorkflowListResultField
@@ -121,42 +116,9 @@
 		return visible;
 	}
 
-	/** params/condition の参照select用: 現在の値を `'__literal__'` / ステップid / `item:<foreachのid>:<field>` / `trigger:<field>` / `self:account_id` に変換する。 */
-	function refSelectValue(operand: string | undefined): string {
-		const itemRef = parseItemRef(operand);
-		if (itemRef !== null) {
-			// foreachのidを省略した旧形式は最も内側のforeachを指すものとして解釈する
-			const foreachStepId = itemRef.foreachStepId ?? itemScopes[itemScopes.length - 1]?.foreachStepId ?? '';
-			return `item:${foreachStepId}:${itemRef.field}`;
-		}
-		const triggerField = parseTriggerRef(operand);
-		if (triggerField !== null) return `trigger:${triggerField}`;
-		const inputField = parseInputRef(operand);
-		if (inputField !== null) return `input:${inputField}`;
-		if (operand === SELF_ACCOUNT_ID_REF) return 'self:account_id';
-		const stepId = parseStepRef(operand);
-		if (stepId !== null) return stepId;
-		return '__literal__';
-	}
-
-	/** refSelectValue の逆変換: select の選択値を実際に保存するoperand文字列に変換する。 */
-	function operandFromSelect(value: string): string {
-		if (value === '__literal__') return '';
-		if (value.startsWith('item:')) {
-			const rest = value.slice('item:'.length);
-			const sep = rest.indexOf(':');
-			return makeItemRef(rest.slice(0, sep), rest.slice(sep + 1));
-		}
-		if (value.startsWith('trigger:')) return makeTriggerRef(value.slice('trigger:'.length));
-		if (value.startsWith('input:')) return makeInputRef(value.slice('input:'.length));
-		if (value === 'self:account_id') return SELF_ACCOUNT_ID_REF;
-		return makeStepRef(value);
-	}
-
 	/**
-	 * このステップの位置で選択可能な「現在の項目」フィールドを、祖先のforeach全て（itemScopes）から
-	 * フラットなリストにする。ネストしている場合（itemScopes.length > 1）は、どのループの項目かを
-	 * ラベルに付記して区別する。
+	 * このステップの位置で参照できる「現在の項目」フィールドを、祖先のforeach全て（itemScopes）から
+	 * フラットなリストにする（「ここで使える変数」ヘルプパネルへの表示専用。値の入力は直接入力のみ）。
 	 */
 	type ItemOption = { foreachStepId: string; field: WorkflowListResultField; scopeLabel: string };
 
@@ -166,52 +128,17 @@
 		);
 	}
 
-	/** フィールド構成が不明なforeachスコープ(call_external_apiのlist_path等)があるかどうか。
-	 *  その場合、選択候補を出せないので「直接入力」欄で@item:<id>:<key>を手入力してもらう案内を出す。 */
-	function hasUnknownItemScope(): boolean {
-		return itemScopes.some((s) => s.itemFields === null);
-	}
-
-	/** selValが「フィールド構成不明なforeachスコープを指すitem参照」かどうか。
-	 *  この場合、選択肢のselectには対応するoptionが無いため、直接入力欄も併せて表示して編集可能にする。 */
-	function isUnknownItemRefValue(selVal: string): boolean {
-		if (!selVal.startsWith('item:')) return false;
-		const rest = selVal.slice('item:'.length);
-		const sep = rest.indexOf(':');
-		if (sep === -1) return false;
-		const scope = itemScopes.find((s) => s.foreachStepId === rest.slice(0, sep));
-		return !!scope && scope.itemFields === null;
-	}
-
-	function itemSelectValue(opt: ItemOption): string {
-		return `item:${opt.foreachStepId}:${opt.field.key}`;
-	}
-
-	function itemOptionLabel(opt: ItemOption): string {
-		return itemScopes.length > 1 ? `${opt.field.label}（${opt.scopeLabel}）` : `${opt.field.label}（現在の項目）`;
-	}
-
 	function itemToken(opt: ItemOption): string {
 		return `@item:${opt.foreachStepId}:${opt.field.key}`;
-	}
-
-	function triggerSelectValue(field: WorkflowListResultField): string {
-		return `trigger:${field.key}`;
 	}
 
 	function triggerToken(field: WorkflowListResultField): string {
 		return makeTriggerRef(field.key);
 	}
 
-	function inputSelectValue(field: WorkflowListResultField): string {
-		return `input:${field.key}`;
-	}
-
 	function inputToken(field: WorkflowListResultField): string {
 		return makeInputRef(field.key);
 	}
-
-	const SELF_SELECT_VALUE = 'self:account_id';
 
 	// カテゴリ選択中（対象未選択でtoolが空の）ステップのカテゴリを覚えておくための一時状態。
 	// tool が決まれば常にそこからカテゴリを逆引きできるため、これは未確定の間だけ使う。
@@ -473,8 +400,6 @@
 						{@const hasValue = fieldVal !== '' && fieldVal != null}
 						{@const shown = isParamShown(step.id, field.key, hasValue, !!field.required)}
 						{#if shown}
-							{@const selVal = refSelectValue(step.params?.[field.key])}
-							{@const hasRefs = visible.length > 0 || itemOpts.length > 0 || triggerFields.length > 0 || inputFields.length > 0 || selVal !== '__literal__'}
 							<div class="wf-line wf-param" class:wf-param-optional={!field.required}>
 								<label for="wf-param-{step.id}-{field.key}">{field.label}</label>
 								{#if field.type === 'select'}
@@ -491,76 +416,49 @@
 											<option value={opt.value}>{opt.label}</option>
 										{/each}
 									</select>
-								{:else if hasRefs}
-									<select
+								{:else if field.type === 'textarea'}
+									<textarea
 										id="wf-param-{step.id}-{field.key}"
-										value={selVal}
+										value={fieldVal}
 										disabled={!editable}
-										onchange={(e) => {
+										oninput={(e) => {
 											if (!step.params) step.params = {};
-											step.params[field.key] = operandFromSelect(e.currentTarget.value);
+											step.params[field.key] = e.currentTarget.value;
 										}}
-									>
-										<option value="__literal__">直接入力</option>
-										{#each visible as v (v.id)}
-											<option value={v.id}>{v.label}の結果を使う</option>
-										{/each}
-										{#each itemOpts as opt (opt.foreachStepId + ':' + opt.field.key)}
-											<option value={itemSelectValue(opt)}>{itemOptionLabel(opt)}</option>
-										{/each}
-										{#each triggerFields as f, tfi (tfi)}
-											<option value={triggerSelectValue(f)}>{f.label}（トリガーレコード）</option>
-										{/each}
-										{#each inputFields as f, ifi (ifi)}
-											<option value={inputSelectValue(f)}>{f.label}（入力パラメータ）</option>
-										{/each}
-										<option value={SELF_SELECT_VALUE}>自分のアカウントID</option>
-									</select>
-								{/if}
-								{#if (selVal === '__literal__' || !hasRefs || isUnknownItemRefValue(selVal)) && field.type !== 'select'}
-									{#if field.type === 'textarea'}
-										<textarea
-											value={fieldVal}
-											disabled={!editable}
-											oninput={(e) => {
-												if (!step.params) step.params = {};
-												step.params[field.key] = e.currentTarget.value;
-											}}
-										></textarea>
-									{:else if field.type === 'number'}
-										<input
-											id={!hasRefs ? `wf-param-${step.id}-${field.key}` : undefined}
-											type="number"
-											value={fieldVal}
-											disabled={!editable}
-											oninput={(e) => {
-												if (!step.params) step.params = {};
-												step.params[field.key] = e.currentTarget.value;
-											}}
-										/>
-									{:else if field.type === 'date'}
-										<input
-											id={!hasRefs ? `wf-param-${step.id}-${field.key}` : undefined}
-											type="date"
-											value={fieldVal}
-											disabled={!editable}
-											oninput={(e) => {
-												if (!step.params) step.params = {};
-												step.params[field.key] = e.currentTarget.value;
-											}}
-										/>
-									{:else}
-										<input
-											id={!hasRefs ? `wf-param-${step.id}-${field.key}` : undefined}
-											type="text"
-											value={fieldVal}
-											disabled={!editable}
-											oninput={(e) => {
-												if (!step.params) step.params = {};
-												step.params[field.key] = e.currentTarget.value;
-											}}
-										/>
-									{/if}
+									></textarea>
+								{:else if field.type === 'number'}
+									<input
+										id="wf-param-{step.id}-{field.key}"
+										type="number"
+										value={fieldVal}
+										disabled={!editable}
+										oninput={(e) => {
+											if (!step.params) step.params = {};
+											step.params[field.key] = e.currentTarget.value;
+										}}
+									/>
+								{:else if field.type === 'date'}
+									<input
+										id="wf-param-{step.id}-{field.key}"
+										type="date"
+										value={fieldVal}
+										disabled={!editable}
+										oninput={(e) => {
+											if (!step.params) step.params = {};
+											step.params[field.key] = e.currentTarget.value;
+										}}
+									/>
+								{:else}
+									<input
+										id="wf-param-{step.id}-{field.key}"
+										type="text"
+										value={fieldVal}
+										disabled={!editable}
+										oninput={(e) => {
+											if (!step.params) step.params = {};
+											step.params[field.key] = e.currentTarget.value;
+										}}
+									/>
 								{/if}
 								{#if editable && !field.required}
 									<button
@@ -623,29 +521,15 @@
 					</div>
 				{/if}
 			{:else if step.kind === 'condition'}
-				{@const rightSel = refSelectValue(step.right)}
 				<div class="wf-line wf-cond-line">
 					<span class="wf-cond-label">判定:</span>
-					<select
-						value={refSelectValue(step.left)}
+					<input
+						type="text"
+						placeholder="@step:xxx / @item:xxx:yyy 等"
+						value={step.left}
 						disabled={!editable}
-						onchange={(e) => (step.left = operandFromSelect(e.currentTarget.value))}
-					>
-						<option value="__literal__">選択してください</option>
-						{#each visible as v (v.id)}
-							<option value={v.id}>{v.label}{v.resultDesc ? `（${v.resultDesc}）` : ''}</option>
-						{/each}
-						{#each itemOpts as opt (opt.foreachStepId + ':' + opt.field.key)}
-							<option value={itemSelectValue(opt)}>{itemOptionLabel(opt)}</option>
-						{/each}
-						{#each triggerFields as f, tfi (tfi)}
-							<option value={triggerSelectValue(f)}>{f.label}（トリガーレコード）</option>
-						{/each}
-						{#each inputFields as f, ifi (ifi)}
-							<option value={inputSelectValue(f)}>{f.label}（入力パラメータ）</option>
-						{/each}
-						<option value={SELF_SELECT_VALUE}>自分のアカウントID</option>
-					</select>
+						oninput={(e) => (step.left = e.currentTarget.value)}
+					/>
 					<select
 						value={step.operator}
 						disabled={!editable}
@@ -655,51 +539,26 @@
 							<option value={op.value}>{op.label}</option>
 						{/each}
 					</select>
-					<select
-						value={rightSel}
+					<input
+						type="text"
+						placeholder="直接入力 または @step:xxx 等"
+						value={step.right}
 						disabled={!editable}
-						onchange={(e) => (step.right = operandFromSelect(e.currentTarget.value))}
-					>
-						<option value="__literal__">直接入力</option>
-						{#each visible as v (v.id)}
-							<option value={v.id}>{v.label}の結果</option>
-						{/each}
-						{#each itemOpts as opt (opt.foreachStepId + ':' + opt.field.key)}
-							<option value={itemSelectValue(opt)}>{itemOptionLabel(opt)}</option>
-						{/each}
-						{#each triggerFields as f, tfi (tfi)}
-							<option value={triggerSelectValue(f)}>{f.label}（トリガーレコード）</option>
-						{/each}
-						{#each inputFields as f, ifi (ifi)}
-							<option value={inputSelectValue(f)}>{f.label}（入力パラメータ）</option>
-						{/each}
-						<option value={SELF_SELECT_VALUE}>自分のアカウントID</option>
-					</select>
-					{#if rightSel === '__literal__' || isUnknownItemRefValue(rightSel)}
-						<input
-							type="text"
-							value={step.right}
-							disabled={!editable}
-							oninput={(e) => (step.right = e.currentTarget.value)}
-						/>
-					{/if}
+						oninput={(e) => (step.right = e.currentTarget.value)}
+					/>
 				</div>
 			{:else}
 				{@const listVisible = visibleListUpTo(i)}
-				{@const sourceStepId = parseStepRef(step.source)}
-				{@const sourceVisible = listVisible.find((v) => v.id === sourceStepId)}
+				{@const sourceVisible = listVisible.find((v) => v.id === parseStepRef(step.source))}
 				<div class="wf-line wf-foreach-line">
 					<span class="wf-cond-label">対象:</span>
-					<select
-						value={sourceStepId ?? ''}
+					<input
+						type="text"
+						placeholder="@step:xxx（一覧を返すステップ）"
+						value={step.source}
 						disabled={!editable}
-						onchange={(e) => (step.source = e.currentTarget.value ? makeStepRef(e.currentTarget.value) : '')}
-					>
-						<option value="">選択してください</option>
-						{#each listVisible as v (v.id)}
-							<option value={v.id}>{v.label}の一覧</option>
-						{/each}
-					</select>
+						oninput={(e) => (step.source = e.currentTarget.value)}
+					/>
 				</div>
 			{/if}
 
