@@ -118,5 +118,13 @@
   "approval_status_pending": "審査中",
   "approval_status_approved": "承認済",
   "approval_status_rejected": "否決",
-  "approval_status_cancelled": "取消"
+  "approval_status_cancelled": "取消",
+  "oauth_authorize_title": "外部アプリからのアクセス許可",
+  "oauth_authorize_intro": "「{client}」が、あなたの代わりに以下のアプリのデータにアクセスすることを求めています。",
+  "oauth_authorize_app_label": "対象アプリ",
+  "oauth_authorize_scope_label": "許可する操作範囲",
+  "oauth_authorize_scope_mcp": "MCPツール経由でのデータ操作(テーブル・ワークフロー)",
+  "oauth_authorize_approve": "許可する",
+  "oauth_authorize_deny": "拒否する",
+  "oauth_authorize_warning": "信頼できるアプリだけに許可してください。許可すると、このアプリはあなたの権限でデータの閲覧・登録・更新・削除を行えるようになります。"
 }

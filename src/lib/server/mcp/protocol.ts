@@ -1,3 +1,4 @@
+import { json } from '@sveltejs/kit';
 import { z } from 'zod';
 import type { Db } from '../db';
 import { RpcErrorCode, rpcError, rpcResult, type JsonRpcId } from './jsonrpc';
@@ -84,4 +85,21 @@ export async function handleMcpMessage(db: Db, appId: string, msg: unknown, env?
 			body: rpcError(rpcId, RpcErrorCode.InternalError, e instanceof Error ? e.message : String(e))
 		};
 	}
+}
+
+/**
+ * 認証済みのMCPリクエスト(HTTP)をJSON-RPCとして処理してResponseを返す。認証方式(静的Bearer/OAuth)
+ * を問わず共通の後処理として、SvelteKitの`/api/apps/[id]/mcp`ルートと、workers-oauth-providerの
+ * apiHandler(worker.ts)の両方から呼ばれる。
+ */
+export async function handleMcpHttpRequest(db: Db, appId: string, request: Request, env?: ToolEnv): Promise<Response> {
+	let body: unknown;
+	try {
+		body = JSON.parse(await request.text());
+	} catch {
+		return json(rpcError(null, RpcErrorCode.ParseError, 'Parse error'), { status: 200 });
+	}
+
+	const { httpStatus, body: resBody } = await handleMcpMessage(db, appId, body, env);
+	return resBody === null ? new Response(null, { status: httpStatus }) : json(resBody, { status: httpStatus });
 }

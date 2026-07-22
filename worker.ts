@@ -4,16 +4,41 @@
 // wrangler.build.jsonc, see svelte.config.js) and adds a `scheduled` handler for the
 // workflow schedule-trigger Cron Trigger. Kept outside src/ so svelte-check doesn't try to
 // type-check the generated bundle that doesn't exist until `vite build` runs.
+//
+// `fetch` is wrapped by an OAuthProvider (@cloudflare/workers-oauth-provider) so that
+// `/api/apps/<id>/mcp` can be reached either via the legacy static Bearer token (unchanged,
+// still handled by the SvelteKit route) or via a proper OAuth 2.1 access token. Requests that
+// the OAuthProvider doesn't recognize as a valid OAuth API call (including the OAuth protocol's
+// own /oauth/token, /oauth/register, and everything else in the app) fall straight through to
+// the SvelteKit worker unchanged. See src/lib/server/mcp/oauth-config.ts for the routing design.
+import { OAuthProvider } from '@cloudflare/workers-oauth-provider';
 import { createDb } from './src/lib/server/db';
 import { processDueWorkflows } from './src/lib/server/workflow/run';
 import { processImportJob } from './src/lib/server/imports/consumer';
 import { dispatchWorkflowEvents } from './src/lib/server/workflow/event-trigger';
 import type { ImportJobMessage } from './src/lib/server/imports/types';
 import type { WorkflowEventMessage } from './src/lib/server/workflow/event-trigger';
+import { handleMcpOAuthApiRequest } from './src/lib/server/mcp/oauth-api-handler';
+import { OAUTH_ROUTES, MCP_API_ROUTE_PREFIX, MCP_TOOL_SCOPE } from './src/lib/server/mcp/oauth-config';
 import sveltekitWorker from './.svelte-kit/cloudflare/_worker.js';
 
+const defaultHandler = { fetch: sveltekitWorker.fetch };
+
+const oauthProvider = new OAuthProvider({
+	apiRoute: MCP_API_ROUTE_PREFIX,
+	apiHandler: {
+		fetch: (request, env, ctx) => handleMcpOAuthApiRequest(request, env, ctx, defaultHandler.fetch)
+	},
+	defaultHandler,
+	authorizeEndpoint: OAUTH_ROUTES.authorize,
+	tokenEndpoint: OAUTH_ROUTES.token,
+	clientRegistrationEndpoint: OAUTH_ROUTES.register,
+	scopesSupported: [MCP_TOOL_SCOPE],
+	accessTokenTTL: 3600
+});
+
 export default {
-	fetch: sveltekitWorker.fetch,
+	fetch: (request, env, ctx) => oauthProvider.fetch(request, env, ctx),
 	async scheduled(_controller, env, ctx) {
 		const db = createDb(env.DB);
 		ctx.waitUntil(processDueWorkflows(db, env));

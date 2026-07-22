@@ -36,6 +36,7 @@
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.102.0",
+    "@cloudflare/workers-oauth-provider": "^0.8.2",
     "@inlang/paraglide-sveltekit": "^0.16.1",
     "docx": "^9.7.1",
     "drizzle-orm": "^0.45.2",

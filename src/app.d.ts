@@ -15,6 +15,10 @@ declare global {
 				ANTHROPIC_API_KEY: string;
 				MOCK_AI: string;
 				KV?: KVNamespace;
+				// @cloudflare/workers-oauth-provider の必須バインディングと、worker.ts側で
+				// OAuthProviderがラップして渡す際にenvへ注入されるヘルパー(/oauth/authorizeで使用)。
+				OAUTH_KV?: KVNamespace;
+				OAUTH_PROVIDER?: import('@cloudflare/workers-oauth-provider').OAuthHelpers;
 				R2?: R2Bucket;
 				QUEUE?: Queue<import('$lib/server/imports/types').ImportJobMessage | import('$lib/server/workflow/event-trigger').WorkflowEventMessage>;
 				// email (set EMAIL_PROVIDER to 'resend' | 'ses' | 'smtp')

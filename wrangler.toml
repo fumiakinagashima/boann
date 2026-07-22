@@ -18,6 +18,11 @@ migrations_dir = "drizzle"
 binding = "KV"
 id = "bc134c6752074c459622d7c32c360268"
 
+# @cloudflare/workers-oauth-provider の必須バインディング(固定名"OAUTH_KV")。
+[[kv_namespaces]]
+binding = "OAUTH_KV"
+id = "9625073ea6824f179746426936b7d7fc"
+
 [[r2_buckets]]
 binding = "R2"
 bucket_name = "boann"
@@ -47,6 +52,10 @@ migrations_dir = "drizzle"
 
 [[env.dev.kv_namespaces]]
 binding = "KV"
+id = "local"
+
+[[env.dev.kv_namespaces]]
+binding = "OAUTH_KV"
 id = "local"
 
 [[env.dev.r2_buckets]]
