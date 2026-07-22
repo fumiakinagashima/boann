@@ -12,6 +12,7 @@
 	import AppIcon from '$lib/components/AppIcon.svelte';
 	import LayoutGrid from '@lucide/svelte/icons/layout-grid';
 	import Star from '@lucide/svelte/icons/star';
+	import Plug from '@lucide/svelte/icons/plug';
 	import type { AccountRow } from '$lib/server/db/account-service';
 
 	type AppItem = { id: string; name: string; label: string; icon: string | null };
@@ -110,6 +111,10 @@
 			<a href="/accounts" class="footer-item" class:active={isUnderPath('/accounts')}>
 				<Users size={15} />
 				アカウント
+			</a>
+			<a href="/api-connections" class="footer-item" class:active={isUnderPath('/api-connections')}>
+				<Plug size={15} />
+				連携設定
 			</a>
 		{/if}
 

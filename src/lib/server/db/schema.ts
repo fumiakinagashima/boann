@@ -111,6 +111,23 @@ export const integrations = sqliteTable('integrations', {
 		.default(sql`(unixepoch())`)
 });
 
+// ワークフローの「外部APIを呼び出す」アクション専用の連携設定。上の`integrations`（Slack通知等、
+// 通知目的の連携）とは目的が別のシステム単位の設定（2026-07-22、ユーザー方針）。
+// 認証はauthType別のフィールドではなく、汎用的なヘッダーのkey/valueのみ（headers列にJSON保存）。
+export const externalApiConnections = sqliteTable('external_api_connections', {
+	id: text('id').primaryKey(),
+	name: text('name').notNull(),
+	url: text('url').notNull(),
+	headers: text('headers').notNull().default('{}'),
+	createdAt: integer('created_at', { mode: 'timestamp' })
+		.notNull()
+		.default(sql`(unixepoch())`),
+	updatedAt: integer('updated_at', { mode: 'timestamp' })
+		.notNull()
+		.default(sql`(unixepoch())`),
+	createdBy: text('created_by')
+});
+
 export const emailProviders = sqliteTable('email_providers', {
 	id: text('id').primaryKey(),
 	provider: text('provider', { enum: ['resend', 'ses', 'smtp'] })

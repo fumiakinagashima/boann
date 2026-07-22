@@ -13,10 +13,12 @@ const MCP_ENDPOINT_RE = /^\/api\/apps\/[^/]+\/mcp$/;
 // 認証情報・権限変更を含むページ・APIはadmin権限のみアクセス可能
 const ADMIN_ONLY_PREFIXES = [
 	'/accounts',
+	'/api-connections',
 	'/settings/integrations',
 	'/settings/email',
 	'/settings/ai',
 	'/api/accounts',
+	'/api/api-connections',
 	'/api/integrations',
 	'/api/email/settings',
 	'/api/ai/settings',
