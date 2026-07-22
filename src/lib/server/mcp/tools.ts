@@ -17,15 +17,29 @@ import { runWorkflowNow } from '../workflow/run';
 import type { ToolEnv } from '../tools/shared';
 import { RECORD_VIEW_URI } from './ui-resources';
 
-// TODO: Tool Annotations（readOnlyHint/destructiveHint/idempotentHint/openWorldHint）未実装（2026-07-21）。
-// list_はreadOnlyHint:true、update_はidempotentHint:true、delete_はdestructiveHint:trueあたりが素直な候補。
+export type McpToolAnnotations = {
+	readOnlyHint?: boolean;
+	destructiveHint?: boolean;
+	idempotentHint?: boolean;
+	openWorldHint?: boolean;
+};
+
 export type McpTool = {
 	name: string;
 	description: string;
 	inputSchema: Record<string, unknown>;
 	outputSchema?: Record<string, unknown>;
+	annotations?: McpToolAnnotations;
 	_meta?: { ui: { resourceUri: string; visibility?: ('model' | 'app')[] } };
 };
+
+// テーブルCRUDツールの注釈。closed worldなアプリ内データのみを操作するためopenWorldHint:falseで統一。
+const READ_ANNOTATIONS: McpToolAnnotations = { readOnlyHint: true, openWorldHint: false };
+const CREATE_ANNOTATIONS: McpToolAnnotations = { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false };
+const UPDATE_ANNOTATIONS: McpToolAnnotations = { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false };
+const DELETE_ANNOTATIONS: McpToolAnnotations = { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false };
+// ワークフローはステップ内で外部API呼び出し・削除等の任意の操作を行いうるため保守的な既定値にする。
+const WORKFLOW_ANNOTATIONS: McpToolAnnotations = { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: true };
 
 /** list_<table>/get_<table> の結果をチャット内にテーブル/詳細表示するための共通MCP Appsテンプレート。 */
 const RECORD_VIEW_META = { ui: { resourceUri: RECORD_VIEW_URI } };
@@ -63,7 +77,8 @@ export async function listAppMcpTools(db: Db, appId: string): Promise<McpTool[]>
 		name: `run_workflow_${w.id.slice(0, 8)}`,
 		description: w.description?.trim() || `ワークフロー「${w.name}」を実行する。`,
 		inputSchema: toJsonSchema(buildEntityDataSchema(w.inputSchema, 'create')),
-		outputSchema: toJsonSchema(z.object({ ok: z.boolean(), name: z.string() }))
+		outputSchema: toJsonSchema(z.object({ ok: z.boolean(), name: z.string() })),
+		annotations: WORKFLOW_ANNOTATIONS
 	}));
 	const tableTools = tables.flatMap((t) => [
 		...(t.mcpRead ? [{
@@ -73,31 +88,36 @@ export async function listAppMcpTools(db: Db, appId: string): Promise<McpTool[]>
 			// structuredContentはMCP仕様上オブジェクトである必要がある（配列は一部クライアントのバリデーションで拒否される。
 			// 実機確認: Pydantic系クライアントで"structuredContent Input should be a valid dictionary"エラーになった）。
 			outputSchema: toJsonSchema(z.object({ records: z.array(buildRecordOutputSchema(t.fields)) })),
+			annotations: READ_ANNOTATIONS,
 			_meta: RECORD_VIEW_META
 		}, {
 			name: `get_${t.id}`,
 			description: `${t.label}のレコードを1件取得する。`,
 			inputSchema: toJsonSchema(ID_ARGS_SCHEMA),
 			outputSchema: toJsonSchema(buildRecordOutputSchema(t.fields)),
+			annotations: READ_ANNOTATIONS,
 			_meta: RECORD_VIEW_META
 		}] : []),
 		...(t.mcpCreate ? [{
 			name: `create_${t.id}`,
 			description: `${t.label}にレコードを登録する。`,
 			inputSchema: toJsonSchema(buildEntityDataSchema(t.fields, 'create')),
-			outputSchema: toJsonSchema(buildRecordOutputSchema(t.fields))
+			outputSchema: toJsonSchema(buildRecordOutputSchema(t.fields)),
+			annotations: CREATE_ANNOTATIONS
 		}] : []),
 		...(t.mcpUpdate ? [{
 			name: `update_${t.id}`,
 			description: `${t.label}のレコードを更新する（指定したフィールドのみ既存データにマージ）。`,
 			inputSchema: toJsonSchema(z.object({ id: z.string().min(1) }).extend(buildEntityDataSchema(t.fields, 'update').shape)),
-			outputSchema: toJsonSchema(buildRecordOutputSchema(t.fields))
+			outputSchema: toJsonSchema(buildRecordOutputSchema(t.fields)),
+			annotations: UPDATE_ANNOTATIONS
 		}] : []),
 		...(t.mcpDelete ? [{
 			name: `delete_${t.id}`,
 			description: `${t.label}のレコードを削除する。`,
 			inputSchema: toJsonSchema(ID_ARGS_SCHEMA),
-			outputSchema: toJsonSchema(z.object({ deleted: z.boolean(), id: z.string() }))
+			outputSchema: toJsonSchema(z.object({ deleted: z.boolean(), id: z.string() })),
+			annotations: DELETE_ANNOTATIONS
 		}] : [])
 	]);
 	return [...tableTools, ...workflowTools];
