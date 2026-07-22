@@ -2,7 +2,7 @@ import { eq, and, desc, sql, inArray, isNull } from 'drizzle-orm';
 import type { BatchItem } from 'drizzle-orm/batch';
 import type { SQLiteColumn, SQLiteTable } from 'drizzle-orm/sqlite-core';
 import type { Db } from './index';
-import { apps, entityTypes, entityFields, entities, bookmarks, workflows, workflowRuns, accounts } from './schema';
+import { apps, entityTypes, entityFields, entities, bookmarks, workflows, workflowRuns, accounts, appMcpTokens } from './schema';
 
 // app スコープ内の末尾に追加するための次の sortOrder（最大値 + 1、無ければ 0）を返す。
 async function nextSortOrder(
@@ -413,8 +413,9 @@ export async function deleteApp(db: Db, id: string): Promise<void> {
 		queries.push(db.delete(workflowRuns).where(inArray(workflowRuns.workflowId, wfRows.map((w) => w.id))));
 	}
 	queries.push(db.delete(workflows).where(eq(workflows.appId, id)));
-	// 3. bookmarks を削除
+	// 3. bookmarks / app_mcp_tokens を削除
 	queries.push(db.delete(bookmarks).where(eq(bookmarks.appId, id)));
+	queries.push(db.delete(appMcpTokens).where(eq(appMcpTokens.appId, id)));
 	// 4. apps を削除
 	queries.push(db.delete(apps).where(eq(apps.id, id)));
 	await db.batch(queries as [BatchItem<'sqlite'>, ...BatchItem<'sqlite'>[]]);
