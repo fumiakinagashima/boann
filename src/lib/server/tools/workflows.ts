@@ -9,6 +9,7 @@ import { listIntegrationsForWorkflow } from '../db/integration-service';
 import { validateWorkflow } from '$lib/workflow-validation';
 import { runWorkflowNow } from '../workflow/run';
 import { listWorkflowRuns } from '../db/workflow-run-service';
+import { WORKFLOW_MAX_RETRIES } from '$lib/constants';
 import type { WorkflowStep } from '$lib/types/chat';
 
 const workflowStepSchema: z.ZodType<WorkflowStep> = z.lazy(() =>
@@ -18,7 +19,10 @@ const workflowStepSchema: z.ZodType<WorkflowStep> = z.lazy(() =>
 			kind: z.literal('action'),
 			label: z.string(),
 			tool: z.string(),
-			params: z.record(z.string(), z.string()).optional()
+			params: z.record(z.string(), z.string()).optional(),
+			category: z.string().optional(),
+			maxRetries: z.number().int().min(0).max(WORKFLOW_MAX_RETRIES).optional(),
+			continueOnError: z.boolean().optional()
 		}),
 		z.object({
 			id: z.string(),
