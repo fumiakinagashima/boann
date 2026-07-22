@@ -128,9 +128,10 @@ export async function callExternalApiConnection(
 		headers: { 'Content-Type': 'application/json', ...connection.headers },
 		body: input.body !== undefined ? JSON.stringify(input.body) : undefined
 	});
-	// TODO: 現状JSONレスポンスを前提にした実装（result_path/list_pathでの参照もJSON.parse済みの
-	// オブジェクト/配列前提）。プレーンテキスト/HTML等の非JSON応答をワークフロー側でどう扱うか
-	// （result_path/list_pathを無視して素通しにする等）は未検討・別途対応する（2026-07-22）。
+	// TODO: 現状JSONレスポンスを前提にした実装（`@step:<id>.<path>`参照もJSON.parse済みの
+	// オブジェクト/配列前提）。プレーンテキスト/HTML等の非JSON応答の扱いは未検討・別途対応する
+	// （2026-07-22。非JSON時は既に.text()にフォールバックしており、パス無し参照ではそのまま
+	// 文字列として使えるが、パス指定時にどう振る舞うべきかは未整理）。
 	const ct = res.headers.get('content-type') ?? '';
 	const body = ct.includes('application/json') ? await res.json() : await res.text();
 	return { status: res.status, ok: res.ok, body };

@@ -60,9 +60,9 @@ function sleep(ms: number): Promise<void> {
 }
 
 /**
- * call_external_apiのresult_pathで取り出した値(型不明)をStepResultへ変換する。
- * boolean/number/string以外(オブジェクト・配列・null・undefined)はJSON文字列表現に落とす
- * (@step:参照で後続ステップから使う際、値が確認できないより文字列化されている方が実用的なため)。
+ * call_external_apiのレスポンスボディ(結果を格納する時)や`@step:<id>.<path>`参照でresolveJsonPathが
+ * 取り出した値(型不明)をStepResultへ変換する。boolean/number/string以外(オブジェクト・配列・
+ * null・undefined)はJSON文字列表現に落とす(値が確認できないより文字列化されている方が実用的なため)。
  */
 function coerceScalarResult(value: unknown): StepResult {
 	if (typeof value === 'boolean') return { type: 'boolean', value };
@@ -283,30 +283,13 @@ async function performAction(
 			body
 		});
 
-		// スカラー結果: result_pathが指定されていればそのフィールド値、無指定なら レスポンスボディ全体を
-		// そのまま返す(coerceScalarResultがオブジェクトはJSON文字列化する)。rawには分解前の値
-		// （オブジェクト/配列等）を保持し、後続ステップから`@step:<id>.<path>`でさらに辿れるようにする。
-		const resultPath = step.params?.['result_path'];
-		const scalarSource = resultPath ? resolveJsonPath(raw.body, resultPath) : raw.body;
-		const scalar = coerceScalarResult(scalarSource);
-		results.set(step.id, { ...scalar, raw: scalarSource });
+		// スカラー結果は常にレスポンスボディ全体(coerceScalarResultがオブジェクトはJSON文字列化する)。
+		// rawには分解前の値（オブジェクト/配列等）を保持し、参照側で`@step:<id>.<path>`によりフィールド・
+		// 配列要素を辿る（result_path/list_pathのようなステップ定義時のフィールド抽出設定は廃止した。
+		// 参照側でパス指定できるので、ステップ側で事前に決め打つ必要が無いため — 2026-07-22）。
+		results.set(step.id, { ...coerceScalarResult(raw.body), raw: raw.body });
 
-		// 一覧結果: list_pathが指定された場合のみforeachのsourceとして使えるようにする
-		const listPath = step.params?.['list_path'];
-		if (listPath) {
-			const listSource = resolveJsonPath(raw.body, listPath);
-			if (Array.isArray(listSource)) {
-				listResults.set(
-					step.id,
-					listSource.map((item) =>
-						item && typeof item === 'object' && !Array.isArray(item) ? (item as Record<string, unknown>) : { value: item }
-					)
-				);
-			}
-		}
-
-		const resultSummary = resultPath ? `外部API呼び出し完了（${resultPath}: ${scalar.value}）` : `外部API呼び出し完了（ステータス: ${raw.status}）`;
-		return { result: resultSummary };
+		return { result: `外部API呼び出し完了（ステータス: ${raw.status}）` };
 	}
 
 	let input: Record<string, unknown> = resolvedParams;
@@ -386,6 +369,34 @@ async function runAction(
 	throw lastError;
 }
 
+/**
+ * foreachのsourceを解決する。`@step:<id>`（パス無し）はget_entities等、静的にlistResultを持つ
+ * アクションの一覧をそのまま使う。`@step:<id>.<path>`はcall_external_api等、rawを保持するステップの
+ * 生の値からresolveJsonPathで配列を取り出す（result_path/list_pathの代わり。参照側でパスを指定できる
+ * ので、ステップ側で事前に「一覧として取り出すフィールド」を決め打つ必要が無い — 2026-07-22）。
+ */
+function resolveForeachSource(
+	stepRef: { id: string; path: string | null },
+	label: string,
+	results: Map<string, StepResult>,
+	listResults: ListResults
+): Record<string, unknown>[] {
+	if (stepRef.path === null) {
+		const items = listResults.get(stepRef.id);
+		if (!items) throw new WorkflowAbortError(`「${label}」の参照先のリスト結果が見つかりません: ${stepRef.id}`);
+		return items;
+	}
+	const found = results.get(stepRef.id);
+	if (!found || found.raw === undefined) {
+		throw new WorkflowAbortError(`「${label}」の参照先はフィールドを指定して参照できません（call_external_api以外は非対応）: ${stepRef.id}`);
+	}
+	const resolved = resolveJsonPath(found.raw, stepRef.path);
+	if (!Array.isArray(resolved)) throw new WorkflowAbortError(`「${label}」の参照先は配列ではありません: ${stepRef.id}.${stepRef.path}`);
+	return resolved.map((item) =>
+		item && typeof item === 'object' && !Array.isArray(item) ? (item as Record<string, unknown>) : { value: item }
+	);
+}
+
 async function runForeach(
 	db: Db,
 	step: WorkflowForeachStep,
@@ -399,11 +410,9 @@ async function runForeach(
 	triggerContext?: TriggerContext,
 	inputArgs?: Record<string, unknown>
 ): Promise<void> {
-	// foreachのsourceはステップ全体（一覧）を指す前提で、パス指定（@step:<id>.<path>）は対応しない
-	const refId = parseStepRef(step.source)?.id;
-	if (!refId) throw new WorkflowAbortError(`「${step.label}」の対象が選択されていません`);
-	const items = listResults.get(refId);
-	if (!items) throw new WorkflowAbortError(`「${step.label}」の参照先のリスト結果が見つかりません: ${refId}`);
+	const stepRef = parseStepRef(step.source);
+	if (!stepRef) throw new WorkflowAbortError(`「${step.label}」の対象が選択されていません`);
+	const items = resolveForeachSource(stepRef, step.label, results, listResults);
 	for (const item of items.slice(0, WORKFLOW_FOREACH_MAX_ITEMS)) {
 		await runSteps(db, step.body, results, listResults, env, self, [...itemStack, { foreachStepId: step.id, item }], budget, logs, triggerContext, inputArgs);
 	}

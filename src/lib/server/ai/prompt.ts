@@ -4,11 +4,11 @@ import type { WorkflowStep } from '$lib/types/chat';
 
 // レビューAI・チャットアシスタントAI・メインチャット共通: @step:<id> の解決ルールの説明。記述がズレないよう一箇所にまとめる。
 const STEP_REF_SEMANTICS_NOTE =
-	'`@step:<id>` は、そのステップ（action）の実行結果のうちカタログのresultTypeに従って抽出済みのスカラー値（数値・文字列・真偽値）を直接指す。加えて、call_external_apiの結果（result_pathを指定しない場合はレスポンスボディ全体）に対しては `@step:<id>.<path>` の形式でドット区切りのプロパティアクセスができる（例: `@step:sef.name`、配列の場合は `@step:sfw.0.id` のようにインデックスを指定）。call_external_api以外のツールの結果にはこのパスアクセスは使えない（元々分解不要な単一値のため）。パスで指定したフィールドが存在しない場合は実行時エラーになる。';
+	'`@step:<id>` は、そのステップ（action）の実行結果のうちカタログのresultTypeに従って抽出済みのスカラー値（数値・文字列・真偽値）を直接指す。call_external_apiの結果はレスポンスボディ全体（オブジェクトはJSON文字列化）で、特定のフィールドが必要な場合は `@step:<id>.<path>` の形式でドット区切りのプロパティアクセスができる（例: `@step:sef.name`、配列の場合は `@step:sfw.0.id` のようにインデックスを指定）。call_external_api以外のツールの結果にはこのパスアクセスは使えない（元々分解不要な単一値のため）。パスで指定したフィールドが存在しない場合は実行時エラーになる。';
 
 // レビューAI・チャットアシスタントAI・メインチャット共通: foreach・@item:<field> の解決ルールの説明。
 const ITEM_REF_SEMANTICS_NOTE =
-	'`foreach` ステップは、listResultを持つ先行アクションの一覧（@step:<id>）を1件ずつ処理する。body内では `@item:<foreachのid>:<field>` で現在処理中の項目のフィールドを参照する（fieldはツールのlistResultが提供するitemFieldsのキーのみ有効）。foreachのidを省略した `@item:<field>` 形式も使えるが、その場合は最も内側のforeachを指す。foreachをネストする場合、内側のbodyから外側のforeachの項目を参照するには外側のforeachのidを含む形式が必須（省略すると内側のforeachを指してしまい外側の項目にアクセスできない）。body内の結果・@itemはbodyの外からは参照できない（条件のthenと同じスコープ規則）。暴走防止のため、1回の実行で先頭から最大50件までしか処理しない仕様（while相当の無限ループは提供しない）。';
+	'`foreach` ステップのsourceには、listResultを持つ先行アクションの一覧（@step:<id>）を指定する。call_external_apiの結果は静的なlistResultを持たないため、代わりに `@step:<id>.<path>` でレスポンス内の配列を直接指定する（例: `@step:sfw.data.items`）。body内では `@item:<foreachのid>:<field>` で現在処理中の項目のフィールドを参照する（fieldはツールのlistResultが提供するitemFieldsのキー。call_external_api由来の配列はフィールド構成が事前にわからないため、要素がオブジェクトならそのキー、オブジェクトでない値の並びなら`value`を指定する）。foreachのidを省略した `@item:<field>` 形式も使えるが、その場合は最も内側のforeachを指す。foreachをネストする場合、内側のbodyから外側のforeachの項目を参照するには外側のforeachのidを含む形式が必須（省略すると内側のforeachを指してしまい外側の項目にアクセスできない）。body内の結果・@itemはbodyの外からは参照できない（条件のthenと同じスコープ規則）。暴走防止のため、1回の実行で先頭から最大50件までしか処理しない仕様（while相当の無限ループは提供しない）。';
 
 export const SYSTEM_PROMPT = `あなたはBoannというノーコードアプリ作成・業務管理プラットフォームのアシスタントです。
 ユーザーの業務指示を日本語で受け取り、適切なツールを使ってカスタムテーブルの構築・データの登録・取得・更新を行います（新規アプリそのものの作成はユーザーがUIから行うため、AIチャットの役割ではありません）。

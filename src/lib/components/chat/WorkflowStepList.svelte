@@ -22,7 +22,7 @@
 	import WorkflowStepList from './WorkflowStepList.svelte';
 
 	/** ネストしたforeachのうち、いずれか1段の「現在の項目」スコープ。bodyの内側ではこのスタック（祖先のforeach全て）を全て参照できる。
-	 *  itemFields===null はフィールド構成が事前にわからない場合(call_external_apiのlist_path等)。 */
+	 *  itemFields===null はフィールド構成が事前にわからない場合(call_external_apiをsourceに@step:<id>.<path>で指定した場合等)。 */
 	type ItemScope = { foreachStepId: string; label: string; itemFields: WorkflowListResultField[] | null };
 
 	type Props = {
@@ -136,11 +136,9 @@
 					const itemFields =
 						s.tool === 'get_entities' ? entityListItemFields(entityTypes, s.params?.entity_type_id) : tool.listResult.itemFields;
 					visible.push({ id: s.id, label: s.label, itemFields });
-				} else if (s.tool === 'call_external_api' && s.params?.list_path) {
-					// list_pathはステップごとの設定でツール定義に固定できないため個別に判定する。
-					// フィールド構成は外部APIのレスポンス次第でBoann側は知り得ないためnull(候補一覧は出せない)。
-					visible.push({ id: s.id, label: s.label, itemFields: null });
 				}
+				// call_external_apiはここに載せない: `@step:<id>`(パス無し)では一覧化されず、
+				// `@step:<id>.<path>`（パス指定）で参照する場合はforeachのsource側で別途許可している。
 			}
 		}
 		return visible;
@@ -578,13 +576,11 @@
 					/>
 				</div>
 			{:else}
-				{@const listVisible = visibleListUpTo(i)}
-				{@const sourceVisible = listVisible.find((v) => v.id === parseStepRef(step.source)?.id)}
 				<div class="wf-line wf-foreach-line">
 					<span class="wf-cond-label">対象:</span>
 					<input
 						type="text"
-						placeholder="@step:xxx（一覧を返すステップ）"
+						placeholder="@step:xxx（一覧を返すステップ） または @step:xxx.data.items（call_external_apiの配列を指定）"
 						value={step.source}
 						disabled={!editable}
 						oninput={(e) => (step.source = e.currentTarget.value)}
@@ -610,7 +606,9 @@
 				</div>
 			{:else if step.kind === 'foreach'}
 				{@const listVisible = visibleListUpTo(i)}
-				{@const sourceVisible = listVisible.find((v) => v.id === parseStepRef(step.source)?.id)}
+				{@const stepRef = parseStepRef(step.source)}
+				{@const sourceVisible = stepRef && stepRef.path === null ? listVisible.find((v) => v.id === stepRef.id) : undefined}
+				{@const pathBasedSource = !!stepRef && stepRef.path !== null}
 				<div class="wf-then">
 					<WorkflowStepList
 						steps={step.body}
@@ -618,7 +616,9 @@
 						listVisibleBefore={listVisible}
 						itemScopes={sourceVisible
 							? [...itemScopes, { foreachStepId: step.id, label: step.label, itemFields: sourceVisible.itemFields }]
-							: itemScopes}
+							: pathBasedSource
+								? [...itemScopes, { foreachStepId: step.id, label: step.label, itemFields: null }]
+								: itemScopes}
 						{editable}
 						{entityTypes}
 						{slackIntegrations}

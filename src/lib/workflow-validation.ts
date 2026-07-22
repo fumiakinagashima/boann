@@ -28,14 +28,14 @@ export type VisibleStep = {
 export type VisibleListStep = {
 	id: string;
 	label: string;
-	/** null = フィールド構成が事前にわからない(call_external_apiのlist_path等)。@item参照の存在チェックをスキップする。 */
+	/** null = フィールド構成が事前にわからない(call_external_apiをforeachのsourceに@step:<id>.<path>で指定した場合等)。@item参照の存在チェックをスキップする。 */
 	itemFields: WorkflowListResultField[] | null;
 };
 
 /** ネストしたforeachのうち、いずれか1段の「現在の項目」スコープ。bodyの内側ではこのスタック（祖先のforeach全て）を全て参照できる。 */
 export type ItemScope = {
 	foreachStepId: string;
-	/** null = フィールド構成が事前にわからない(call_external_apiのlist_path等)。@item参照の存在チェックをスキップする。 */
+	/** null = フィールド構成が事前にわからない(call_external_apiをforeachのsourceに@step:<id>.<path>で指定した場合等)。@item参照の存在チェックをスキップする。 */
 	itemFields: WorkflowListResultField[] | null;
 };
 
@@ -104,12 +104,9 @@ function walkList(
 							)
 						: tool.listResult.itemFields;
 				visible = [...visible, { id: step.id, label: step.label, itemFields }];
-			} else if (step.tool === 'call_external_api' && step.params?.list_path) {
-				// list_resultをツール定義に固定できない(list_pathはステップごとの設定)ため、
-				// ここだけstep.paramsを見て個別に可視性を判定する。フィールド構成は外部APIの
-				// レスポンス次第でBoann側は知り得ないため、itemFieldsはnull(存在チェックをスキップ)。
-				visible = [...visible, { id: step.id, label: step.label, itemFields: null }];
 			}
+			// call_external_apiはlistVisibleに載せない: `@step:<id>`(パス無し)では一覧化されず、
+			// `@step:<id>.<path>`（パス指定）で参照する場合はcheckStepのforeach分岐で別途許可している。
 		} else if (step.kind === 'condition') {
 			walkList(step.then, visible, out, entityTypes);
 		} else {
@@ -131,7 +128,8 @@ function resolveOperandType(
 			? itemScopes.find((s) => s.foreachStepId === itemRef.foreachStepId)
 			: itemScopes[itemScopes.length - 1];
 		if (!scope) return { ok: false, error: `@item参照はforeachの中でのみ使用できます: ${operand}` };
-		// itemFields===null は構成不明(call_external_apiのlist_path等)を意味し、存在チェックをスキップする
+		// itemFields===null は構成不明(call_external_apiをforeachのsourceに@step:<id>.<path>で指定した場合等)を
+		// 意味し、存在チェックをスキップする
 		if (scope.itemFields && !scope.itemFields.some((f) => f.key === itemRef.field)) {
 			return { ok: false, error: `存在しない項目フィールドです: ${itemRef.field}` };
 		}
@@ -269,10 +267,13 @@ export function validateWorkflow(
 		} else {
 			const stepRef = parseStepRef(step.source);
 			const listVisible = listVisibility.get(step.id) ?? [];
-			const sourceStep = stepRef !== null ? listVisible.find((v) => v.id === stepRef.id) : undefined;
+			const sourceStep = stepRef !== null && stepRef.path === null ? listVisible.find((v) => v.id === stepRef.id) : undefined;
+			// パス指定（@step:<id>.<path>）は実行時でないと配列かどうか判定できないため、静的には許可する
+			// （@itemの構成不明ケースと同じ方針。call_external_api以外を指定した場合等はrun.ts側でエラーになる）。
+			const pathBasedSource = stepRef !== null && stepRef.path !== null;
 			if (!step.source) {
 				errors.push(`「${step.label}」の対象（一覧）が選択されていません`);
-			} else if (!sourceStep) {
+			} else if (!sourceStep && !pathBasedSource) {
 				errors.push(`「${step.label}」の対象は一覧を返す先行ステップを選択してください`);
 			}
 			if (step.body.length === 0) {
@@ -280,7 +281,9 @@ export function validateWorkflow(
 			}
 			const bodyItemScopes = sourceStep
 				? [...itemScopes, { foreachStepId: step.id, itemFields: sourceStep.itemFields }]
-				: itemScopes;
+				: pathBasedSource
+					? [...itemScopes, { foreachStepId: step.id, itemFields: null }]
+					: itemScopes;
 			for (const child of step.body) checkStep(child, bodyItemScopes);
 		}
 	}
