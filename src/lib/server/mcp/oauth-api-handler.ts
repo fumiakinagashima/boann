@@ -17,6 +17,13 @@ function forbidden(message: string): Response {
  * 一致しない場合は素通しで既存のSvelteKitワーカー(defaultHandler)に委譲する。
  * これによりOAuthトークンを持つリクエストが誤って他の`/api/apps/**`エンドポイントに
  * ルーティングされても、今まで通りセッションCookie認証で処理される。
+ *
+ * この関数のシグネチャ(request, env, ctx)とctx.propsの意味は@cloudflare/workers-oauth-provider
+ * が規定する契約(apiHandlerオプション)であり、MCPやOAuth自体の仕様ではない。
+ * https://github.com/cloudflare/workers-oauth-provider （README「apiHandler」節、
+ * `dist/oauth-provider.d.ts`の`OAuthProviderOptions.apiHandler`のJSDoc参照）。
+ * props(accountId/appId)の中身はBoann独自(`/oauth/authorize`のcompleteAuthorization呼び出し側
+ * =`src/routes/oauth/authorize/+page.server.ts`で詰めている)。
  */
 export async function handleMcpOAuthApiRequest(
 	request: Request,

@@ -1,3 +1,8 @@
+// このファイルはBoann独自のBearer認証で、MCPやOAuthの仕様が規定しているものではない
+// （`Authorization: Bearer <token>`というヘッダー形式自体はHTTP認証の一般的な慣習だが、
+// トークンの発行・ハッシュ保存・検証方式はBoannが独自に設計したもの）。OAuth 2.1側の実装は
+// `oauth-config.ts`/`oauth-api-handler.ts`/`worker.ts`側にあり、こちらとは別の認証経路として
+// 共存させている（詳細は`oauth-config.ts`のコメント参照）。
 import { eq } from 'drizzle-orm';
 import type { Db } from '../db';
 import { appMcpTokens } from '../db/schema';

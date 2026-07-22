@@ -6,6 +6,11 @@ import { listAppMcpTools, callAppMcpTool } from './tools';
 import type { ToolEnv } from '../tools/shared';
 import { RECORD_VIEW_URI, RECORD_VIEW_HTML } from './ui-resources';
 
+// MCP(Model Context Protocol)のbase protocol実装。ここのメソッド名(initialize/tools/list等)・
+// レスポンス形・通知(id無し)の扱いは仕様がそのまま決めているもので、Boann独自の設計ではない。
+// 仕様: https://modelcontextprotocol.io/specification/2025-06-18
+// (SUPPORTED_PROTOCOL_VERSIONSの並び=クライアントが指定したバージョンが未対応ならこちらの最新に
+// フォールバックする、というネゴシエーション方式も仕様の"Version Negotiation"節で定義されている挙動)
 export const SUPPORTED_PROTOCOL_VERSIONS = ['2025-06-18', '2025-03-26', '2024-11-05'];
 const SERVER_INFO = { name: 'boann', version: '0.1.0' };
 
@@ -53,12 +58,19 @@ export async function handleMcpMessage(db: Db, appId: string, msg: unknown, env?
 	const isNotification = id === undefined;
 
 	try {
+		// method名・params/result形はMCP仕様の各節が規定するもの(下記URLはBoannが対応している
+		// メソッドの一次情報。initialize/ping: basic/lifecycle、tools/*: server/tools、
+		// resources/read: server/resources)。listAppMcpTools/callAppMcpTool/handleResourcesRead
+		// の中身(どのツールを生成するか等)はBoann独自の設計。
+		// https://modelcontextprotocol.io/specification/2025-06-18
 		let result: unknown;
 		switch (method) {
 			case 'initialize':
 				result = handleInitialize(params);
 				break;
 			case 'notifications/initialized':
+				// 通知(id無し)への応答は仕様上「本文なしの202」。ここもBoannの選択ではなく
+				// MCPのStreamable HTTP transport節が定めている挙動。
 				return { httpStatus: 202, body: null };
 			case 'ping':
 				result = {};

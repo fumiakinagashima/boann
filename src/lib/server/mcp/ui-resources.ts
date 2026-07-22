@@ -2,6 +2,14 @@
  * MCP Apps（SEP-1865）用の ui:// リソース本体。list_<table>/get_<table> の結果を
  * チャット内にインラインでテーブル/詳細表示するための、テーブルに依存しない共通テンプレート。
  * 自己完結（インラインCSS/JS、外部リソースへの通信なし）。
+ *
+ * 仕様: https://modelcontextprotocol.io/seps/1865-mcp-apps-interactive-user-interfaces-for-mcp
+ * (Boannが実装対象にしている版: https://github.com/modelcontextprotocol/ext-apps/blob/main/specification/2026-01-26/apps.mdx)
+ *
+ * 仕様が決めている部分: ui://スキームのリソースURI、`window.parent`とのpostMessageによる
+ * JSON-RPC通信（`ui/initialize`ハンドシェイク、`ui/notifications/tool-result`通知）。
+ * Boann独自の部分: render()以下の描画ロジック（テーブル/詳細のどちらで出すかの判定、
+ * DOM構築、XSS対策でtextContentのみ使う方針）——ここは仕様が規定しない自由な実装領域。
  */
 
 export const RECORD_VIEW_URI = 'ui://boann/record-view';

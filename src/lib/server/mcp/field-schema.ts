@@ -65,7 +65,14 @@ export function buildRecordOutputSchema(fields: FieldDef[]) {
 		.passthrough();
 }
 
-/** tools/list の inputSchema として渡す素のJSON Schemaに変換する（$schemaフィールドは除去）。 */
+/**
+ * tools/list の inputSchema/outputSchema として渡す素のJSON Schemaに変換する（$schemaフィールドは除去）。
+ * MCPのTool.inputSchema/outputSchemaはJSON Schemaオブジェクトそのもの(仕様:
+ * https://modelcontextprotocol.io/specification/2025-06-18/server/tools)なので変換自体はMCP由来の要件。
+ * ただしZod側の挙動として、z.toJSONSchema()は.strict()の有無に関わらずデフォルトで
+ * additionalProperties:falseを出力する(Zod本体の仕様、MCPとは無関係)。buildRecordOutputSchema
+ * が.passthrough()を明示しているのはこのZodの挙動に対する回避策。
+ */
 export function toJsonSchema(schema: z.ZodTypeAny): Record<string, unknown> {
 	const { $schema: _drop, ...rest } = z.toJSONSchema(schema) as Record<string, unknown>;
 	return rest;

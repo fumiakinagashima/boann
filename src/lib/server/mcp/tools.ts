@@ -17,6 +17,9 @@ import { runWorkflowNow } from '../workflow/run';
 import type { ToolEnv } from '../tools/shared';
 import { RECORD_VIEW_URI } from './ui-resources';
 
+// フィールド名(readOnlyHint等4つ)自体はMCP仕様が定義するTool Annotationsの語彙で、Boannが
+// 名付けたものではない。「どのツールにどの値を割り当てるか」の判断はBoann側の設計。
+// 仕様: https://modelcontextprotocol.io/specification/2025-06-18/server/tools#annotations
 export type McpToolAnnotations = {
 	readOnlyHint?: boolean;
 	destructiveHint?: boolean;
@@ -24,6 +27,8 @@ export type McpToolAnnotations = {
 	openWorldHint?: boolean;
 };
 
+// McpTool型自体もMCPのtools/list結果(Toolオブジェクト)の形をなぞったもの。_metaのuiキーだけは
+// MCP Apps(SEP-1865)の拡張(ui-resources.tsのコメント参照)で、素のMCP仕様には無いフィールド。
 export type McpTool = {
 	name: string;
 	description: string;
@@ -33,6 +38,7 @@ export type McpTool = {
 	_meta?: { ui: { resourceUri: string; visibility?: ('model' | 'app')[] } };
 };
 
+// 各値そのものはBoannの判断(仕様は語彙を定義するだけで値の割り当ては規定しない)。
 // テーブルCRUDツールの注釈。closed worldなアプリ内データのみを操作するためopenWorldHint:falseで統一。
 const READ_ANNOTATIONS: McpToolAnnotations = { readOnlyHint: true, openWorldHint: false };
 const CREATE_ANNOTATIONS: McpToolAnnotations = { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false };
@@ -87,6 +93,8 @@ export async function listAppMcpTools(db: Db, appId: string): Promise<McpTool[]>
 			inputSchema: toJsonSchema(LIST_ARGS_SCHEMA),
 			// structuredContentはMCP仕様上オブジェクトである必要がある（配列は一部クライアントのバリデーションで拒否される。
 			// 実機確認: Pydantic系クライアントで"structuredContent Input should be a valid dictionary"エラーになった）。
+			// 仕様: https://modelcontextprotocol.io/specification/2025-06-18/server/tools
+			// (structuredContent: `{ [key: string]: unknown }`。配列は型として許容されない)
 			outputSchema: toJsonSchema(z.object({ records: z.array(buildRecordOutputSchema(t.fields)) })),
 			annotations: READ_ANNOTATIONS,
 			_meta: RECORD_VIEW_META

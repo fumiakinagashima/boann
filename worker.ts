@@ -11,6 +11,12 @@
 // the OAuthProvider doesn't recognize as a valid OAuth API call (including the OAuth protocol's
 // own /oauth/token, /oauth/register, and everything else in the app) fall straight through to
 // the SvelteKit worker unchanged. See src/lib/server/mcp/oauth-config.ts for the routing design.
+//
+// The shape below (apiRoute/apiHandler/defaultHandler/*Endpoint options, the OAUTH_KV binding
+// name, and the defaultHandler-fallback-on-invalid-token behavior) is the library's own contract,
+// not something Boann invented: https://github.com/cloudflare/workers-oauth-provider
+// (see its README and dist/oauth-provider.d.ts, both in node_modules, for the authoritative
+// option list). The *values* passed in (routes, scope name, TTL) are Boann's own choices.
 import { OAuthProvider } from '@cloudflare/workers-oauth-provider';
 import { createDb } from './src/lib/server/db';
 import { processDueWorkflows } from './src/lib/server/workflow/run';
