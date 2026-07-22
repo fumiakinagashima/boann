@@ -7,6 +7,10 @@ export type WorkflowParamField = {
 	label: string;
 	type: 'text' | 'textarea' | 'number' | 'select' | 'date';
 	required?: boolean;
+	/** 未入力でも省略可能だが、UI上は常に表示しておきたい任意パラメータの場合true（「＋オプションを追加」の裏に隠さない） */
+	alwaysShow?: boolean;
+	/** trueの場合、保存時にJSON形式（preQuoteReferences適用後にJSON.parse可能）かどうかを検証する（run.tsが実行時にJSON.parseする値と同じ規則） */
+	jsonFormat?: boolean;
 	/** type: 'select' の場合の選択肢 */
 	options?: { value: string; label: string }[];
 };
@@ -124,7 +128,7 @@ export const WORKFLOW_ACTION_TOOLS: WorkflowActionToolDef[] = [
 					{ value: 'DELETE', label: 'DELETE' }
 				]
 			},
-			{ key: 'body', label: 'リクエストボディ（JSON形式、任意）', type: 'textarea' }
+			{ key: 'body', label: 'リクエストボディ（JSON形式）', type: 'textarea', alwaysShow: true, jsonFormat: true }
 		],
 		resultType: 'string',
 		resultDesc: 'レスポンスボディ全体（オブジェクトはJSON文字列化）。特定のフィールドが必要な場合は @step:<id>.<path> で参照する（例: @step:sef.data.id）',
@@ -263,6 +267,21 @@ export function resolveJsonPath(value: unknown, path: string): unknown {
 		}
 	}
 	return current;
+}
+
+/**
+ * data フィールド（JSON テキスト）内のクォートされていない @trigger:xxx / @step:xxx / @item:xxx / @self:xxx / @input:xxx 参照を
+ * クォートで囲んでから JSON.parse できるようにする。すでにクォート済みの場合は冪等。
+ * JSON値の位置（`:` の直後〜`,`/`}` の直前）にある場合のみ対象とし、既存の文字列値の中に
+ * 地の文として "@self:account_id" 等が含まれるケースを誤って壊さないようにする。
+ * run.ts（実行時の解決）とworkflow-validation.ts（保存時のJSON形式チェック）の両方から使うため、
+ * サーバー専用依存を持たないこのファイルに置く。
+ */
+export function preQuoteReferences(jsonStr: string): string {
+	return jsonStr.replace(
+		/:(\s*)(@(?:trigger|step|item|self|input):[a-zA-Z0-9_]+(?::[a-zA-Z0-9_]+)*)(\s*)([,}])/g,
+		':$1"$2"$3$4'
+	);
 }
 
 const RESULT_TYPE_LABELS: Record<WorkflowResultType, string> = {

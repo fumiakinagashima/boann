@@ -7,6 +7,7 @@ import {
 	parseInputRef,
 	entityListItemFields,
 	triggerFieldsFor,
+	preQuoteReferences,
 	SELF_ACCOUNT_ID_REF,
 	type WorkflowListResultField
 } from './workflow-tools';
@@ -237,6 +238,15 @@ export function validateWorkflow(
 				if (value) {
 					const resolved = resolveOperandType(value, visible, itemScopes, triggerFields, inputSchema);
 					if (!resolved.ok) errors.push(`「${step.label}」の「${field.label}」: ${resolved.error}`);
+					// run.tsの実行時パース（preQuoteReferences→JSON.parse）と同じ規則で、保存時点でも
+					// JSON形式かどうかを検証する（実行時まで気づかないのを防ぐ）。
+					if (field.jsonFormat) {
+						try {
+							JSON.parse(preQuoteReferences(value));
+						} catch {
+							errors.push(`「${step.label}」の「${field.label}」がJSON形式ではありません`);
+						}
+					}
 				}
 			}
 		} else if (step.kind === 'condition') {

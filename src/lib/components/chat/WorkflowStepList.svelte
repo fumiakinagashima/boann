@@ -175,8 +175,14 @@
 	// 任意パラメーターをユーザーが明示的に開いたもの（ステップID → パラメーターキーのSet）
 	let openedParams = $state<Record<string, Set<string>>>({});
 
-	function isParamShown(stepId: string, fieldKey: string, hasValue: boolean, required: boolean): boolean {
-		if (required) return true;
+	function isParamShown(
+		stepId: string,
+		fieldKey: string,
+		hasValue: boolean,
+		required: boolean,
+		alwaysShow: boolean
+	): boolean {
+		if (required || alwaysShow) return true;
 		if (hasValue) return true;
 		return openedParams[stepId]?.has(fieldKey) ?? false;
 	}
@@ -426,7 +432,7 @@
 					{#each tool.params as field (field.key)}
 						{@const fieldVal = step.params?.[field.key] ?? ''}
 						{@const hasValue = fieldVal !== '' && fieldVal != null}
-						{@const shown = isParamShown(step.id, field.key, hasValue, !!field.required)}
+						{@const shown = isParamShown(step.id, field.key, hasValue, !!field.required, !!field.alwaysShow)}
 						{#if shown}
 							<div class="wf-line wf-param" class:wf-param-optional={!field.required}>
 								<label for="wf-param-{step.id}-{field.key}">{field.label}</label>
@@ -488,7 +494,7 @@
 										}}
 									/>
 								{/if}
-								{#if editable && !field.required}
+								{#if editable && !field.required && !field.alwaysShow}
 									<button
 										class="wf-param-del"
 										onclick={() => closeParam(step, field.key)}
@@ -500,7 +506,7 @@
 					{/each}
 					{#if editable}
 						{@const hiddenOptional = tool.params.filter(
-							(f) => !isParamShown(step.id, f.key, !!(step.params?.[f.key] ?? '') , !!f.required)
+							(f) => !isParamShown(step.id, f.key, !!(step.params?.[f.key] ?? ''), !!f.required, !!f.alwaysShow)
 						)}
 						{#if hiddenOptional.length > 0}
 							<div class="wf-line wf-add-param">

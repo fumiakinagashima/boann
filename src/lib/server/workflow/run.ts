@@ -5,7 +5,7 @@ import { getEnabledWorkflows, getWorkflow, type WorkflowRow } from '../db/workfl
 import { recordWorkflowRun, type StepLog } from '../db/workflow-run-service';
 import { getAccount } from '../db/account-service';
 import { getJstHourMinute } from '$lib/datetime';
-import { getWorkflowActionTool, parseStepRef, parseItemRef, resolveJsonPath } from '$lib/workflow-tools';
+import { getWorkflowActionTool, parseStepRef, parseItemRef, resolveJsonPath, preQuoteReferences } from '$lib/workflow-tools';
 import { WORKFLOW_FOREACH_MAX_ITEMS, WORKFLOW_MAX_ACTIONS_PER_RUN, WORKFLOW_MAX_RETRIES, WORKFLOW_RETRY_DELAY_MS } from '$lib/constants';
 import { createRecordByEntityTypeId, updateRecordByEntityTypeId, deleteRecord } from '../db/table-service';
 import { getExternalApiConnection, callExternalApiConnection } from '../db/external-api-connection-service';
@@ -72,18 +72,9 @@ function coerceScalarResult(value: unknown): StepResult {
 	return { type: 'string', value: JSON.stringify(value) };
 }
 
-/**
- * data フィールド（JSON テキスト）内のクォートされていない @trigger:xxx / @step:xxx / @item:xxx / @self:xxx 参照を
- * クォートで囲んでから JSON.parse できるようにする。すでにクォート済みの場合は冪等。
- * JSON値の位置（`:` の直後〜`,`/`}` の直前）にある場合のみ対象とし、既存の文字列値の中に
- * 地の文として "@self:account_id" 等が含まれるケースを誤って壊さないようにする。
- */
-export function preQuoteReferences(jsonStr: string): string {
-	return jsonStr.replace(
-		/:(\s*)(@(?:trigger|step|item|self|input):[a-zA-Z0-9_]+(?::[a-zA-Z0-9_]+)*)(\s*)([,}])/g,
-		':$1"$2"$3$4'
-	);
-}
+// preQuoteReferences は $lib/workflow-tools（サーバー専用依存を持たない共有カタログ）に定義されている。
+// run.test.ts が従来 './run' からimportしているため、後方互換のためここで再エクスポートする。
+export { preQuoteReferences };
 
 /** JSON.parse 済みの data オブジェクト内の文字列値に含まれる @参照を解決する。 */
 function resolveDataValues(
