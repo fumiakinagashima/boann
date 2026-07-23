@@ -21,6 +21,8 @@ export type WorkflowRunRow = {
 	ok: boolean;
 	error: string | null;
 	log: StepLog[] | null;
+	/** set_resultアクションで組み立てられた結果オブジェクト。未使用のワークフローはnull。 */
+	result: Record<string, unknown> | null;
 	startedAt: Date;
 	finishedAt: Date;
 };
@@ -32,6 +34,7 @@ function toRow(r: typeof workflowRuns.$inferSelect): WorkflowRunRow {
 		ok: r.ok,
 		error: r.error,
 		log: r.log ? (JSON.parse(r.log) as StepLog[]) : null,
+		result: r.result ? (JSON.parse(r.result) as Record<string, unknown>) : null,
 		startedAt: r.startedAt,
 		finishedAt: r.finishedAt
 	};
@@ -39,7 +42,15 @@ function toRow(r: typeof workflowRuns.$inferSelect): WorkflowRunRow {
 
 export async function recordWorkflowRun(
 	db: Db,
-	input: { workflowId: string; ok: boolean; error?: string | null; log?: StepLog[]; startedAt: Date; finishedAt: Date }
+	input: {
+		workflowId: string;
+		ok: boolean;
+		error?: string | null;
+		log?: StepLog[];
+		result?: Record<string, unknown>;
+		startedAt: Date;
+		finishedAt: Date;
+	}
 ): Promise<void> {
 	await db.insert(workflowRuns).values({
 		id: crypto.randomUUID(),
@@ -47,6 +58,7 @@ export async function recordWorkflowRun(
 		ok: input.ok,
 		error: input.error ?? null,
 		log: input.log ? JSON.stringify(input.log) : null,
+		result: input.result && Object.keys(input.result).length > 0 ? JSON.stringify(input.result) : null,
 		startedAt: input.startedAt,
 		finishedAt: input.finishedAt
 	});

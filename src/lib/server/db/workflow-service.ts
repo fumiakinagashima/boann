@@ -196,7 +196,7 @@ function stepsReferenceEntityType(steps: WorkflowStep[], entityTypeId: string): 
 			if (step.tool === 'get_entities' && step.params?.entity_type_id === entityTypeId) return true;
 		} else if (step.kind === 'condition') {
 			if (stepsReferenceEntityType(step.then, entityTypeId)) return true;
-		} else {
+		} else if (step.kind === 'foreach') {
 			if (stepsReferenceEntityType(step.body, entityTypeId)) return true;
 		}
 	}

@@ -276,6 +276,7 @@ export async function handleRunWorkflow(db: Db, input: unknown, env?: ToolEnv) {
 		name: result.name,
 		ok: result.ok,
 		...(result.error ? { error: result.error } : {}),
+		...(Object.keys(result.result).length > 0 ? { result: result.result } : {}),
 		message: result.ok
 			? `ワークフロー「${result.name}」を実行しました。`
 			: `ワークフロー「${result.name}」の実行に失敗しました: ${result.error}`

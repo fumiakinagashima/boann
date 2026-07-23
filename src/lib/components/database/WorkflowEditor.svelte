@@ -82,6 +82,8 @@
 	let aiReviewError = $state('');
 
 	let runningNow = $state(false);
+	// 「今すぐ実行」の結果（set_resultで組み立てられたレスポンス）。表示用に整形してワークフローの下に出す。
+	let lastRunResult = $state<Record<string, unknown> | null>(null);
 
 	function collectInputArgs(inputSchema: FieldDef[]): Record<string, unknown> | null {
 		const inputArgs: Record<string, unknown> = {};
@@ -138,11 +140,17 @@
 				headers: hasBody ? { 'Content-Type': 'application/json' } : {},
 				body: hasBody ? JSON.stringify(body) : undefined
 			});
-			const result = (await res.json()) as { ok?: boolean; name?: string; error?: string };
+			const result = (await res.json()) as {
+				ok?: boolean;
+				name?: string;
+				error?: string;
+				result?: Record<string, unknown>;
+			};
 			if (!res.ok) {
 				toast.error(result.error ?? '実行に失敗しました');
 				return;
 			}
+			lastRunResult = result.result ?? {};
 			if (result.ok) {
 				toast.success(`「${result.name}」を実行しました`);
 			} else {
@@ -279,6 +287,13 @@
 		</div>
 	</div>
 
+	{#if lastRunResult}
+		<div class="run-result-box">
+			<div class="run-result-title">実行結果（レスポンス）</div>
+			<pre class="run-result-json">{JSON.stringify(lastRunResult, null, 2)}</pre>
+		</div>
+	{/if}
+
 	<!-- MCP専用フェーズのため実行ログUIは非表示（runs/toggleRunExpand等のロジックはそのまま維持） -->
 </div>
 
@@ -401,5 +416,35 @@
 
 	.editor-canvas {
 		flex: 1;
+	}
+
+	.run-result-box {
+		display: flex;
+		flex-direction: column;
+		gap: 6px;
+		padding: 14px 16px;
+		border: 1px solid var(--color-border);
+		border-radius: 8px;
+		background: var(--color-surface);
+	}
+
+	.run-result-title {
+		font-size: 0.75rem;
+		font-weight: 600;
+		color: var(--color-text-muted);
+	}
+
+	.run-result-json {
+		margin: 0;
+		padding: 10px 12px;
+		background: var(--color-background);
+		border: 1px solid var(--color-border);
+		border-radius: 6px;
+		font-family: ui-monospace, monospace;
+		font-size: 0.8125rem;
+		line-height: 1.6;
+		white-space: pre-wrap;
+		word-break: break-word;
+		overflow-x: auto;
 	}
 </style>

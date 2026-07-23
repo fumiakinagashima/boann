@@ -121,6 +121,13 @@ function sanitizeWorkflowSteps(steps: unknown): WorkflowStep[] {
 				body: sanitizeWorkflowSteps(step.body)
 			};
 		}
+		if (step.kind === 'result') {
+			return {
+				...step,
+				key: typeof step.key === 'string' ? step.key : String(step.key ?? ''),
+				value: typeof step.value === 'string' ? step.value : String(step.value ?? '')
+			};
+		}
 		return step;
 	});
 }

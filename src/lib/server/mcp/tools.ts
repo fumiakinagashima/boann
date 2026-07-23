@@ -83,7 +83,8 @@ export async function listAppMcpTools(db: Db, appId: string): Promise<McpTool[]>
 		name: `run_workflow_${w.id.slice(0, 8)}`,
 		description: w.description?.trim() || `ワークフロー「${w.name}」を実行する。`,
 		inputSchema: toJsonSchema(buildEntityDataSchema(w.inputSchema, 'create')),
-		outputSchema: toJsonSchema(z.object({ ok: z.boolean(), name: z.string() })),
+		// resultはset_resultアクションで組み立てられる任意のキー・値（未使用のワークフローは空オブジェクト）。
+		outputSchema: toJsonSchema(z.object({ ok: z.boolean(), name: z.string(), result: z.record(z.string(), z.unknown()) })),
 		annotations: WORKFLOW_ANNOTATIONS
 	}));
 	const tableTools = tables.flatMap((t) => [
@@ -175,7 +176,7 @@ async function callWorkflowMcpTool(
 
 	const result = await runWorkflowNow(db, workflow.id, env, undefined, parsed.data);
 	if (!result.ok) return toolError(result.error ?? '実行に失敗しました');
-	return toolOk({ ok: true, name: result.name });
+	return toolOk({ ok: true, name: result.name, result: result.result });
 }
 
 // TODO: 全ツール呼び出し（テーブルCRUD含む）のコールログを永続化したい（2026-07-21、ユーザー要望）。

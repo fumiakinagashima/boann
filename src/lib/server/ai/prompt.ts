@@ -325,6 +325,9 @@ function renderWorkflowStepsForAI(steps: WorkflowStep[], indent = ''): string {
 				const thenDesc = s.then.length > 0 ? `\n${renderWorkflowStepsForAI(s.then, `${indent}    `)}` : `${indent}    （なし）`;
 				return `${indent}- [${s.id}] condition「${s.label}」 ${s.left || '(未選択)'} ${s.operator} ${s.right || '(未入力)'}\n${indent}  YESの場合:${thenDesc}`;
 			}
+			if (s.kind === 'result') {
+				return `${indent}- [${s.id}] result「${s.label}」 key=${s.key || '(未入力)'} valueType=${s.valueType} value=${s.value || '(未入力)'}`;
+			}
 			const bodyDesc = s.body.length > 0 ? `\n${renderWorkflowStepsForAI(s.body, `${indent}    `)}` : `${indent}    （なし）`;
 			return `${indent}- [${s.id}] foreach「${s.label}」 対象=${s.source || '(未選択)'}\n${indent}  繰り返す内容:${bodyDesc}`;
 		})

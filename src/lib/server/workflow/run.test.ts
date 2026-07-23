@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { preQuoteReferences, compare, resolveOperand } from './run';
+import { preQuoteReferences, compare, resolveOperand, computeSetResultValue } from './run';
 
 describe('preQuoteReferences', () => {
 	it('quotes a bare reference used as a JSON value', () => {
@@ -43,6 +43,49 @@ describe('resolveOperand @input:', () => {
 
 	it('throws when no inputArgs were passed at all', () => {
 		expect(() => resolveOperand('@input:customer_name', new Map(), [], undefined, undefined, undefined)).toThrow('入力パラメータが指定されていません: customer_name');
+	});
+});
+
+describe('computeSetResultValue', () => {
+	it('resolves a scalar literal as-is', () => {
+		expect(computeSetResultValue('scalar', '東京', 'set', new Map(), [])).toBe('東京');
+	});
+
+	it('resolves a scalar @step reference', () => {
+		const results = new Map([['sef', { type: 'string' as const, value: '田中' }]]);
+		expect(computeSetResultValue('scalar', '@step:sef', 'set', results, [])).toBe('田中');
+	});
+
+	it('returns an empty string for an empty scalar value', () => {
+		expect(computeSetResultValue('scalar', '', 'set', new Map(), [])).toBe('');
+	});
+
+	it('resolves an array of literals and references, preserving order', () => {
+		const results = new Map([['sef', { type: 'number' as const, value: 42 }]]);
+		const out = computeSetResultValue('array', '["London", "@step:sef", "Dublin"]', 'set', results, []);
+		expect(out).toEqual(['London', 42, 'Dublin']);
+	});
+
+	it('resolves @item references inside an array', () => {
+		const itemStack = [{ foreachStepId: '1fw', item: { age: 30 } }];
+		const out = computeSetResultValue('array', '["@item:1fw:age"]', 'set', new Map(), itemStack);
+		expect(out).toEqual([30]);
+	});
+
+	it('throws when the array value is not valid JSON', () => {
+		expect(() => computeSetResultValue('array', 'not json', 'set', new Map(), [])).toThrow(
+			'「set」の値が配列形式ではありません'
+		);
+	});
+
+	it('throws when the array value parses but is not an array', () => {
+		expect(() => computeSetResultValue('array', '{"a":1}', 'set', new Map(), [])).toThrow(
+			'「set」の値は配列で指定してください'
+		);
+	});
+
+	it('defaults to an empty array when no value is given', () => {
+		expect(computeSetResultValue('array', '', 'set', new Map(), [])).toEqual([]);
 	});
 });
 

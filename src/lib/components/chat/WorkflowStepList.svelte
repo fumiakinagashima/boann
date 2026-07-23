@@ -89,7 +89,7 @@
 		return id;
 	}
 
-	function addStep(kind: 'action' | 'condition' | 'foreach') {
+	function addStep(kind: 'action' | 'condition' | 'foreach' | 'result') {
 		if (kind === 'action') {
 			steps.push({ id: makeId(), kind: 'action', label: '新しいアクション', tool: '', params: {} });
 		} else if (kind === 'condition') {
@@ -102,6 +102,8 @@
 				right: '',
 				then: []
 			});
+		} else if (kind === 'result') {
+			steps.push({ id: makeId(), kind: 'result', label: '新しいレスポンス設定', key: '', valueType: 'scalar', value: '' });
 		} else {
 			steps.push({ id: makeId(), kind: 'foreach', label: '新しい繰り返し', source: '', body: [] });
 		}
@@ -190,6 +192,40 @@
 	function openParam(stepId: string, key: string) {
 		if (!openedParams[stepId]) openedParams[stepId] = new Set();
 		openedParams[stepId] = new Set([...openedParams[stepId], key]);
+	}
+
+	// resultステップ専用: 「値」欄。valueTypeが'array'の場合、step.valueはJSON文字列化された
+	// 文字列配列として保持する（エディタが常に正しくクォートするため、run.ts側でJSON.parseするだけで良い）。
+	function parseResultArrayValue(raw: string | undefined): string[] {
+		if (!raw) return [''];
+		try {
+			const parsed = JSON.parse(raw);
+			return Array.isArray(parsed) && parsed.length > 0 ? parsed.map((v) => String(v)) : [''];
+		} catch {
+			return [''];
+		}
+	}
+
+	function writeResultArrayValue(step: { value: string }, items: string[]) {
+		step.value = JSON.stringify(items);
+	}
+
+	function updateResultArrayItem(step: { value: string }, index: number, value: string) {
+		const items = parseResultArrayValue(step.value);
+		items[index] = value;
+		writeResultArrayValue(step, items);
+	}
+
+	function addResultArrayItem(step: { value: string }) {
+		const items = parseResultArrayValue(step.value);
+		items.push('');
+		writeResultArrayValue(step, items);
+	}
+
+	function removeResultArrayItem(step: { value: string }, index: number) {
+		const items = parseResultArrayValue(step.value);
+		items.splice(index, 1);
+		writeResultArrayValue(step, items.length > 0 ? items : ['']);
 	}
 
 	function closeParam(step: { id: string; params?: Record<string, string> }, key: string) {
@@ -581,6 +617,68 @@
 						oninput={(e) => (step.right = e.currentTarget.value)}
 					/>
 				</div>
+			{:else if step.kind === 'result'}
+				<div class="wf-line wf-result-line">
+					<span class="wf-cond-label">キー:</span>
+					<input
+						type="text"
+						placeholder="レスポンスのキー名"
+						value={step.key}
+						disabled={!editable}
+						oninput={(e) => (step.key = e.currentTarget.value)}
+					/>
+					<select
+						value={step.valueType}
+						disabled={!editable}
+						onchange={(e) => {
+							step.valueType = e.currentTarget.value as typeof step.valueType;
+							step.value = '';
+						}}
+					>
+						<option value="scalar">スカラー</option>
+						<option value="array">配列</option>
+					</select>
+				</div>
+				<div class="wf-line wf-result-value">
+					<span class="wf-cond-label">値:</span>
+					{#if step.valueType === 'array'}
+						<div class="wf-result-array">
+							{#each parseResultArrayValue(step.value) as itemVal, idx (idx)}
+								<div class="wf-result-array-row">
+									<input
+										type="text"
+										value={itemVal}
+										disabled={!editable}
+										placeholder="直接入力 または @step:xxx 等"
+										oninput={(e) => updateResultArrayItem(step, idx, e.currentTarget.value)}
+									/>
+									{#if editable}
+										<button
+											type="button"
+											class="wf-param-del"
+											onclick={() => removeResultArrayItem(step, idx)}
+											title="この項目を削除"
+										>×</button>
+									{/if}
+								</div>
+							{/each}
+							{#if editable}
+								<button type="button" class="wf-result-array-add" onclick={() => addResultArrayItem(step)}>
+									+ 項目を追加
+								</button>
+							{/if}
+						</div>
+					{:else}
+						<input
+							type="text"
+							class="wf-result-scalar-input"
+							value={step.value}
+							disabled={!editable}
+							placeholder="直接入力 または @step:xxx 等"
+							oninput={(e) => (step.value = e.currentTarget.value)}
+						/>
+					{/if}
+				</div>
 			{:else}
 				<div class="wf-line wf-foreach-line">
 					<span class="wf-cond-label">対象:</span>
@@ -653,6 +751,7 @@
 			<button class="btn-add t-action" onclick={() => addStep('action')}>+ アクション</button>
 			<button class="btn-add t-condition" onclick={() => addStep('condition')}>+ 条件</button>
 			<button class="btn-add t-foreach" onclick={() => addStep('foreach')}>+ 繰り返し</button>
+			<button class="btn-add t-result" onclick={() => addStep('result')}>+ レスポンス</button>
 		</div>
 	{/if}
 </div>
@@ -676,6 +775,10 @@
 
 		&.t-foreach {
 			border-left-color: var(--color-info);
+		}
+
+		&.t-result {
+			border-left-color: #6366f1;
 		}
 
 		&.dragging {
@@ -797,6 +900,43 @@
 		background: none;
 		border: 1px dashed var(--color-border);
 		padding: 3px 8px;
+		cursor: pointer;
+		&:hover {
+			border-color: var(--color-primary);
+			color: var(--color-primary);
+		}
+	}
+
+	.wf-result-array {
+		display: flex;
+		flex-direction: column;
+		gap: 4px;
+		flex: 1 1 360px;
+	}
+
+	.wf-result-array-row {
+		display: flex;
+		align-items: center;
+		gap: 4px;
+		input[type='text'] {
+			min-width: 360px;
+			flex: 1 1 360px;
+		}
+	}
+
+	.wf-result-scalar-input {
+		min-width: 360px;
+		flex: 1 1 360px;
+	}
+
+	.wf-result-array-add {
+		align-self: flex-start;
+		font-size: 0.75rem;
+		color: var(--color-text-muted);
+		background: none;
+		border: 1px dashed var(--color-border);
+		padding: 3px 8px;
+		border-radius: 4px;
 		cursor: pointer;
 		&:hover {
 			border-color: var(--color-primary);
@@ -938,6 +1078,10 @@
 		&.t-foreach {
 			background: var(--color-info);
 			border-color: var(--color-info);
+		}
+		&.t-result {
+			background: #6366f1;
+			border-color: #6366f1;
 		}
 	}
 </style>

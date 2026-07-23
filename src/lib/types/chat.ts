@@ -171,7 +171,24 @@ export type WorkflowForeachStep = {
 	body: WorkflowStep[];
 };
 
-export type WorkflowStep = WorkflowActionStep | WorkflowConditionStep | WorkflowForeachStep;
+export type WorkflowResultValueType = 'scalar' | 'array';
+
+/**
+ * ワークフロー全体の実行結果（run_workflow_*のMCPレスポンス、「今すぐ実行」の結果表示）にキーをセットする。
+ * 同じキーを複数回セットすると後に実行された方で上書きされる。
+ * valueTypeが'array'の場合、valueはJSON.stringifyされた文字列配列（各要素は@step:/@item:等の参照 or 直接入力）。
+ * オブジェクト型（ネスト）は現状非対応。
+ */
+export type WorkflowResultStep = {
+	id: string;
+	kind: 'result';
+	label: string;
+	key: string;
+	valueType: WorkflowResultValueType;
+	value: WorkflowOperand;
+};
+
+export type WorkflowStep = WorkflowActionStep | WorkflowConditionStep | WorkflowForeachStep | WorkflowResultStep;
 
 export type WorkflowContent = {
 	type: 'workflow';

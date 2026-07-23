@@ -59,6 +59,40 @@ function sleep(ms: number): Promise<void> {
 	return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+/** set_resultが組み立てる、ワークフロー実行全体の結果オブジェクト（run_workflow_*のMCPレスポンス・「今すぐ実行」の結果表示に使う）。 */
+type ResultObject = Record<string, unknown>;
+
+/**
+ * set_resultの value フィールドを解決する。scalarは単一のoperand（@step:等の参照も可）、
+ * arrayはJSON配列（文字列要素のみ@refとして解決、それ以外はそのまま）。
+ * エディタが書き込むvalue（配列時はJSON.stringifyされた文字列配列）を前提にしており、
+ * preQuoteReferences相当のクォート補完は不要（エディタが常に正しくクォートされたJSONを書く）。
+ */
+export function computeSetResultValue(
+	valueType: 'scalar' | 'array',
+	rawValue: string,
+	label: string,
+	results: Map<string, StepResult>,
+	itemStack: ItemStack,
+	triggerContext?: TriggerContext,
+	self?: SelfContext,
+	inputArgs?: Record<string, unknown>
+): unknown {
+	if (valueType === 'array') {
+		let items: unknown[];
+		try {
+			items = JSON.parse(rawValue || '[]');
+		} catch {
+			throw new WorkflowAbortError(`「${label}」の値が配列形式ではありません`);
+		}
+		if (!Array.isArray(items)) throw new WorkflowAbortError(`「${label}」の値は配列で指定してください`);
+		return items.map((v) =>
+			typeof v === 'string' ? resolveOperand(v, results, itemStack, triggerContext, self, inputArgs).value : v
+		);
+	}
+	return rawValue ? resolveOperand(rawValue, results, itemStack, triggerContext, self, inputArgs).value : '';
+}
+
 /**
  * call_external_apiのレスポンスボディ(結果を格納する時)や`@step:<id>.<path>`参照でresolveJsonPathが
  * 取り出した値(型不明)をStepResultへ変換する。boolean/number/string以外(オブジェクト・配列・
@@ -398,6 +432,7 @@ async function runForeach(
 	itemStack: ItemStack,
 	budget: Budget,
 	logs: StepLog[],
+	resultObj: ResultObject,
 	triggerContext?: TriggerContext,
 	inputArgs?: Record<string, unknown>
 ): Promise<void> {
@@ -405,7 +440,7 @@ async function runForeach(
 	if (!stepRef) throw new WorkflowAbortError(`「${step.label}」の対象が選択されていません`);
 	const items = resolveForeachSource(stepRef, step.label, results, listResults);
 	for (const item of items.slice(0, WORKFLOW_FOREACH_MAX_ITEMS)) {
-		await runSteps(db, step.body, results, listResults, env, self, [...itemStack, { foreachStepId: step.id, item }], budget, logs, triggerContext, inputArgs);
+		await runSteps(db, step.body, results, listResults, env, self, [...itemStack, { foreachStepId: step.id, item }], budget, logs, resultObj, triggerContext, inputArgs);
 	}
 }
 
@@ -419,6 +454,7 @@ async function runSteps(
 	itemStack: ItemStack = [],
 	budget: Budget = { remaining: WORKFLOW_MAX_ACTIONS_PER_RUN },
 	logs: StepLog[] = [],
+	resultObj: ResultObject = {},
 	triggerContext?: TriggerContext,
 	inputArgs?: Record<string, unknown>
 ): Promise<void> {
@@ -447,15 +483,27 @@ async function runSteps(
 				throw e;
 			}
 			if (matched) {
-				await runSteps(db, step.then, results, listResults, env, self, itemStack, budget, logs, triggerContext, inputArgs);
+				await runSteps(db, step.then, results, listResults, env, self, itemStack, budget, logs, resultObj, triggerContext, inputArgs);
+			}
+		} else if (step.kind === 'result') {
+			const start = Date.now();
+			try {
+				consumeBudget(budget);
+				if (!step.key) throw new WorkflowAbortError(`「${step.label}」のキー名が指定されていません`);
+				resultObj[step.key] = computeSetResultValue(step.valueType, step.value, step.label, results, itemStack, triggerContext, self, inputArgs);
+				logs.push({ id: step.id, label: step.label, ok: true, result: `「${step.key}」をセットしました`, ms: Date.now() - start });
+			} catch (e) {
+				const error = e instanceof Error ? e.message : String(e);
+				logs.push({ id: step.id, label: step.label, ok: false, error, ms: Date.now() - start });
+				throw e;
 			}
 		} else {
-			await runForeach(db, step, results, listResults, env, self, itemStack, budget, logs, triggerContext, inputArgs);
+			await runForeach(db, step, results, listResults, env, self, itemStack, budget, logs, resultObj, triggerContext, inputArgs);
 		}
 	}
 }
 
-export type WorkflowRunResult = { id: string; name: string; ok: boolean; error?: string };
+export type WorkflowRunResult = { id: string; name: string; ok: boolean; error?: string; result: ResultObject };
 
 const WORKFLOW_RUN_LOCK_PREFIX = 'workflow-run-lock:';
 /**
@@ -489,11 +537,13 @@ async function executeWorkflow(db: Db, workflow: WorkflowRow, env?: ToolEnv, tri
 			id: workflow.id,
 			name: workflow.name,
 			ok: false,
-			error: '他の処理がこのワークフローを実行中のため今回はスキップしました。しばらく待ってから再度お試しください'
+			error: '他の処理がこのワークフローを実行中のため今回はスキップしました。しばらく待ってから再度お試しください',
+			result: {}
 		};
 	}
 	const startedAt = new Date();
 	const logs: StepLog[] = [];
+	const resultObj: ResultObject = {};
 	try {
 		const account = workflow.accountId ? await getAccount(db, workflow.accountId) : null;
 		// send_notification 等、env.accountId を「通知・登録の宛先」として参照するツールのために、
@@ -502,13 +552,13 @@ async function executeWorkflow(db: Db, workflow: WorkflowRow, env?: ToolEnv, tri
 			? { ...(env ?? {}), accountId: workflow.accountId }
 			: env;
 		const self: SelfContext = { email: account?.email ?? null, accountId: workflow.accountId ?? null };
-		await runSteps(db, workflow.steps, new Map(), new Map(), toolEnv, self, [], { remaining: WORKFLOW_MAX_ACTIONS_PER_RUN }, logs, triggerContext, inputArgs);
-		await recordWorkflowRun(db, { workflowId: workflow.id, ok: true, log: logs, startedAt, finishedAt: new Date() });
-		return { id: workflow.id, name: workflow.name, ok: true };
+		await runSteps(db, workflow.steps, new Map(), new Map(), toolEnv, self, [], { remaining: WORKFLOW_MAX_ACTIONS_PER_RUN }, logs, resultObj, triggerContext, inputArgs);
+		await recordWorkflowRun(db, { workflowId: workflow.id, ok: true, log: logs, result: resultObj, startedAt, finishedAt: new Date() });
+		return { id: workflow.id, name: workflow.name, ok: true, result: resultObj };
 	} catch (e) {
 		const error = e instanceof Error ? e.message : String(e);
-		await recordWorkflowRun(db, { workflowId: workflow.id, ok: false, error, log: logs, startedAt, finishedAt: new Date() });
-		return { id: workflow.id, name: workflow.name, ok: false, error };
+		await recordWorkflowRun(db, { workflowId: workflow.id, ok: false, error, log: logs, result: resultObj, startedAt, finishedAt: new Date() });
+		return { id: workflow.id, name: workflow.name, ok: false, error, result: resultObj };
 	} finally {
 		await releaseRunLock(env?.KV, workflow.id);
 	}

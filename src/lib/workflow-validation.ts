@@ -66,7 +66,7 @@ function walk(steps: WorkflowStep[], visibleBefore: VisibleStep[], out: Map<stri
 		} else if (step.kind === 'condition') {
 			walk(step.then, visible, out);
 			// then を抜けた後は、then 内で作られた結果を見せない（visible はここでは更新しない）
-		} else {
+		} else if (step.kind === 'foreach') {
 			walk(step.body, visible, out);
 			// body を抜けた後は、body 内で作られた結果を見せない（visible はここでは更新しない）
 		}
@@ -110,7 +110,7 @@ function walkList(
 			// `@step:<id>.<path>`（パス指定）で参照する場合はcheckStepのforeach分岐で別途許可している。
 		} else if (step.kind === 'condition') {
 			walkList(step.then, visible, out, entityTypes);
-		} else {
+		} else if (step.kind === 'foreach') {
 			walkList(step.body, visible, out, entityTypes);
 		}
 	}
@@ -274,6 +274,27 @@ export function validateWorkflow(
 				errors.push(`「${step.label}」のYes時の処理が1つもありません`);
 			}
 			for (const child of step.then) checkStep(child, itemScopes);
+		} else if (step.kind === 'result') {
+			if (!step.key) {
+				errors.push(`「${step.label}」のキー名が未入力です`);
+			}
+			if (!step.value) {
+				errors.push(`「${step.label}」の値が未入力です`);
+			} else if (step.valueType === 'array') {
+				// エディタは常にJSON.stringifyされた文字列配列を書き込むため、それ以外（AI生成データ等）は保存時点で弾く
+				let parsedArray: unknown;
+				try {
+					parsedArray = JSON.parse(step.value);
+				} catch {
+					parsedArray = undefined;
+				}
+				if (!Array.isArray(parsedArray) || !parsedArray.every((v) => typeof v === 'string')) {
+					errors.push(`「${step.label}」の値は文字列の配列（JSON形式）で指定してください`);
+				}
+			} else {
+				const resolved = resolveOperandType(step.value, visible, itemScopes, triggerFields, inputSchema);
+				if (!resolved.ok) errors.push(`「${step.label}」の値: ${resolved.error}`);
+			}
 		} else {
 			const stepRef = parseStepRef(step.source);
 			const listVisible = listVisibility.get(step.id) ?? [];
