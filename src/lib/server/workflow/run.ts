@@ -5,7 +5,7 @@ import { getEnabledWorkflows, getWorkflow, type WorkflowRow } from '../db/workfl
 import { recordWorkflowRun, type StepLog } from '../db/workflow-run-service';
 import { getAccount } from '../db/account-service';
 import { getJstHourMinute } from '$lib/datetime';
-import { getWorkflowActionTool, parseStepRef, parseItemRef, resolveJsonPath, preQuoteReferences, isReferenceOperand } from '$lib/workflow-tools';
+import { getWorkflowActionTool, parseStepRef, parseItemRef, resolveJsonPath, preQuoteReferences, isReferenceOperand, setResultPath } from '$lib/workflow-tools';
 import { WORKFLOW_FOREACH_MAX_ITEMS, WORKFLOW_MAX_ACTIONS_PER_RUN, WORKFLOW_MAX_RETRIES, WORKFLOW_RETRY_DELAY_MS } from '$lib/constants';
 import { createRecordByEntityTypeId, updateRecordByEntityTypeId, deleteRecord } from '../db/table-service';
 import { getExternalApiConnection, callExternalApiConnection } from '../db/external-api-connection-service';
@@ -490,7 +490,7 @@ async function runSteps(
 			try {
 				consumeBudget(budget);
 				if (!step.key) throw new WorkflowAbortError(`「${step.label}」のキー名が指定されていません`);
-				resultObj[step.key] = computeSetResultValue(step.valueType, step.value, step.label, results, itemStack, triggerContext, self, inputArgs);
+				setResultPath(resultObj, step.key, computeSetResultValue(step.valueType, step.value, step.label, results, itemStack, triggerContext, self, inputArgs));
 				logs.push({ id: step.id, label: step.label, ok: true, result: `「${step.key}」をセットしました`, ms: Date.now() - start });
 			} catch (e) {
 				const error = e instanceof Error ? e.message : String(e);

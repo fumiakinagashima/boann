@@ -277,6 +277,9 @@ export function validateWorkflow(
 		} else if (step.kind === 'result') {
 			if (!step.key) {
 				errors.push(`「${step.label}」のキー名が未入力です`);
+			} else if (step.key.split('.').some((seg) => !seg)) {
+				// キーはドット区切りでネストを表す（例: "user.name"）。空のセグメント（先頭・末尾のドット、連続するドット）は不正。
+				errors.push(`「${step.label}」のキー名の形式が不正です（空のセグメントは使えません）`);
 			}
 			if (!step.value) {
 				errors.push(`「${step.label}」の値が未入力です`);

@@ -270,10 +270,31 @@ export function resolveJsonPath(value: unknown, path: string): unknown {
 }
 
 /**
+ * resultステップのkeyをドット区切り（例: "user.name"）でネストとして解釈し、targetの中にオブジェクトを
+ * 掘り進めながら値をセットする。中間パスに既に値があり、それがプレーンオブジェクトでない場合
+ * （スカラー・配列・未設定）は新しいオブジェクトで置き換える——同じキーへの再セットは後勝ちで上書きする、
+ * という既存の（ネストしていない場合の）方針をネストにも一貫して適用したもの。
+ * オブジェクト型（ネストしたキーの直接指定）自体は非対応のまま、キー側のドット記法だけでネストを表現する。
+ */
+export function setResultPath(target: Record<string, unknown>, key: string, value: unknown): void {
+	const segments = key.split('.');
+	let current = target;
+	for (let i = 0; i < segments.length - 1; i++) {
+		const seg = segments[i];
+		const existing = current[seg];
+		if (!existing || typeof existing !== 'object' || Array.isArray(existing)) {
+			current[seg] = {};
+		}
+		current = current[seg] as Record<string, unknown>;
+	}
+	current[segments[segments.length - 1]] = value;
+}
+
+/**
  * ワークフロービルダーで、実行せずに「resultステップで何が組み立てられるか」をその場でプレビューするための
  * 静的な組み立て（実行時のrun.ts resolveOperandとは異なり、@step:等の参照は解決せずトークンのまま載せる）。
  * condition/foreachの中のresultステップも辿るが、実際にその分岐・繰り返しが実行されるかは考慮しない
- * （あくまで「このワークフローにどんなresultステップがあるか」の見取り図）。同じキーは後勝ちで上書きする。
+ * （あくまで「このワークフローにどんなresultステップがあるか」の見取り図）。
  */
 export function buildResultPreview(steps: WorkflowStep[]): Record<string, unknown> {
 	const out: Record<string, unknown> = {};
@@ -281,16 +302,18 @@ export function buildResultPreview(steps: WorkflowStep[]): Record<string, unknow
 		for (const step of list) {
 			if (step.kind === 'result') {
 				if (!step.key) continue;
+				let value: unknown;
 				if (step.valueType === 'array') {
 					try {
 						const parsed = JSON.parse(step.value || '[]');
-						out[step.key] = Array.isArray(parsed) ? parsed : step.value;
+						value = Array.isArray(parsed) ? parsed : step.value;
 					} catch {
-						out[step.key] = step.value;
+						value = step.value;
 					}
 				} else {
-					out[step.key] = step.value;
+					value = step.value;
 				}
+				setResultPath(out, step.key, value);
 			} else if (step.kind === 'condition') {
 				walk(step.then);
 			} else if (step.kind === 'foreach') {
@@ -309,6 +332,13 @@ function formatPreviewValue(value: unknown, indent: string): string {
 		const inner = value.map((v) => `${indent}  ${formatPreviewValue(v, `${indent}  `)}`).join(',\n');
 		return `[\n${inner}\n${indent}]`;
 	}
+	if (value !== null && typeof value === 'object') {
+		const obj = value as Record<string, unknown>;
+		const keys = Object.keys(obj);
+		if (keys.length === 0) return '{}';
+		const inner = keys.map((k) => `${indent}  ${JSON.stringify(k)}: ${formatPreviewValue(obj[k], `${indent}  `)}`).join(',\n');
+		return `{\n${inner}\n${indent}}`;
+	}
 	return JSON.stringify(value);
 }
 
@@ -317,10 +347,7 @@ function formatPreviewValue(value: unknown, indent: string): string {
  * （実際の値ではなく式であることが分かるようにするための表示専用フォーマットで、構文的に有効なJSONではない）。
  */
 export function formatResultPreview(preview: Record<string, unknown>): string {
-	const keys = Object.keys(preview);
-	if (keys.length === 0) return '{}';
-	const inner = keys.map((k) => `  ${JSON.stringify(k)}: ${formatPreviewValue(preview[k], '  ')}`).join(',\n');
-	return `{\n${inner}\n}`;
+	return formatPreviewValue(preview, '');
 }
 
 /**

@@ -10,6 +10,11 @@ const STEP_REF_SEMANTICS_NOTE =
 const ITEM_REF_SEMANTICS_NOTE =
 	'`foreach` ステップのsourceには、listResultを持つ先行アクションの一覧（@step:<id>）を指定する。call_external_apiの結果は静的なlistResultを持たないため、代わりに `@step:<id>.<path>` でレスポンス内の配列を直接指定する（例: `@step:sfw.data.items`）。body内では `@item:<foreachのid>:<field>` で現在処理中の項目のフィールドを参照する（fieldはツールのlistResultが提供するitemFieldsのキー。call_external_api由来の配列はフィールド構成が事前にわからないため、要素がオブジェクトならそのキー、オブジェクトでない値の並びなら`value`を指定する）。foreachのidを省略した `@item:<field>` 形式も使えるが、その場合は最も内側のforeachを指す。foreachをネストする場合、内側のbodyから外側のforeachの項目を参照するには外側のforeachのidを含む形式が必須（省略すると内側のforeachを指してしまい外側の項目にアクセスできない）。body内の結果・@itemはbodyの外からは参照できない（条件のthenと同じスコープ規則）。暴走防止のため、1回の実行で先頭から最大50件までしか処理しない仕様（while相当の無限ループは提供しない）。';
 
+// レビューAI・チャットアシスタントAI・メインチャット共通: resultステップ（ワークフロー全体の実行結果=run_workflow_*のMCPレスポンス、
+// および「今すぐ実行」の結果表示に載せる値）の解決ルールの説明。
+const RESULT_STEP_SEMANTICS_NOTE =
+	'keyで指定したキーに、valueType（"scalar"または"array"）に応じた値をセットする。valueTypeが"scalar"の場合、valueは@step:/@item:等の参照1個、または直接入力した文字列。valueTypeが"array"の場合、valueは文字列配列をJSON.stringifyした文字列（例: `["東京","大阪"]` や `["@step:sef"]`、各要素は参照または直接入力した文字列）。オブジェクト型は直接指定できないが、keyをドット区切り（例: "user.name"）にするとネストしたオブジェクトとして組み立てられる（例: keyが"user.id"と"user.name"の2つのresultステップを置くと `{"user":{"id":"...","name":"..."}}` になる）。同じkeyに複数回セットすると後に実行された方（ネストの場合は同じパスの末端）が上書きする。';
+
 export const SYSTEM_PROMPT = `あなたはBoannというノーコードアプリ作成・業務管理プラットフォームのアシスタントです。
 ユーザーの業務指示を日本語で受け取り、適切なツールを使ってカスタムテーブルの構築・データの登録・取得・更新を行います（新規アプリそのものの作成はユーザーがUIから行うため、AIチャットの役割ではありません）。
 
@@ -146,10 +151,11 @@ get_help の結果を受け取ったら、見やすく整理して日本語で�
 </ui>
 一方、依頼に具体的なトリガー時刻・処理内容が既に含まれている場合は、質問せず下記の通り実際のステップ構成を組み立てて提案する（空にしない）。
 
-**steps（配列、上から順に実行）の要素は3種類:**
+**steps（配列、上から順に実行）の要素は4種類:**
 - \`action\`: \`{"id":"s1","kind":"action","label":"...","tool":"...","params":{...}}\`
 - \`condition\`: \`{"id":"s2","kind":"condition","label":"...","left":"...","operator":"==","right":"...","then":[...]}\`（\`then\` 配列はYesの場合のみ実行。elseは存在しないため、必要なら別の condition ステップとして並べる）
 - \`foreach\`: \`{"id":"s3","kind":"foreach","label":"...","source":"@step:<id>","body":[...]}\`（listResultを持つ先行actionの一覧を1件ずつ処理する。while相当の無限ループは提供しない）
+- \`result\`: \`{"id":"s4","kind":"result","label":"...","key":"...","valueType":"scalar","value":"..."}\`（${RESULT_STEP_SEMANTICS_NOTE}）
 
 **id**: ステップごとに一意な文字列（s1, s2... で連番でよい）。他のステップから結果を参照する際のキーになる。
 
@@ -383,12 +389,13 @@ export function buildWorkflowChatSystemPrompt(current: {
 	return `あなたはBoannというノーコードアプリプラットフォームの「ワークフロー」（スケジュールまたはイベントで起動する自動化フロー）作成を専門にサポートするAIアシスタントです。画面右側のエディタと連動しており、あなたが提案した内容はそのまま右側に反映されます。
 
 ## 役目
-ユーザーとの会話から、トリガー設定とステップ構成（action/condition）を組み立てて提案する。ワークフロー作成・編集に関係のない質問には対応せず、ワークフロー作成の話題に戻すよう促す。
+ユーザーとの会話から、トリガー設定とステップ構成（action/condition/foreach/result）を組み立てて提案する。ワークフロー作成・編集に関係のない質問には対応せず、ワークフロー作成の話題に戻すよう促す。
 
-## steps（配列、上から順に実行）の要素は3種類
+## steps（配列、上から順に実行）の要素は4種類
 - action: \`{"id":"s1","kind":"action","label":"...","tool":"...","params":{...}}\`
 - condition: \`{"id":"s2","kind":"condition","label":"...","left":"...","operator":"==","right":"...","then":[...]}\`（thenはYesの場合のみ実行。elseは存在しないため、必要なら別のconditionステップとして並べる）
 - foreach: \`{"id":"s3","kind":"foreach","label":"...","source":"@step:<id>","body":[...]}\`（listResultを持つ先行actionの一覧を1件ずつ処理する。while相当の無限ループは提供しない）
+- result: \`{"id":"s4","kind":"result","label":"...","key":"...","valueType":"scalar","value":"..."}\`（${RESULT_STEP_SEMANTICS_NOTE}）
 
 id はステップごとに一意な文字列（s1, s2... で連番でよい）。
 

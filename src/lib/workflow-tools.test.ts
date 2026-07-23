@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { buildResultPreview, formatResultPreview, isReferenceOperand } from './workflow-tools';
+import { buildResultPreview, formatResultPreview, isReferenceOperand, setResultPath } from './workflow-tools';
 import type { WorkflowStep } from './types/chat';
 
 describe('buildResultPreview', () => {
@@ -60,6 +60,41 @@ describe('buildResultPreview', () => {
 		];
 		expect(buildResultPreview(steps)).toEqual({ name: 'second' });
 	});
+
+	it('nests a dot-separated key into an object', () => {
+		const steps: WorkflowStep[] = [
+			{ id: 'r1', kind: 'result', label: 'a', key: 'user.id', valueType: 'scalar', value: '123' },
+			{ id: 'r2', kind: 'result', label: 'b', key: 'user.name', valueType: 'scalar', value: 'myname' }
+		];
+		expect(buildResultPreview(steps)).toEqual({ user: { id: '123', name: 'myname' } });
+	});
+});
+
+describe('setResultPath', () => {
+	it('sets a top-level key', () => {
+		const target: Record<string, unknown> = {};
+		setResultPath(target, 'name', 'test');
+		expect(target).toEqual({ name: 'test' });
+	});
+
+	it('builds intermediate objects for a nested key', () => {
+		const target: Record<string, unknown> = {};
+		setResultPath(target, 'key2.id', '123');
+		setResultPath(target, 'key2.name', 'myname');
+		expect(target).toEqual({ key2: { id: '123', name: 'myname' } });
+	});
+
+	it('overwrites a non-object value found along the path', () => {
+		const target: Record<string, unknown> = { key2: 'scalar-already-here' };
+		setResultPath(target, 'key2.id', '123');
+		expect(target).toEqual({ key2: { id: '123' } });
+	});
+
+	it('overwrites a nested object when the same key is later set as a plain scalar', () => {
+		const target: Record<string, unknown> = { key2: { id: '123' } };
+		setResultPath(target, 'key2', 'now a scalar');
+		expect(target).toEqual({ key2: 'now a scalar' });
+	});
 });
 
 describe('isReferenceOperand', () => {
@@ -95,5 +130,10 @@ describe('formatResultPreview', () => {
 
 	it('renders an empty array compactly', () => {
 		expect(formatResultPreview({ list: [] })).toBe('{\n  "list": []\n}');
+	});
+
+	it('renders a nested object with indentation, unquoting reference tokens at any depth', () => {
+		const out = formatResultPreview({ user: { id: '@step:sef', name: '田中' } });
+		expect(out).toBe('{\n  "user": {\n    "id": @step:sef,\n    "name": "田中"\n  }\n}');
 	});
 });

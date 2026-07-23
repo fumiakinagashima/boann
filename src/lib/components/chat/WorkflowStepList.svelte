@@ -624,7 +624,7 @@
 					<span class="wf-cond-label">キー:</span>
 					<input
 						type="text"
-						placeholder="レスポンスのキー名"
+						placeholder="レスポンスのキー名（例: user.name でネスト）"
 						value={step.key}
 						disabled={!editable}
 						oninput={(e) => (step.key = e.currentTarget.value)}
