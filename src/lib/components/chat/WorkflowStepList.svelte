@@ -110,6 +110,8 @@
 	}
 
 	function removeStep(index: number) {
+		const step = steps[index];
+		if (!confirm(`「${step.label}」を削除します。よろしいですか？`)) return;
 		steps.splice(index, 1);
 	}
 

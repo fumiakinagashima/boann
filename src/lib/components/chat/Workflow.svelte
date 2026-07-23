@@ -161,7 +161,7 @@
 
 	{#if hasResultPreview}
 		<div class="wf-result-preview">
-			<div class="wf-result-preview-title">レスポンスのプレビュー（未実行、設定値そのまま）</div>
+			<div class="wf-result-preview-title">結果プレビュー</div>
 			<pre class="wf-result-preview-json">{formatResultPreview(resultPreview)}</pre>
 		</div>
 	{/if}
