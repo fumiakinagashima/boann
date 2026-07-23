@@ -1,6 +1,6 @@
 // ワークフローの「アクション」ステップで選択できるツールのカタログ。
 // クライアント（編集UI）・サーバー（実行エンジン）の両方から参照するため、DB等のサーバー専用依存は持たない。
-import type { WorkflowResultType } from './types/chat';
+import type { WorkflowResultType, WorkflowStep } from './types/chat';
 
 export type WorkflowParamField = {
 	key: string;
@@ -270,6 +270,60 @@ export function resolveJsonPath(value: unknown, path: string): unknown {
 }
 
 /**
+ * ワークフロービルダーで、実行せずに「resultステップで何が組み立てられるか」をその場でプレビューするための
+ * 静的な組み立て（実行時のrun.ts resolveOperandとは異なり、@step:等の参照は解決せずトークンのまま載せる）。
+ * condition/foreachの中のresultステップも辿るが、実際にその分岐・繰り返しが実行されるかは考慮しない
+ * （あくまで「このワークフローにどんなresultステップがあるか」の見取り図）。同じキーは後勝ちで上書きする。
+ */
+export function buildResultPreview(steps: WorkflowStep[]): Record<string, unknown> {
+	const out: Record<string, unknown> = {};
+	function walk(list: WorkflowStep[]) {
+		for (const step of list) {
+			if (step.kind === 'result') {
+				if (!step.key) continue;
+				if (step.valueType === 'array') {
+					try {
+						const parsed = JSON.parse(step.value || '[]');
+						out[step.key] = Array.isArray(parsed) ? parsed : step.value;
+					} catch {
+						out[step.key] = step.value;
+					}
+				} else {
+					out[step.key] = step.value;
+				}
+			} else if (step.kind === 'condition') {
+				walk(step.then);
+			} else if (step.kind === 'foreach') {
+				walk(step.body);
+			}
+		}
+	}
+	walk(steps);
+	return out;
+}
+
+function formatPreviewValue(value: unknown, indent: string): string {
+	if (isReferenceOperand(value)) return value;
+	if (Array.isArray(value)) {
+		if (value.length === 0) return '[]';
+		const inner = value.map((v) => `${indent}  ${formatPreviewValue(v, `${indent}  `)}`).join(',\n');
+		return `[\n${inner}\n${indent}]`;
+	}
+	return JSON.stringify(value);
+}
+
+/**
+ * buildResultPreviewの結果を表示用に整形する。@step:等の参照トークンはダブルクォートで囲まない
+ * （実際の値ではなく式であることが分かるようにするための表示専用フォーマットで、構文的に有効なJSONではない）。
+ */
+export function formatResultPreview(preview: Record<string, unknown>): string {
+	const keys = Object.keys(preview);
+	if (keys.length === 0) return '{}';
+	const inner = keys.map((k) => `  ${JSON.stringify(k)}: ${formatPreviewValue(preview[k], '  ')}`).join(',\n');
+	return `{\n${inner}\n}`;
+}
+
+/**
  * data フィールド（JSON テキスト）内のクォートされていない @trigger:xxx / @step:xxx / @item:xxx / @self:xxx / @input:xxx 参照を
  * クォートで囲んでから JSON.parse できるようにする。すでにクォート済みの場合は冪等。
  * JSON値の位置（`:` の直後〜`,`/`}` の直前）にある場合のみ対象とし、既存の文字列値の中に
@@ -314,6 +368,13 @@ export const WORKFLOW_OPERATORS: { value: string; label: string }[] = [
 	{ value: '>=', label: '≧' },
 	{ value: '<=', label: '≦' }
 ];
+
+const REFERENCE_PREFIXES = ['@trigger:', '@step:', '@item:', '@self:', '@input:'] as const;
+
+/** 値が@trigger:/@step:/@item:/@self:/@input:のいずれかの参照記法かどうか。 */
+export function isReferenceOperand(value: unknown): value is string {
+	return typeof value === 'string' && REFERENCE_PREFIXES.some((p) => value.startsWith(p));
+}
 
 const STEP_REF_PREFIX = '@step:';
 

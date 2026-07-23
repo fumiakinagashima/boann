@@ -5,7 +5,7 @@ import { getEnabledWorkflows, getWorkflow, type WorkflowRow } from '../db/workfl
 import { recordWorkflowRun, type StepLog } from '../db/workflow-run-service';
 import { getAccount } from '../db/account-service';
 import { getJstHourMinute } from '$lib/datetime';
-import { getWorkflowActionTool, parseStepRef, parseItemRef, resolveJsonPath, preQuoteReferences } from '$lib/workflow-tools';
+import { getWorkflowActionTool, parseStepRef, parseItemRef, resolveJsonPath, preQuoteReferences, isReferenceOperand } from '$lib/workflow-tools';
 import { WORKFLOW_FOREACH_MAX_ITEMS, WORKFLOW_MAX_ACTIONS_PER_RUN, WORKFLOW_MAX_RETRIES, WORKFLOW_RETRY_DELAY_MS } from '$lib/constants';
 import { createRecordByEntityTypeId, updateRecordByEntityTypeId, deleteRecord } from '../db/table-service';
 import { getExternalApiConnection, callExternalApiConnection } from '../db/external-api-connection-service';
@@ -121,7 +121,7 @@ function resolveDataValues(
 ): Record<string, unknown> {
 	const out: Record<string, unknown> = {};
 	for (const [k, v] of Object.entries(data)) {
-		if (typeof v === 'string' && (v.startsWith('@trigger:') || v.startsWith('@step:') || v.startsWith('@item:') || v.startsWith('@self:') || v.startsWith('@input:'))) {
+		if (isReferenceOperand(v)) {
 			out[k] = resolveOperand(v, results, itemStack, triggerContext, self, inputArgs).value;
 		} else {
 			out[k] = v;

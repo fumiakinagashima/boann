@@ -4,7 +4,7 @@
 	import type { EntityTypeForWorkflow, FieldDef, EditableField } from '$lib/server/db/table-service';
 	import type { SlackIntegrationOption } from '$lib/server/slack';
 	import type { ExternalApiConnectionOption } from '$lib/server/db/external-api-connection-service';
-	import { triggerFieldsFor } from '$lib/workflow-tools';
+	import { triggerFieldsFor, buildResultPreview, formatResultPreview } from '$lib/workflow-tools';
 	import WorkflowStepList from './WorkflowStepList.svelte';
 	import WorkflowInputSchemaDrawer from '$lib/components/database/WorkflowInputSchemaDrawer.svelte';
 
@@ -109,6 +109,10 @@
 
 	// 宣言された入力パラメータ。ステップ内で @input:<key> として参照できる一覧（キー・ラベルのみ）。
 	const inputFields = $derived(inputSchema.map((f) => ({ key: f.key, label: f.label })));
+
+	// resultステップの設定内容から組み立てる、実行前のプレビュー（@step:等の参照は解決せずトークンのまま）。
+	const resultPreview = $derived(buildResultPreview(steps));
+	const hasResultPreview = $derived(Object.keys(resultPreview).length > 0);
 </script>
 
 <div class="wf-wrap">
@@ -154,6 +158,13 @@
 			{inputFields}
 		/>
 	</div>
+
+	{#if hasResultPreview}
+		<div class="wf-result-preview">
+			<div class="wf-result-preview-title">レスポンスのプレビュー（未実行、設定値そのまま）</div>
+			<pre class="wf-result-preview-json">{formatResultPreview(resultPreview)}</pre>
+		</div>
+	{/if}
 </div>
 
 <WorkflowInputSchemaDrawer
@@ -247,5 +258,35 @@
 	.wf-body {
 		display: flex;
 		flex-direction: column;
+	}
+
+	.wf-result-preview {
+		display: flex;
+		flex-direction: column;
+		gap: 4px;
+		margin-top: 4px;
+		padding: 10px 12px;
+		border: 1px dashed var(--color-border);
+		border-radius: 6px;
+	}
+
+	.wf-result-preview-title {
+		font-size: 0.75rem;
+		font-weight: 600;
+		color: var(--color-text-muted);
+	}
+
+	.wf-result-preview-json {
+		margin: 0;
+		padding: 8px 10px;
+		background: var(--color-surface);
+		border: 1px solid var(--color-border);
+		border-radius: 6px;
+		font-family: ui-monospace, monospace;
+		font-size: 0.8125rem;
+		line-height: 1.6;
+		white-space: pre-wrap;
+		word-break: break-word;
+		overflow-x: auto;
 	}
 </style>
