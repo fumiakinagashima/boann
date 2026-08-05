@@ -11,6 +11,7 @@ export const PATCH: RequestHandler = async ({ params, url, request, platform }) 
 	if (!platform?.env?.DB) return json({ error: 'DB not available' }, { status: 500 });
 	const db = createDb(platform.env.DB);
 	const appId = url.searchParams.get('appId');
+	if (!appId) return json({ error: 'appId is required' }, { status: 400 });
 	try {
 		const input = await request.json() as Partial<EntityTypeInput> & { fields?: EditableField[] };
 		await updateEntityType(db, params.name, input, appId);
@@ -24,6 +25,7 @@ export const DELETE: RequestHandler = async ({ params, url, platform }) => {
 	if (!platform?.env?.DB) return json({ error: 'DB not available' }, { status: 500 });
 	const db = createDb(platform.env.DB);
 	const appId = url.searchParams.get('appId');
+	if (!appId) return json({ error: 'appId is required' }, { status: 400 });
 	if (url.searchParams.get('force') !== '1') {
 		const et = await getEntityTypeByName(db, params.name, appId);
 		if (et) {

@@ -8,6 +8,7 @@ export const GET: RequestHandler = async ({ params, url, platform }) => {
 	if (!platform?.env?.DB) return json({ error: 'DB not available' }, { status: 500 });
 	const db = createDb(platform.env.DB);
 	const appId = url.searchParams.get('appId');
+	if (!appId) return json({ error: 'appId is required' }, { status: 400 });
 	const info = await getTableInfo(db, params.type, appId);
 	if (!info) return json({ error: 'Table not found' }, { status: 404 });
 	const rows = await listRecords(db, params.type, 200, appId);
@@ -18,6 +19,7 @@ export const POST: RequestHandler = async ({ params, url, request, platform, loc
 	if (!platform?.env?.DB) return json({ error: 'DB not available' }, { status: 500 });
 	const db = createDb(platform.env.DB);
 	const appId = url.searchParams.get('appId');
+	if (!appId) return json({ error: 'appId is required' }, { status: 400 });
 	const info = await getTableInfo(db, params.type, appId);
 	if (!info) return json({ error: 'Table not found' }, { status: 404 });
 	try {

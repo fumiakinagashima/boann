@@ -44,7 +44,7 @@ export const actions: Actions = {
 				message: `このテーブルはワークフロー（${used.map((w) => w.name).join(', ')}）で使用されているため削除できません。`
 			});
 		}
-		await deleteEntityType(db, et.name, et.appId);
+		await deleteEntityType(db, et.name, params.id);
 		redirect(303, `/apps/${params.id}`);
 	}
 };

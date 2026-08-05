@@ -32,6 +32,7 @@ export const DELETE: RequestHandler = async ({ params, url, platform }) => {
 	if (!platform?.env?.DB) return json({ error: 'DB not available' }, { status: 500 });
 	const db = createDb(platform.env.DB);
 	const appId = url.searchParams.get('appId');
+	if (!appId) return json({ error: 'appId is required' }, { status: 400 });
 	const info = await getTableInfo(db, params.type, appId);
 	// ワークフローの @trigger:<field> 参照用に、削除前のフィールド値スナップショットを取っておく
 	// （削除後は entities から読み出せないため）。
