@@ -48,7 +48,7 @@ export type FormContent = {
 	title?: string;
 	fields: FormField[];
 	tool: string;
-	entity?: string; // カスタムテーブル等を RecordDialog で開く場合にテーブル種別を指定
+	entity?: string;
 	submitLabel?: string;
 	completed?: boolean;
 };
