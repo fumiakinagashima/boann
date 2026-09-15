@@ -61,7 +61,7 @@ export async function createWorkflow(
 ): Promise<WorkflowRow> {
 	const id = crypto.randomUUID();
 	const now = new Date();
-	// app 内の末尾に追加する
+	// Appended to the end within the app
 	const appId = input.appId ?? null;
 	const [maxRow] = await db
 		.select({ s: workflows.sortOrder })
@@ -112,7 +112,7 @@ export async function listWorkflowsByAppId(db: Db, appId: string): Promise<Workf
 	return rows.map(toRow);
 }
 
-// アプリ設定のワークフロータブ: ドラッグ&ドロップ後の並び順を sortOrder に反映する。
+// App settings' workflow tab: reflects the drag-and-drop order into sortOrder.
 export async function reorderWorkflows(db: Db, appId: string, orderedIds: string[]): Promise<void> {
 	if (orderedIds.length === 0) return;
 	const queries: BatchItem<'sqlite'>[] = orderedIds.map((id, i) =>
@@ -203,7 +203,7 @@ function stepsReferenceEntityType(steps: WorkflowStep[], entityTypeId: string): 
 	return false;
 }
 
-/** カスタムテーブル削除前のチェック用: このentity_type_idを `get_entities` ステップで参照しているワークフローを探す。 */
+/** For checking before deleting a custom table: finds workflows that reference this entity_type_id in a `get_entities` step. */
 export async function findWorkflowsUsingEntityType(
 	db: Db,
 	entityTypeId: string

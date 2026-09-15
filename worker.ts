@@ -49,8 +49,8 @@ export default {
 		const db = createDb(env.DB);
 		ctx.waitUntil(processDueWorkflows(db, env));
 	},
-	// boann-imports キュー: アプリ生成ジョブおよびワークフローイベントを非同期処理する。
-	// 失敗は各 handler 内で握って通知するため、メッセージは原則 ack（リトライしない）。
+	// boann-imports queue: processes app generation jobs and workflow events asynchronously.
+	// Failures are caught and reported inside each handler, so messages are acked by default (not retried).
 	async queue(batch, env, _ctx) {
 		const db = createDb(env.DB);
 		for (const message of batch.messages) {

@@ -9,16 +9,17 @@
 		fields?: LocalField[];
 	};
 
-	// ワークフローの入力パラメータでは、対象テーブル解決の仕組みが別途必要になる
-	// recordSelect/account は今回対象外（将来ここに追加するだけで拡張できる）。
-	// tel/textareaはfieldToZod（field-schema.ts）でtext同様z.string()にしかならず、
-	// 入力パラメータには専用UIも無い（prompt()収集のみ）ため区別する意味がなく含めない。
+	// Workflow input parameters would need a separate mechanism for resolving target tables,
+	// so recordSelect/account are out of scope for now (can be added here later to extend this).
+	// tel/textarea only ever resolve to z.string() like text does in fieldToZod (field-schema.ts),
+	// and input parameters have no dedicated UI for them (just prompt() collection), so there's
+	// no meaningful distinction and they're left out.
 	const FIELD_TYPES: { value: CustomFieldType; label: string }[] = [
-		{ value: 'text', label: 'テキスト' },
-		{ value: 'number', label: '数値' },
-		{ value: 'select', label: '選択' },
-		{ value: 'date', label: '日付' },
-		{ value: 'email', label: 'メール' }
+		{ value: 'text', label: 'Text' },
+		{ value: 'number', label: 'Number' },
+		{ value: 'select', label: 'Select' },
+		{ value: 'date', label: 'Date' },
+		{ value: 'email', label: 'Email' }
 	];
 
 	let { fields = $bindable([]) }: Props = $props();
@@ -29,7 +30,7 @@
 			key: '',
 			label: '',
 			type: 'text',
-			// 入力パラメータは基本的に必須であってほしいので、デフォルトで必須にする
+			// Input parameters are generally expected to be required, so default to required
 			required: true,
 			options: []
 		}];
@@ -67,14 +68,14 @@
 						<input
 							class="input-key"
 							type="text"
-							placeholder="key (英数字)"
+							placeholder="key (alphanumeric)"
 							value={field.key}
 							oninput={(e) => updateField(field._id, { key: (e.target as HTMLInputElement).value })}
 						/>
 						<input
 							class="input-label"
 							type="text"
-							placeholder="表示名"
+							placeholder="Display name"
 							value={field.label}
 							oninput={(e) => updateField(field._id, { label: (e.target as HTMLInputElement).value })}
 						/>
@@ -93,25 +94,25 @@
 								checked={!field.required}
 								onchange={(e) => updateField(field._id, { required: !(e.target as HTMLInputElement).checked })}
 							/>
-							未設定を許容する
+							Allow unset
 						</label>
-						<button type="button" class="remove-btn" onclick={() => removeField(field._id)} aria-label="フィールドを削除">
+						<button type="button" class="remove-btn" onclick={() => removeField(field._id)} aria-label="Remove field">
 							<X size={14} />
 						</button>
 					</div>
 					<div class="options-row">
-						<label class="options-label" for="desc-{field._id}">補足説明（任意）</label>
+						<label class="options-label" for="desc-{field._id}">Additional notes (optional)</label>
 						<input
 							id="desc-{field._id}"
 							type="text"
-							placeholder="このフィールドの用途や値の説明"
+							placeholder="Describe this field's purpose or expected values"
 							value={field.description ?? ''}
 							oninput={(e) => updateField(field._id, { description: (e.target as HTMLInputElement).value })}
 						/>
 					</div>
 					{#if field.type === 'select'}
 						<div class="options-row">
-							<label class="options-label" for="opts-{field._id}">選択肢（1行1つ、「表示名:値」または「表示名」）</label>
+							<label class="options-label" for="opts-{field._id}">Options (one per line, "label:value" or just "label")</label>
 							<textarea
 								id="opts-{field._id}"
 								class="options-input"
@@ -125,12 +126,12 @@
 			{/each}
 		</div>
 	{:else}
-		<p class="empty">フィールドがありません。</p>
+		<p class="empty">No fields.</p>
 	{/if}
 
 	<button type="button" class="add-btn" onclick={addField}>
 		<Plus size={14} />
-		フィールドを追加
+		Add field
 	</button>
 </div>
 

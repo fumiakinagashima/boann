@@ -19,7 +19,7 @@
 		label,
 		value = $bindable(''),
 		options,
-		placeholder = '選択または検索...',
+		placeholder = 'Select or search...',
 		required = false,
 		disabled = false,
 		error,
@@ -122,7 +122,7 @@
 		{/if}
 
 		{#if value && !open}
-			<button type="button" class="icon-btn clear-btn" onclick={clear} tabindex="-1" aria-label="クリア">
+			<button type="button" class="icon-btn clear-btn" onclick={clear} tabindex="-1" aria-label="Clear">
 				<X size={14} />
 			</button>
 		{:else}
@@ -135,7 +135,7 @@
 	{#if open}
 		<ul class="dropdown" role="listbox">
 			{#if filtered.length === 0}
-				<li class="empty">該当なし</li>
+				<li class="empty">No matches</li>
 			{:else}
 				{#each filtered as opt, i}
 					<li

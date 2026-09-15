@@ -25,16 +25,16 @@
 		<span class="handoff-label">{label}</span>
 		<a href={downloadUrl} download={filename} class="download-btn">
 			<Download size={14} />
-			ダウンロード
+			Download
 		</a>
 	</div>
 
 	<div class="prompt-section">
-		<div class="prompt-title">外部AIツール用プロンプト</div>
+		<div class="prompt-title">Prompt for external AI tools</div>
 		<div class="prompt-body">{prompt}</div>
 		<button class="copy-btn" onclick={copyPrompt} class:copied>
 			<Copy size={13} />
-			{copied ? 'コピーしました' : 'プロンプトをコピー'}
+			{copied ? 'Copied' : 'Copy prompt'}
 		</button>
 	</div>
 </div>

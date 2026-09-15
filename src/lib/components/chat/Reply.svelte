@@ -9,7 +9,7 @@
 		onsubmit: (answer: string) => void;
 	};
 
-	let { title, fields, submitLabel = '送信', onsubmit }: Props = $props();
+	let { title, fields, submitLabel = 'Send', onsubmit }: Props = $props();
 
 	let answers = $state<Record<string, string | string[]>>(
 		Object.fromEntries(fields.map((f) => [f.key, f.type === 'multiple' ? [] : '']))
@@ -28,7 +28,7 @@
 				text = field.options?.find((o) => o.value === selected)?.label ?? selected;
 			} else if (field.type === 'multiple') {
 				const selected = val as string[];
-				text = selected.map((v) => field.options?.find((o) => o.value === v)?.label ?? v).join('、');
+				text = selected.map((v) => field.options?.find((o) => o.value === v)?.label ?? v).join(', ');
 			} else {
 				text = val as string;
 			}

@@ -17,15 +17,15 @@ function toRow(r: typeof externalApiConnections.$inferSelect): ExternalApiConnec
 	return { ...r, headers: JSON.parse(r.headers || '{}') as Record<string, string> };
 }
 
-// ヘッダーの値は(Authorization等の)トークンを含みうるため、integration-service.tsのauthConfigと
-// 同じ方針でクライアントには常にマスクした状態で返す。キー名から機械的に「秘匿かどうか」を
-// 判別できないため、全ての値を一律マスクする(部分的にしか隠さないより安全側に倒す)。
+// Header values may contain tokens (e.g. Authorization), so — following the same policy as
+// integration-service.ts's authConfig — they're always returned masked to the client. Since there's
+// no mechanical way to tell "sensitive or not" from the key name alone, every value is masked uniformly (erring on the side of safety over partial masking).
 export function maskHeaders(headers: Record<string, string>): Record<string, string> {
 	return Object.fromEntries(Object.keys(headers).map((k) => [k, MASKED_SECRET]));
 }
 
-// PATCH時、マスク値(未変更)のキーは既存の実値を保持する。新規キーや変更された値はそのまま採用し、
-// 送信されなかった(削除された)既存キーは結果から除く。
+// On PATCH, keys still at the masked value (unchanged) keep their existing real value. New or changed
+// keys are used as-is, and existing keys that weren't sent (i.e. deleted) are dropped from the result.
 export function mergeHeaders(
 	existing: Record<string, string>,
 	incoming: Record<string, string>
@@ -60,7 +60,7 @@ export async function createExternalApiConnection(
 		createdBy: input.createdBy ?? null
 	});
 	const row = await getExternalApiConnection(db, id);
-	if (!row) throw new Error('作成に失敗しました');
+	if (!row) throw new Error('Failed to create');
 	return row;
 }
 
@@ -90,7 +90,7 @@ export async function deleteExternalApiConnection(db: Db, id: string): Promise<v
 
 export type ExternalApiConnectionOption = { id: string; name: string };
 
-/** ワークフローの「外部APIを呼び出す」対象選択用に、ヘッダー(認証情報を含む)を除いた一覧を取得する。 */
+/** Fetches a list without headers (which include credentials), for selecting the target of a workflow's "call external API" action. */
 export async function listExternalApiConnectionsForWorkflow(db: Db): Promise<ExternalApiConnectionOption[]> {
 	return db
 		.select({ id: externalApiConnections.id, name: externalApiConnections.name })
@@ -99,16 +99,16 @@ export async function listExternalApiConnectionsForWorkflow(db: Db): Promise<Ext
 }
 
 /**
- * endpointが相対パス/省略なら connection.url を基点に結合する。絶対URLの場合は
- * connection.url と同一オリジンのものだけ許可する(ヘッダーに認証情報が乗るため、
- * ワークフローの動的な参照値でendpointが差し替わっても他ホストに秘密が漏れないようにするガード)。
+ * If endpoint is a relative path or omitted, joins it onto connection.url. If it's an absolute URL,
+ * only allows one on the same origin as connection.url (a guard so that, since headers carry credentials,
+ * secrets can't leak to another host even if endpoint gets swapped out via a workflow's dynamic reference value).
  */
 export function resolveConnectionUrl(baseUrl: string, endpoint: string | undefined): string {
 	const base = baseUrl.replace(/\/$/, '');
 	if (!endpoint || endpoint === '/') return base;
 	if (endpoint.startsWith('http')) {
 		if (new URL(endpoint).origin !== new URL(base).origin) {
-			throw new Error('endpoint は連携先(url)と同じホストのURLのみ指定できます');
+			throw new Error('endpoint must be a URL on the same host as the connection (url)');
 		}
 		return endpoint;
 	}
@@ -117,7 +117,7 @@ export function resolveConnectionUrl(baseUrl: string, endpoint: string | undefin
 
 export type ExternalApiCallResult = { status: number; ok: boolean; body: unknown };
 
-/** 連携設定のurl/headersを使って実際に外部APIを呼び出す(ワークフローのcall_external_apiアクション用)。 */
+/** Actually calls the external API using the connection's url/headers (for the workflow's call_external_api action). */
 export async function callExternalApiConnection(
 	connection: { url: string; headers: Record<string, string> },
 	input: { endpoint?: string; method: string; body?: unknown }
@@ -128,10 +128,10 @@ export async function callExternalApiConnection(
 		headers: { 'Content-Type': 'application/json', ...connection.headers },
 		body: input.body !== undefined ? JSON.stringify(input.body) : undefined
 	});
-	// TODO: 現状JSONレスポンスを前提にした実装（`@step:<id>.<path>`参照もJSON.parse済みの
-	// オブジェクト/配列前提）。プレーンテキスト/HTML等の非JSON応答の扱いは未検討・別途対応する
-	// （2026-07-22。非JSON時は既に.text()にフォールバックしており、パス無し参照ではそのまま
-	// 文字列として使えるが、パス指定時にどう振る舞うべきかは未整理）。
+	// TODO: currently assumes a JSON response (`@step:<id>.<path>` references also assume an already
+	// JSON.parse'd object/array). Handling of non-JSON responses (plain text/HTML etc.) hasn't been
+	// worked out and is deferred (2026-07-22. Already falls back to .text() for non-JSON, which works
+	// fine as a plain string for a no-path reference, but behavior when a path is given is still unresolved).
 	const ct = res.headers.get('content-type') ?? '';
 	const body = ct.includes('application/json') ? await res.json() : await res.text();
 	return { status: res.status, ok: res.ok, body };

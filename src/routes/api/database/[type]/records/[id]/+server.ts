@@ -34,8 +34,8 @@ export const DELETE: RequestHandler = async ({ params, url, platform }) => {
 	const appId = url.searchParams.get('appId');
 	if (!appId) return json({ error: 'appId is required' }, { status: 400 });
 	const info = await getTableInfo(db, params.type, appId);
-	// ワークフローの @trigger:<field> 参照用に、削除前のフィールド値スナップショットを取っておく
-	// （削除後は entities から読み出せないため）。
+	// Take a snapshot of the field values before deletion, for the workflow's @trigger:<field> references
+	// (since they can no longer be read from entities after deletion).
 	const snapshot = await getRecord(db, params.type, params.id);
 	await deleteRecord(db, params.type, params.id);
 	if (platform.env.QUEUE && info?.entityTypeId) {

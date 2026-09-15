@@ -9,7 +9,7 @@ export const load: PageServerLoad = async ({ params, platform }) => {
 	if (!platform?.env?.DB) error(500);
 	const db = createDb(platform.env.DB);
 	const app = await getAppById(db, params.id);
-	if (!app) error(404, 'アプリが見つかりません');
+	if (!app) error(404, 'App not found');
 	const [tables, workflows, mcpStatus] = await Promise.all([
 		getTablesByAppId(db, params.id),
 		listWorkflowsByAppId(db, params.id),

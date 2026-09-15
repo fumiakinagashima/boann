@@ -1,4 +1,4 @@
--- ページ機能（カスタムページビルダー）を廃止する。
--- entity_types 単位の汎用データ管理画面（/apps/[id]/tables/[tableId]）が既に
--- ページなしでテーブルの閲覧・登録・編集・削除を提供しており、app_pages は冗長だった。
+-- Remove the page feature (custom page builder).
+-- The generic per-entity_types data management screen (/apps/[id]/tables/[tableId]) already
+-- provides table viewing/creation/editing/deletion without pages, making app_pages redundant.
 DROP TABLE `app_pages`;

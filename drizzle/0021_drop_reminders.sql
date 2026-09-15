@@ -1,3 +1,3 @@
--- リマインダー機能を削除する。配信基盤（Cron）は残っていたが、レコードを作成するUI・MCPツールが
--- 既に存在せず実質未稼働だったため、テーブルごと廃止する。
+-- Remove the reminder feature. The delivery infrastructure (Cron) remained, but the UI/MCP tool for
+-- creating records had already been removed, so it was effectively dormant — dropping the table entirely.
 DROP TABLE `reminders`;

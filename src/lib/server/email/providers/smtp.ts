@@ -27,7 +27,7 @@ async function readSmtpResponse(
 	while (true) {
 		while (!buf.value.includes('\n')) {
 			const { value, done } = await reader.read();
-			if (done) throw new Error('SMTP接続が予期せず切断されました');
+			if (done) throw new Error('The SMTP connection was unexpectedly disconnected');
 			buf.value += dec.decode(value);
 		}
 		const nlIdx = buf.value.indexOf('\n');
@@ -105,7 +105,7 @@ export async function sendSmtp(config: SmtpConfig, mail: Mail): Promise<void> {
 		({ connect } = await import('cloudflare:sockets'));
 	} catch {
 		throw new Error(
-			'SMTP送信は Cloudflare Workers ランタイムでのみ利用できます（`bun run dev` のローカル環境では利用できません）。本番環境（デプロイ後）または `wrangler dev` でお試しください。ローカルでのテストには Resend または AWS SES をご利用ください。'
+			'SMTP sending is only available in the Cloudflare Workers runtime (it is not available in the local `bun run dev` environment). Please try it in production (after deploying) or with `wrangler dev`. For local testing, use Resend or AWS SES instead.'
 		);
 	}
 
@@ -133,7 +133,7 @@ export async function sendSmtp(config: SmtpConfig, mail: Mail): Promise<void> {
 		await write('STARTTLS');
 		const starttlsResp = await read();
 		if (starttlsResp.code !== 220) {
-			throw new Error(`STARTTLS が拒否されました: ${starttlsResp.lines.join(' ')}`);
+			throw new Error(`STARTTLS was rejected: ${starttlsResp.lines.join(' ')}`);
 		}
 		// Upgrade TLS
 		reader.releaseLock();
@@ -150,37 +150,37 @@ export async function sendSmtp(config: SmtpConfig, mail: Mail): Promise<void> {
 	// AUTH LOGIN
 	await write('AUTH LOGIN');
 	const authPrompt1 = await read();
-	if (authPrompt1.code !== 334) throw new Error(`AUTH エラー: ${authPrompt1.lines.join(' ')}`);
+	if (authPrompt1.code !== 334) throw new Error(`AUTH error: ${authPrompt1.lines.join(' ')}`);
 
 	await write(btoa(config.username));
 	const authPrompt2 = await read();
-	if (authPrompt2.code !== 334) throw new Error(`AUTH ユーザー名エラー: ${authPrompt2.lines.join(' ')}`);
+	if (authPrompt2.code !== 334) throw new Error(`AUTH username error: ${authPrompt2.lines.join(' ')}`);
 
 	await write(btoa(config.password));
 	const authResult = await read();
-	if (authResult.code !== 235) throw new Error(`SMTP認証失敗: ${authResult.lines.join(' ')}`);
+	if (authResult.code !== 235) throw new Error(`SMTP authentication failed: ${authResult.lines.join(' ')}`);
 
 	// MAIL FROM
 	await write(`MAIL FROM:<${mail.from}>`);
 	const mailFromResp = await read();
-	if (mailFromResp.code !== 250) throw new Error(`MAIL FROM エラー: ${mailFromResp.lines.join(' ')}`);
+	if (mailFromResp.code !== 250) throw new Error(`MAIL FROM error: ${mailFromResp.lines.join(' ')}`);
 
 	// RCPT TO
 	const recipients = Array.isArray(mail.to) ? mail.to : [mail.to];
 	for (const rcpt of recipients) {
 		await write(`RCPT TO:<${rcpt}>`);
 		const rcptResp = await read();
-		if (rcptResp.code !== 250) throw new Error(`RCPT TO エラー (${rcpt}): ${rcptResp.lines.join(' ')}`);
+		if (rcptResp.code !== 250) throw new Error(`RCPT TO error (${rcpt}): ${rcptResp.lines.join(' ')}`);
 	}
 
 	// DATA
 	await write('DATA');
 	const dataResp = await read();
-	if (dataResp.code !== 354) throw new Error(`DATA エラー: ${dataResp.lines.join(' ')}`);
+	if (dataResp.code !== 354) throw new Error(`DATA error: ${dataResp.lines.join(' ')}`);
 
 	await write(buildMimeMessage(mail).slice(0, -2)); // strip trailing \r\n, smtpWrite adds it
 	const sendResp = await read();
-	if (sendResp.code !== 250) throw new Error(`メッセージ送信エラー: ${sendResp.lines.join(' ')}`);
+	if (sendResp.code !== 250) throw new Error(`Message send error: ${sendResp.lines.join(' ')}`);
 
 	// QUIT
 	await write('QUIT');

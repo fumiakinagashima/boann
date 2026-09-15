@@ -4,7 +4,7 @@ import { createDb } from '$lib/server/db';
 import { reorderTables } from '$lib/server/db/table-service';
 import { reorderWorkflows } from '$lib/server/db/workflow-service';
 
-// アプリ設定画面のドラッグ&ドロップ並べ替え。kind ごとに対象テーブルの sortOrder を振り直す。
+// Drag-and-drop reordering on the app settings screen. Reassigns sortOrder for the target rows per kind.
 export const POST: RequestHandler = async ({ params, request, platform }) => {
 	if (!platform?.env?.DB) return json({ error: 'DB not available' }, { status: 500 });
 	const db = createDb(platform.env.DB);

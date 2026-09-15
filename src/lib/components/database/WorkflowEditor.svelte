@@ -33,7 +33,7 @@
 
 	let {
 		id,
-		initialName = '新規ワークフロー',
+		initialName = 'New Workflow',
 		initialDescription = null,
 		initialTriggerType = 'schedule',
 		initialTriggerHour = 9,
@@ -50,9 +50,9 @@
 		noChatPanel = false
 	}: Props = $props();
 
-	// 保存後も画面遷移しないため、新規作成時に発行されたidを保持する
+	// Since saving doesn't navigate away, keep the id issued when creating a new workflow
 	let currentId = $state(untrack(() => id));
-	// MCP専用フェーズのため常に有効化する（トグルUIは非表示、initialEnabledは無視）
+	// Always enabled during the MCP-only phase (the toggle UI is hidden, initialEnabled is ignored)
 	let enabled = $state(true);
 
 	type WorkflowInstance = {
@@ -72,7 +72,7 @@
 	export function setState(s: WorkflowState) {
 		wfRef?.setState(s);
 	}
-	// ホスト側（ビルドページ）の保存処理が有効化フラグを読むために公開する
+	// Exposed so the host side's (build page) save logic can read the enabled flag
 	export function getEnabled(): boolean {
 		return enabled;
 	}
@@ -82,21 +82,21 @@
 	let aiReviewError = $state('');
 
 	let runningNow = $state(false);
-	// 「今すぐ実行」の結果（set_resultで組み立てられたレスポンス）。表示用に整形してワークフローの下に出す。
+	// Result of "Run now" (the response assembled by set_result). Formatted for display beneath the workflow.
 	let lastRunResult = $state<Record<string, unknown> | null>(null);
 
 	function collectInputArgs(inputSchema: FieldDef[]): Record<string, unknown> | null {
 		const inputArgs: Record<string, unknown> = {};
 		for (const f of inputSchema) {
-			const optionsHint = f.type === 'select' && f.options?.length ? `\n選択肢: ${f.options.map((o) => o.value).join(', ')}` : '';
+			const optionsHint = f.type === 'select' && f.options?.length ? `\nOptions: ${f.options.map((o) => o.value).join(', ')}` : '';
 			let raw: string | null;
 			for (;;) {
 				raw = prompt(
-					`${f.label}${f.required ? '（必須）' : '（任意）'}を入力してください${f.description ? `\n${f.description}` : ''}${optionsHint}`
+					`Please enter ${f.label} (${f.required ? 'required' : 'optional'})${f.description ? `\n${f.description}` : ''}${optionsHint}`
 				);
-				if (raw === null) return null; // キャンセル
+				if (raw === null) return null; // cancelled
 				if (raw === '' && f.required) {
-					alert(`${f.label}は必須です。入力してください。`);
+					alert(`${f.label} is required. Please enter a value.`);
 					continue;
 				}
 				break;
@@ -113,19 +113,19 @@
 		let triggerRecordId: string | undefined;
 		if (initialTriggerType === 'event') {
 			const input = prompt(
-				'イベントトリガーのテスト実行です。\n@trigger:id / @trigger:<フィールド> として使用するレコードIDを入力してください（空欄の場合は空文字で実行）。'
+				'This is a test run of the event trigger.\nPlease enter the record ID to use as @trigger:id / @trigger:<field> (leave blank to run with an empty string).'
 			);
-			if (input === null) return; // キャンセル
+			if (input === null) return; // cancelled
 			triggerRecordId = input.trim();
 		} else {
-			if (!confirm('保存されている状態で実行されます。よろしいですか？')) return;
+			if (!confirm('This will run using the currently saved state. Are you sure?')) return;
 		}
 
 		const inputSchema = wfRef?.getState().inputSchema ?? [];
 		let inputArgs: Record<string, unknown> | undefined;
 		if (inputSchema.length > 0) {
 			const collected = collectInputArgs(inputSchema);
-			if (collected === null) return; // キャンセル
+			if (collected === null) return; // cancelled
 			inputArgs = collected;
 		}
 
@@ -147,18 +147,18 @@
 				result?: Record<string, unknown>;
 			};
 			if (!res.ok) {
-				toast.error(result.error ?? '実行に失敗しました');
+				toast.error(result.error ?? 'Run failed');
 				return;
 			}
 			lastRunResult = result.result ?? {};
 			if (result.ok) {
-				toast.success(`「${result.name}」を実行しました`);
+				toast.success(`Ran "${result.name}"`);
 			} else {
-				toast.error(`「${result.name}」の実行に失敗しました: ${result.error ?? ''}`);
+				toast.error(`Failed to run "${result.name}": ${result.error ?? ''}`);
 			}
 			await invalidateAll();
 		} catch (e) {
-			toast.error(e instanceof Error ? e.message : '実行に失敗しました');
+			toast.error(e instanceof Error ? e.message : 'Run failed');
 		} finally {
 			runningNow = false;
 		}
@@ -168,7 +168,7 @@
 		if (aiReviewLoading || !wfRef) return;
 		const state = wfRef.getState();
 		if (state.steps.length === 0) {
-			aiReviewError = 'ステップが1つもありません。';
+			aiReviewError = 'There are no steps.';
 			return;
 		}
 		aiReviewLoading = true;
@@ -182,7 +182,7 @@
 			});
 			const result = (await res.json()) as WorkflowReviewResult & { error?: string };
 			if (!res.ok) {
-				aiReviewError = result.error ?? 'AIレビューに失敗しました。';
+				aiReviewError = result.error ?? 'AI review failed.';
 				return;
 			}
 			aiReview = result;
@@ -202,7 +202,7 @@
 	function stepLogLabel(log: StepLog): string {
 		const status = log.ok ? '✓' : '✗';
 		const ms = log.ms < 1000 ? `${log.ms}ms` : `${(log.ms / 1000).toFixed(1)}s`;
-		return `${status} ${log.label}（${ms}）`;
+		return `${status} ${log.label} (${ms})`;
 	}
 </script>
 
@@ -210,20 +210,20 @@
 	<div class="editor-row1">
 		<div class="editor-row1-actions">
 			<button class="btn-input-schema" onclick={() => wfRef?.openInputSchemaDrawer()}>
-				⚙ 入力パラメータ
+				⚙ Input parameters
 			</button>
 			{#if currentId}
 				<button class="btn-run-now" onclick={runNow} disabled={runningNow}>
-					{runningNow ? '実行中...' : '▶ 今すぐ実行'}
+					{runningNow ? 'Running...' : '▶ Run now'}
 				</button>
 			{/if}
 			<button class="btn-ai-review" onclick={runAiReview} disabled={aiReviewLoading}>
 				{#if aiReviewLoading}
-					レビュー中...
+					Reviewing...
 				{:else if aiReview}
-					✨ 再レビュー
+					✨ Re-review
 				{:else}
-					✨ AIレビュー
+					✨ AI review
 				{/if}
 			</button>
 		</div>
@@ -237,7 +237,7 @@
 			<p class="ai-review-summary">{aiReview.summary}</p>
 			{#if aiReview.issues.length > 0}
 				<div class="ai-review-group">
-					<h3 class="ai-review-group-title">論理的な誤り・未到達ステップ</h3>
+					<h3 class="ai-review-group-title">Logical errors / unreachable steps</h3>
 					<ul class="ai-review-list">
 						{#each aiReview.issues as item}
 							<li>{item}</li>
@@ -247,7 +247,7 @@
 			{/if}
 			{#if aiReview.suggestions.length > 0}
 				<div class="ai-review-group">
-					<h3 class="ai-review-group-title">改善提案</h3>
+					<h3 class="ai-review-group-title">Suggested improvements</h3>
 					<ul class="ai-review-list">
 						{#each aiReview.suggestions as item}
 							<li>{item}</li>
@@ -289,12 +289,12 @@
 
 	{#if lastRunResult}
 		<div class="run-result-box">
-			<div class="run-result-title">実行結果（レスポンス）</div>
+			<div class="run-result-title">Run result (response)</div>
 			<pre class="run-result-json">{JSON.stringify(lastRunResult, null, 2)}</pre>
 		</div>
 	{/if}
 
-	<!-- MCP専用フェーズのため実行ログUIは非表示（runs/toggleRunExpand等のロジックはそのまま維持） -->
+	<!-- Run log UI is hidden during the MCP-only phase (the runs/toggleRunExpand logic etc. is kept as-is) -->
 </div>
 
 <style lang="scss">

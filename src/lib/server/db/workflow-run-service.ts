@@ -9,9 +9,9 @@ export type StepLog = {
 	result?: string;
 	error?: string;
 	ms: number;
-	/** 2回以上試行した場合のみ設定（1回で成功/失敗した場合は省略）。 */
+	/** Set only when attempted two or more times (omitted if it succeeded/failed on the first try). */
 	attempts?: number;
-	/** 最終的に失敗したが continueOnError により実行が続行された場合true。 */
+	/** True if it ultimately failed but execution continued due to continueOnError. */
 	continued?: boolean;
 };
 
@@ -21,7 +21,7 @@ export type WorkflowRunRow = {
 	ok: boolean;
 	error: string | null;
 	log: StepLog[] | null;
-	/** set_resultアクションで組み立てられた結果オブジェクト。未使用のワークフローはnull。 */
+	/** Result object built by the set_result action. Null for workflows that don't use it. */
 	result: Record<string, unknown> | null;
 	startedAt: Date;
 	finishedAt: Date;

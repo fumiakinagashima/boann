@@ -1,8 +1,8 @@
--- app_pages に components カラムを追加（複数コンポーネント対応）
+-- Add a components column to app_pages (supports multiple components)
 ALTER TABLE `app_pages` ADD COLUMN `components` text DEFAULT '[]';
 --> statement-breakpoint
 
--- 既存レコードを移行: table_id + view_type → components JSON
+-- Migrate existing records: table_id + view_type → components JSON
 UPDATE `app_pages`
 SET `components` = json_array(
   json_object(

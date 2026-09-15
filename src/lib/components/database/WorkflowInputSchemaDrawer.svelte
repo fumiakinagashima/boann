@@ -15,16 +15,16 @@
 {#if open}
 	<div class="panel-backdrop" role="presentation" onclick={onclose}></div>
 
-	<aside class="panel" aria-label="入力パラメータ">
+	<aside class="panel" aria-label="Input parameters">
 		<div class="panel-header">
-			<span class="panel-title">入力パラメータ</span>
-			<button class="panel-close" onclick={onclose} aria-label="閉じる">
+			<span class="panel-title">Input parameters</span>
+			<button class="panel-close" onclick={onclose} aria-label="Close">
 				<X size={16} />
 			</button>
 		</div>
 		<div class="panel-body">
 			<p class="panel-desc">
-				このワークフローを呼び出す側が渡す値を定義する。ステップ内で <code>@input:&lt;key&gt;</code> として参照できる。
+				Defines the values the caller of this workflow passes in. Referenceable within steps as <code>@input:&lt;key&gt;</code>.
 			</p>
 			<WorkflowInputEditor bind:fields />
 		</div>

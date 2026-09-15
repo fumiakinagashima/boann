@@ -11,7 +11,7 @@ export const load: PageServerLoad = async ({ params, platform }) => {
 		getEntityTypeById(db, params.tableId),
 		listEntityTypesSimple(db, params.id)
 	]);
-	if (!app) error(404, 'テーブルが見つかりません');
+	if (!app) error(404, 'Table not found');
 	const [fields, otherApps] = await Promise.all([
 		getFieldsByEntityTypeId(db, params.tableId),
 		Promise.all(
@@ -37,11 +37,11 @@ export const actions: Actions = {
 		if (!platform?.env?.DB) error(500);
 		const db = createDb(platform.env.DB);
 		const et = await getEntityTypeById(db, params.tableId);
-		if (!et) error(404, 'テーブルが見つかりません');
+		if (!et) error(404, 'Table not found');
 		const used = await findWorkflowsUsingEntityType(db, et.id);
 		if (used.length > 0) {
 			return fail(409, {
-				message: `このテーブルはワークフロー（${used.map((w) => w.name).join(', ')}）で使用されているため削除できません。`
+				message: `This table cannot be deleted because it is used by workflows (${used.map((w) => w.name).join(', ')}).`
 			});
 		}
 		await deleteEntityType(db, et.name, params.id);

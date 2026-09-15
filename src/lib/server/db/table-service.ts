@@ -4,7 +4,7 @@ import type { SQLiteColumn, SQLiteTable } from 'drizzle-orm/sqlite-core';
 import type { Db } from './index';
 import { apps, entityTypes, entityFields, entities, bookmarks, workflows, workflowRuns, accounts, appMcpTokens } from './schema';
 
-// app スコープ内の末尾に追加するための次の sortOrder（最大値 + 1、無ければ 0）を返す。
+// Returns the next sortOrder for appending to the end within an app scope (max + 1, or 0 if none).
 async function nextSortOrder(
 	db: Db,
 	table: SQLiteTable,
@@ -22,7 +22,7 @@ async function nextSortOrder(
 	return max + 1;
 }
 
-/** クエリ件数が可変の場合に `db.batch([...])` を呼ぶためのヘルパー。空配列なら何もしない。 */
+/** Helper for calling `db.batch([...])` when the number of queries is variable. No-op for an empty array. */
 async function batchIfNonEmpty<U extends BatchItem<'sqlite'>>(db: Db, queries: U[]): Promise<void> {
 	if (queries.length === 0) return;
 	await db.batch(queries as [U, ...U[]]);
@@ -46,13 +46,13 @@ export type FieldDef = {
 };
 
 export type TableInfo = {
-	id: string;        // entity type name（クエリパラメーター等で使うキー）
-	entityTypeId: string;  // entity_types.id（UUIDキー。イベントトリガー等で使用）
+	id: string;        // entity type name (the key used in query params etc.)
+	entityTypeId: string;  // entity_types.id (UUID key, used for event triggers etc.)
 	label: string;
 	icon: string;
 	isCore: boolean;
 	fields: FieldDef[];
-	// 外部MCPサーバー経由で許可するCRUD操作（デフォルト全許可）。
+	// CRUD operations permitted via the external MCP server (all enabled by default).
 	mcpCreate: boolean;
 	mcpRead: boolean;
 	mcpUpdate: boolean;
@@ -66,18 +66,18 @@ const toTs = (d: Date | null | undefined): number | null =>
 
 export const CORE_TABLE_NAMES: string[] = [];
 
-// 固定ルート・サブルートと衝突する予約済みテーブル名
+// Reserved table names that would collide with fixed routes/sub-routes
 const RESERVED_NAMES = new Set([
-	'accounts', 'workflows', // 固定ルート
+	'accounts', 'workflows', // fixed routes
 	'entity_types', 'entity_fields', 'entities',
 	'integrations',
-	'new', 'schema', // サブルート名
+	'new', 'schema', // sub-route names
 ]);
 
 const SYSTEM_KEYS = new Set(['id', 'createdAt', 'updatedAt', 'createdBy', 'updatedBy', 'entityTypeId']);
 
-// account 型フィールドが参照する仮想テーブル。accounts はコアテーブルなので entity_types には存在せず、
-// id→name の解決のために getTableInfo / listRecords が専用ブランチで擬似的に提供する。
+// The virtual table referenced by account-type fields. accounts is a core table, so it doesn't exist in
+// entity_types; getTableInfo / listRecords fake it via a dedicated branch to resolve id -> name.
 export const ACCOUNT_REF_TABLE = 'accounts';
 export const ACCOUNT_LABEL_KEY = 'name';
 
@@ -85,13 +85,13 @@ export { SYSTEM_DISPLAY_FIELDS } from '$lib/system-fields';
 
 function accountTableInfo(): TableInfo {
 	return {
-		id: ACCOUNT_REF_TABLE, entityTypeId: '', label: 'アカウント', icon: 'user', isCore: true,
-		fields: [{ key: ACCOUNT_LABEL_KEY, label: '名前', type: 'text', required: true, options: [], listable: true }],
+		id: ACCOUNT_REF_TABLE, entityTypeId: '', label: 'Account', icon: 'user', isCore: true,
+		fields: [{ key: ACCOUNT_LABEL_KEY, label: 'Name', type: 'text', required: true, options: [], listable: true }],
 		mcpCreate: false, mcpRead: true, mcpUpdate: false, mcpDelete: false
 	};
 }
 
-// 保存する ref 列を決める。account 型は accounts テーブル固定参照なので常に補完する。
+// Determines the ref columns to store. account-type fields always reference the fixed accounts table, so it's always filled in.
 export function refColumns(f: { type: string; refTable?: string | null; refLabelKey?: string | null }): { refTable: string | null; refLabelKey: string | null } {
 	if (f.type === 'account') return { refTable: ACCOUNT_REF_TABLE, refLabelKey: ACCOUNT_LABEL_KEY };
 	return { refTable: f.refTable ?? null, refLabelKey: f.refLabelKey ?? null };
@@ -203,8 +203,8 @@ export type EntityTypeForWorkflow = {
 export type EntityTypeSimple = { id: string; name: string; label: string; icon: string | null };
 
 /**
- * テーブル一覧をアプリ単位で簡易情報で取得する
- * （recordSelect の参照先候補は自アプリ内に限定する。他アプリの同名テーブルとの解決の曖昧さを避けるため）。
+ * Fetches the list of tables as simplified info, scoped per app
+ * (recordSelect reference-target candidates are limited to the same app, to avoid ambiguous resolution against same-named tables in other apps).
  */
 export async function listEntityTypesSimple(db: Db, appId: string): Promise<EntityTypeSimple[]> {
 	return db.select({
@@ -240,7 +240,7 @@ export async function listEntityTypesForWorkflow(db: Db): Promise<EntityTypeForW
 }
 
 export async function listRecords(db: Db, type: string, limit = 200, appId: string): Promise<RecordRow[]> {
-	// accounts は account 型フィールドの選択肢・ラベル解決にのみ使うため、id と name だけを返す（機密情報を露出しない）。
+	// accounts is only used for resolving account-type field options/labels, so it returns just id and name (no sensitive info exposed).
 	if (type === ACCOUNT_REF_TABLE) {
 		return (await db.select({ id: accounts.id, name: accounts.name })
 			.from(accounts).orderBy(accounts.name).limit(limit))
@@ -274,10 +274,10 @@ export async function getRecord(db: Db, type: string, id: string): Promise<Recor
 }
 
 /**
- * レコードが実際にどのテーブル(entity_type)に属するかを返す。
- * getRecord/updateRecordByEntityTypeId/deleteRecord は id のみで操作し type/entityTypeId との
- * 一致を検証しないため、外部トークンなど新しい信頼境界をまたぐ呼び出し側は、この関数で
- * 所有権（意図したテーブルのレコードかどうか）を必ず確認してから実処理に入ること。
+ * Returns which table (entity_type) a record actually belongs to.
+ * getRecord/updateRecordByEntityTypeId/deleteRecord operate on id alone and don't verify it matches
+ * type/entityTypeId, so callers crossing a new trust boundary (e.g. an external token) must always
+ * verify ownership (whether the record actually belongs to the intended table) with this function before proceeding.
  */
 export async function getRecordOwnerEntityTypeId(db: Db, id: string): Promise<string | null> {
 	const [row] = await db.select({ entityTypeId: entities.entityTypeId }).from(entities).where(eq(entities.id, id));
@@ -373,11 +373,11 @@ export type AppInput = {
 
 export async function createApp(db: Db, input: AppInput, accountId?: string | null): Promise<{ id: string; name: string }> {
 	if (RESERVED_NAMES.has(input.name)) {
-		throw new Error(`アプリ名 "${input.name}" はシステムで予約されています。`);
+		throw new Error(`App name "${input.name}" is reserved by the system.`);
 	}
 	const [existing] = await db.select({ id: apps.id }).from(apps).where(eq(apps.name, input.name));
 	if (existing) {
-		throw new Error(`アプリ名 "${input.name}" はすでに使用されています。`);
+		throw new Error(`App name "${input.name}" is already in use.`);
 	}
 	const id = crypto.randomUUID();
 	await db.insert(apps).values({ id, name: input.name, label: input.label, icon: input.icon ?? 'layout-grid', accountId: accountId ?? null });
@@ -390,24 +390,24 @@ export async function deleteApp(db: Db, id: string): Promise<void> {
 	const wfRows = await db.select({ id: workflows.id })
 		.from(workflows).where(eq(workflows.appId, id));
 	const queries: BatchItem<'sqlite'>[] = [];
-	// FK 参照を成立させる順序で削除する:
-	//   entity_types.app_id / workflows.app_id / bookmarks.app_id → apps.id,
-	//   entity_fields / entities → entity_types.id
-	// 1. テーブルに紐づく子レコードを削除してから entity_types を削除
+	// Delete in an order that satisfies FK references:
+	//   entity_types.app_id / workflows.app_id / bookmarks.app_id -> apps.id,
+	//   entity_fields / entities -> entity_types.id
+	// 1. Delete each table's child records, then the entity_types row
 	for (const table of tables) {
 		queries.push(db.delete(entities).where(eq(entities.entityTypeId, table.id)));
 		queries.push(db.delete(entityFields).where(eq(entityFields.entityTypeId, table.id)));
 		queries.push(db.delete(entityTypes).where(eq(entityTypes.id, table.id)));
 	}
-	// 2. workflow_runs（実行ログ）→ workflows を削除（apps を参照しているため apps より先に消す）
+	// 2. Delete workflow_runs (execution logs) -> workflows (before apps, since workflows references apps)
 	if (wfRows.length > 0) {
 		queries.push(db.delete(workflowRuns).where(inArray(workflowRuns.workflowId, wfRows.map((w) => w.id))));
 	}
 	queries.push(db.delete(workflows).where(eq(workflows.appId, id)));
-	// 3. bookmarks / app_mcp_tokens を削除
+	// 3. Delete bookmarks / app_mcp_tokens
 	queries.push(db.delete(bookmarks).where(eq(bookmarks.appId, id)));
 	queries.push(db.delete(appMcpTokens).where(eq(appMcpTokens.appId, id)));
-	// 4. apps を削除
+	// 4. Delete apps
 	queries.push(db.delete(apps).where(eq(apps.id, id)));
 	await db.batch(queries as [BatchItem<'sqlite'>, ...BatchItem<'sqlite'>[]]);
 }
@@ -423,19 +423,19 @@ function uniqueFieldKey(usedKeys: Set<string>, candidate?: string): string {
 
 export async function createEntityType(db: Db, input: EntityTypeInput): Promise<{ id: string; name: string }> {
 	if (RESERVED_NAMES.has(input.name)) {
-		throw new Error(`テーブル名 "${input.name}" はシステムで予約されています。別の名前を使用してください。`);
+		throw new Error(`Table name "${input.name}" is reserved by the system. Please use a different name.`);
 	}
-	// name はアプリ内で一意。同名でも別アプリなら作成できる。
+	// name is unique within an app. The same name can be used in a different app.
 	const [existing] = await db
 		.select({ name: entityTypes.name })
 		.from(entityTypes)
 		.where(and(eq(entityTypes.name, input.name), eq(entityTypes.appId, input.appId)));
 	if (existing) {
-		throw new Error(`テーブル名 "${input.name}" はこのアプリ内ですでに使用されています。`);
+		throw new Error(`Table name "${input.name}" is already in use within this app.`);
 	}
 
 	const id = crypto.randomUUID();
-	// テーブルは app 内の末尾に追加する。ページはテーブルとは独立して別途作成する（自動生成しない）。
+	// Tables are appended to the end within the app. Pages are created separately from tables (not auto-generated).
 	const tableSortOrder = await nextSortOrder(db, entityTypes, entityTypes.appId, input.appId ?? null, entityTypes.sortOrder);
 	await db.batch([
 		db.insert(entityTypes).values({
@@ -485,10 +485,10 @@ export async function getTablesByAppId(db: Db, appId: string): Promise<{ id: str
 	}));
 }
 
-// アプリ設定のテーブルタブ: ドラッグ&ドロップ後の並び順を sortOrder に反映する。
+// App settings' table tab: reflects the drag-and-drop order into sortOrder.
 export async function reorderTables(db: Db, appId: string, orderedIds: string[]): Promise<void> {
 	if (orderedIds.length === 0) return;
-	// appId でも絞り込み、他アプリの id を混入されても他アプリのテーブルを書き換えないようにする
+	// Also filter by appId, so that even if an id from another app is mixed in, that app's tables aren't rewritten
 	const queries: BatchItem<'sqlite'>[] = orderedIds.map((id, i) =>
 		db.update(entityTypes).set({ sortOrder: i }).where(and(eq(entityTypes.id, id), eq(entityTypes.appId, appId)))
 	);

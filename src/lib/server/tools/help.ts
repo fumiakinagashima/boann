@@ -5,14 +5,14 @@ export const tools: Tool[] = [
 	{
 		name: 'get_help',
 		description:
-			'使い方・機能説明を取得する。ユーザーが「使い方を教えて」「何ができる？」「ヘルプ」「〇〇機能の使い方は？」などと聞いた時に呼び出す。topic を省略すると全体概要を返す',
+			'Get usage instructions / feature explanations. Called when the user asks things like "tell me how to use this", "what can this do?", "help", or "how do I use the ○○ feature?". If topic is omitted, returns a general overview',
 		input_schema: {
 			type: 'object',
 			properties: {
 				topic: {
 					type: 'string',
 					enum: ['overview', 'apps', 'tables', 'records', 'workflows', 'documents', 'email'],
-					description: '知りたいトピック（省略時は全体概要）'
+					description: 'The topic to learn about (omit for a general overview)'
 				}
 			}
 		}
@@ -25,120 +25,120 @@ const getHelpInputSchema = z.object({
 
 const HELP: Record<string, object> = {
 	overview: {
-		title: 'Boann 使い方ガイド',
-		description: 'アプリ作成はUIから、テーブル設計・データ管理・ワークフロー自動化などはチャットで業務指示を出すだけで完結するAIファーストなノーコードプラットフォームです',
+		title: 'Boann usage guide',
+		description: 'An AI-first no-code platform: create apps from the UI, and simply describe your business needs in chat to handle table design, data management, workflow automation, and more.',
 		features: [
-			{ name: 'ノーコードアプリ生成', topic: 'apps', examples: ['どんなテーブルがある？', 'アプリの作り方を教えて'] },
-			{ name: 'テーブル管理', topic: 'tables', examples: ['どんなテーブルがある？', '商品管理テーブルにカテゴリフィールドを追加して'] },
-			{ name: 'レコード操作', topic: 'records', examples: ['在庫管理に新しい商品を登録して', '商品一覧を見せて', '〇〇の在庫数を更新して'] },
-			{ name: 'ワークフロー自動化', topic: 'workflows', examples: ['毎日9時に在庫数が少ない商品を通知して', 'ワークフローを作りたい'] },
-			{ name: '資料生成（CSV/Markdownデータ）', topic: 'documents', examples: ['商品一覧をExcel用にまとめて', 'データをCSVで出力して'] },
-			{ name: 'メール送信', topic: 'email', examples: ['〇〇にお知らせメールを送って'] }
+			{ name: 'No-code app generation', topic: 'apps', examples: ['What tables are there?', 'Tell me how to create an app'] },
+			{ name: 'Table management', topic: 'tables', examples: ['What tables are there?', 'Add a category field to the product management table'] },
+			{ name: 'Record operations', topic: 'records', examples: ['Register a new product in inventory management', 'Show me the product list', 'Update the stock count for ○○'] },
+			{ name: 'Workflow automation', topic: 'workflows', examples: ['Notify me every day at 9am about products low in stock', 'I want to create a workflow'] },
+			{ name: 'Document generation (CSV/Markdown data)', topic: 'documents', examples: ['Put together the product list for Excel', 'Export the data as CSV'] },
+			{ name: 'Sending email', topic: 'email', examples: ['Send an announcement email to ○○'] }
 		],
 		tips: [
-			'自然な日本語で指示するだけでOKです',
-			'各機能の詳しい使い方を聞く場合は「アプリ作成の使い方を教えて」のように指定してください',
-			'データ管理・設定変更はサイドメニューの「データ管理」「設定」からも直接操作できます',
-			'レコードの削除は、一覧の行をクリックして詳細ダイアログを開き、右上の「削除」ボタンから行えます'
+			'Just give instructions in natural language',
+			'To hear the detailed usage of a feature, ask something like "tell me how to use app creation"',
+			'Data management and settings changes can also be done directly from "Data Management" / "Settings" in the side menu',
+			'To delete a record, click a row in the list to open the detail dialog, then use the "Delete" button in the top right'
 		],
 		relatedPages: [
-			{ label: 'アプリ一覧', href: '/', description: '作成したアプリのテーブル・データを直接管理できます' },
-			{ label: '設定', href: '/settings', description: 'アプリの各種設定を変更できます' }
+			{ label: 'App list', href: '/', description: 'You can directly manage the tables and data of the apps you created' },
+			{ label: 'Settings', href: '/settings', description: 'You can change various app settings' }
 		]
 	},
 	apps: {
-		title: 'ノーコードアプリ生成',
-		description: '新しいアプリの作成はアプリ一覧画面の「アプリを作成」ボタン（空から作成、またはファイルから取り込み）から行う。作成後のテーブル追加・フィールド設計はチャットでも依頼できる',
+		title: 'No-code app generation',
+		description: 'Create a new app from the "Create App" button on the app list screen (create from scratch, or import from a file). After creation, adding tables and designing fields can also be requested via chat',
 		operations: [
-			{ action: '新しいアプリを作成する', description: 'アプリ一覧画面の「アプリを作成」ボタンから行う（チャットでは作成できない）', examples: ['アプリの作り方を教えて'] },
-			{ action: 'テーブルを追加する', examples: ['このアプリに在庫管理用のテーブルを追加して'] },
-			{ action: 'フィールドを追加する', examples: ['在庫管理テーブルに「担当者」フィールドを追加して', '商品管理に「カテゴリ」列を追加して'] },
-			{ action: '他テーブルと関連付ける', examples: ['案件管理テーブルを顧客テーブルと紐付けたい', '注文テーブルに商品を選択するフィールドを追加して'] }
+			{ action: 'Create a new app', description: 'Done from the "Create App" button on the app list screen (cannot be created via chat)', examples: ['Tell me how to create an app'] },
+			{ action: 'Add a table', examples: ['Add an inventory management table to this app'] },
+			{ action: 'Add a field', examples: ['Add a "person in charge" field to the inventory management table', 'Add a "category" column to product management'] },
+			{ action: 'Relate to another table', examples: ['I want to link the deal management table to the customer table', 'Add a field to the order table to select a product'] }
 		],
 		tips: [
-			'テーブル追加・フィールド設計はアプリ画面内のチャットで依頼できます（AIが構成を提案して確認を求めてから作成します）',
-			'テーブル同士を recordSelect フィールドで関連付けたり、account フィールドでアカウント（担当者）と紐付けたりできます',
-			'作成後はデータ管理画面から直接データ操作ができます',
-			'フィールド構成の変更はデータ管理のスキーマ編集画面からも行えます'
+			'You can request table additions and field design via chat within the app screen (the AI proposes a configuration and asks for confirmation before creating it)',
+			'Tables can be related to each other with a recordSelect field, or linked to an account (assignee) with an account field',
+			'After creation, you can operate the data directly from the data management screen',
+			'Field configuration changes can also be made from the data management schema editing screen'
 		],
 		relatedPages: [
-			{ label: 'アプリ一覧', href: '/', description: 'アプリの作成・テーブル一覧・スキーマ編集ができます' }
+			{ label: 'App list', href: '/', description: 'You can create apps, view the table list, and edit schemas' }
 		]
 	},
 	tables: {
-		title: 'テーブル管理',
-		description: '作成したカスタムテーブルの確認・フィールド追加・削除ができます',
+		title: 'Table management',
+		description: 'You can view your created custom tables and add or remove fields',
 		operations: [
-			{ action: 'テーブル一覧を確認する', examples: ['どんなテーブルがある？', 'テーブル一覧を見せて', '作成済みのアプリを教えて'] },
-			{ action: 'フィールドを追加する', examples: ['〇〇テーブルに「△△」フィールドを追加して'] },
-			{ action: 'テーブルを削除する', description: 'データ管理のスキーマ編集画面から削除できます', examples: ['〇〇テーブルを削除したい'] }
+			{ action: 'Check the table list', examples: ['What tables are there?', 'Show me the table list', 'Tell me the apps that have been created'] },
+			{ action: 'Add a field', examples: ['Add a "△△" field to the ○○ table'] },
+			{ action: 'Delete a table', description: 'Can be deleted from the data management schema editing screen', examples: ['I want to delete the ○○ table'] }
 		],
 		tips: [
-			'テーブル名（識別名）は英小文字・数字・アンダースコアのみ使用できます',
-			'システム予約語（accounts, workflows 等）はテーブル名として使用できません'
+			'Table names (identifiers) can only use lowercase letters, digits, and underscores',
+			'System reserved words (accounts, workflows, etc.) cannot be used as table names'
 		],
 		relatedPages: [
-			{ label: 'アプリ一覧', href: '/', description: 'テーブル一覧・スキーマ編集ができます' }
+			{ label: 'App list', href: '/', description: 'You can view the table list and edit schemas' }
 		]
 	},
 	records: {
-		title: 'レコード操作',
-		description: 'カスタムテーブルのデータ（レコード）の登録・一覧表示・更新・削除ができます',
+		title: 'Record operations',
+		description: 'You can create, list, update, and delete data (records) in custom tables',
 		operations: [
-			{ action: 'レコードを登録する', examples: ['在庫管理に新しい商品を追加して', '〇〇テーブルにデータを登録したい'] },
-			{ action: 'レコード一覧を見る', examples: ['商品一覧を見せて', '〇〇テーブルのデータを表示して'] },
-			{ action: 'レコードを更新する', examples: ['〇〇の在庫数を10に変更して', '〇〇テーブルの〇〇レコードを編集して'] },
-			{ action: 'レコードを削除する', description: 'チャットまたはデータ管理の一覧で行をクリックして詳細ダイアログを開き、右上の「削除」ボタンから削除します', examples: ['〇〇レコードを削除したい'] }
+			{ action: 'Create a record', examples: ['Add a new product to inventory management', 'I want to register data in the ○○ table'] },
+			{ action: 'View the record list', examples: ['Show me the product list', 'Show the data in the ○○ table'] },
+			{ action: 'Update a record', examples: ['Change the stock count of ○○ to 10', 'Edit the ○○ record in the ○○ table'] },
+			{ action: 'Delete a record', description: 'Click a row in the chat list or the data management list to open the detail dialog, then delete from the "Delete" button in the top right', examples: ['I want to delete the ○○ record'] }
 		],
 		tips: [
-			'データ管理画面からも直接レコードの登録・編集・削除ができます',
-			'行クリックで詳細ダイアログを開けます（チャットの一覧テーブルでも使えます）'
+			'Records can also be created, edited, and deleted directly from the data management screen',
+			'Clicking a row opens the detail dialog (also works in the list tables in chat)'
 		],
 		relatedPages: [
-			{ label: 'アプリ一覧', href: '/', description: '各テーブルのレコード一覧・登録・編集・削除ができます' }
+			{ label: 'App list', href: '/', description: 'You can list, create, edit, and delete records for each table' }
 		]
 	},
 	workflows: {
-		title: 'ワークフロー自動化',
-		description: '毎日決まった時刻に実行する自動化フローを作成できます（通知・集計・メール送信など）',
+		title: 'Workflow automation',
+		description: 'You can create automation flows that run at a fixed time every day (notifications, aggregation, sending email, etc.)',
 		operations: [
-			{ action: 'ワークフローを作成する', examples: ['毎日9時に未処理の〇〇を通知して', 'ワークフローを作りたい', '定期実行の自動化フローを作って'] },
-			{ action: 'ワークフロー一覧を確認する', examples: ['設定済みのワークフローは？', 'どんなワークフローがある？'] },
-			{ action: 'ワークフローを編集する', examples: ['〇〇ワークフローのトリガー時刻を変えて', '〇〇ワークフローにステップを追加して'] }
+			{ action: 'Create a workflow', examples: ['Notify me every day at 9am about unprocessed ○○', 'I want to create a workflow', 'Create an automation flow that runs on a schedule'] },
+			{ action: 'Check the workflow list', examples: ['What workflows are configured?', 'What workflows are there?'] },
+			{ action: 'Edit a workflow', examples: ['Change the trigger time of the ○○ workflow', 'Add a step to the ○○ workflow'] }
 		],
 		tips: [
-			'トリガーは毎日の決まった時刻のみ対応しています',
-			'action（ツール実行）/ condition（条件分岐）/ foreach（繰り返し）の3種類のステップを組み合わせます',
-			'ワークフロー管理画面から有効化・無効化・実行ログの確認ができます'
+			'Triggers only support a fixed time each day',
+			'Combine three kinds of steps: action (run a tool) / condition (branch) / foreach (repeat)',
+			'You can enable/disable workflows and check run logs from the workflow management screen'
 		],
 		relatedPages: [
-			{ label: 'アプリ一覧', href: '/', description: 'アプリごとのワークフロー一覧・有効化・実行ログ確認ができます' }
+			{ label: 'App list', href: '/', description: 'You can view the workflow list per app, enable them, and check run logs' }
 		]
 	},
 	documents: {
-		title: '資料生成（CSV / Markdownデータ出力）',
-		description: 'テーブルのデータをCSV・Markdown形式で出力し、ExcelやAIツールで加工できる素材ファイルを生成します',
+		title: 'Document generation (CSV / Markdown data export)',
+		description: 'Exports table data in CSV or Markdown format, generating a source file that can be processed with Excel or AI tools',
 		operations: [
-			{ action: 'データをCSVで出力する', description: 'Excelで開ける表形式データ', examples: ['商品一覧をCSVで出力して', '〇〇テーブルのデータをExcel用にまとめて'] },
-			{ action: 'Markdownレポートを生成する', description: '文章・複数テーブル混在の報告書', examples: ['〇〇のサマリーレポートを作って', '月次まとめをMarkdownで生成して'] }
+			{ action: 'Export data as CSV', description: 'Tabular data that can be opened in Excel', examples: ['Export the product list as CSV', 'Put together the ○○ table data for Excel'] },
+			{ action: 'Generate a Markdown report', description: 'A report mixing prose and multiple tables', examples: ['Create a summary report for ○○', 'Generate the monthly summary in Markdown'] }
 		],
 		tips: [
-			'生成したファイルはダウンロードリンクから取得できます',
-			'Excel・ChatGPT・Copilotなどの外部ツールで加工するための素材ファイルです',
-			'具体的な加工内容を伝えると、外部AIツール向けのプロンプトも一緒に生成します'
+			'Generated files can be obtained from the download link',
+			'These are source files meant for processing with external tools like Excel, ChatGPT, or Copilot',
+			'If you describe the specific processing you need, a prompt for external AI tools will also be generated alongside it'
 		]
 	},
 	email: {
-		title: 'メール送信',
+		title: 'Sending email',
 		operations: [
-			{ action: 'メールを作成・送信する', examples: ['〇〇にお知らせメールを送って', '△△担当者にフォローアップメールを書いて', '確認メールを作成して'] }
+			{ action: 'Compose and send an email', examples: ['Send an announcement email to ○○', 'Write a follow-up email to the person in charge of △△', 'Compose a confirmation email'] }
 		],
 		tips: [
-			'AIが下書きを作成し、フォームで内容を確認・編集してから送信します',
-			'初回利用時はメール設定画面でメールサービスの設定が必要です'
+			'The AI drafts the email, and you review/edit the content in a form before sending',
+			'On first use, you need to configure the email service in the email settings screen'
 		],
 		relatedPages: [
-			{ label: 'メール設定', href: '/settings/email', description: 'メール送信サービスの設定ができます' }
+			{ label: 'Email settings', href: '/settings/email', description: 'You can configure the email sending service' }
 		]
 	}
 };

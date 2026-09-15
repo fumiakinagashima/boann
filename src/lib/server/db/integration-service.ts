@@ -6,12 +6,12 @@ const SECRET_FIELDS = ['value', 'password'] as const;
 
 export type IntegrationOption = { id: string; name: string };
 
-/** ワークフローの「外部API呼び出し」対象選択用に、認証情報を含まない一覧を取得する。 */
+/** Fetches a list without credentials, for selecting the target of a workflow's "call external API" action. */
 export async function listIntegrationsForWorkflow(db: Db): Promise<IntegrationOption[]> {
 	return db.select({ id: integrations.id, name: integrations.name }).from(integrations).orderBy(integrations.name);
 }
 
-// 秘匿フィールド（トークン・パスワード）をクライアント向けにマスクする
+// Masks sensitive fields (tokens, passwords) for the client
 export function maskAuthConfig(authConfig: Record<string, string>): Record<string, string> {
 	const masked = { ...authConfig };
 	for (const key of SECRET_FIELDS) {
@@ -20,7 +20,7 @@ export function maskAuthConfig(authConfig: Record<string, string>): Record<strin
 	return masked;
 }
 
-// PATCH時、秘匿フィールドがマスク値（未変更）のままなら既存値を保持する
+// On PATCH, keeps the existing value if a sensitive field is still the masked value (unchanged)
 export function mergeAuthConfig(
 	existing: Record<string, string>,
 	incoming: Record<string, string>

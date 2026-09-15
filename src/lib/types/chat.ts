@@ -14,9 +14,10 @@ export type FieldType =
 	| 'multiselect';
 
 /**
- * 他レコードを id で参照し、表示・選択肢ではラベル（名前）を見せるリレーション系フィールドか判定する。
- * - recordSelect: 任意のユーザー定義テーブルを参照
- * - account: アカウントテーブル（accounts）を参照する専用型。refTable='accounts' / refLabelKey='name' 固定
+ * Determines whether a field is a relation-type field that references another record by id, while
+ * showing a label (name) in the display/choices.
+ * - recordSelect: references an arbitrary user-defined table
+ * - account: a dedicated type that references the accounts table. Fixed to refTable='accounts' / refLabelKey='name'
  */
 export function isRefField(type: string): boolean {
 	return type === 'recordSelect' || type === 'account';
@@ -57,8 +58,8 @@ export type TableContent = {
 	type: 'table';
 	columns: TableColumn[];
 	rows: Record<string, unknown>[];
-	// 行がレコードを表すテーブルの場合、そのカスタムテーブル名。
-	// 設定されていると行クリックで詳細ダイアログを開ける（rows に id が必要）
+	// When rows represent records of a table, the name of that custom table.
+	// If set, clicking a row can open a detail dialog (rows need an id)
 	entity?: string;
 };
 
@@ -124,8 +125,8 @@ export type ReplyContent = {
 export type WorkflowResultType = 'boolean' | 'number' | 'string';
 
 /**
- * パラメータ・条件のオペランド値。文字列リテラルそのもの、または `@step:<id>` 形式で
- * 同じワークフロー内の先行ステップ（WorkflowActionStep）の結果を参照する。
+ * A parameter/condition operand value. Either a string literal as-is, or a reference via `@step:<id>`
+ * notation to the result of a preceding step (WorkflowActionStep) within the same workflow.
  */
 export type WorkflowOperand = string;
 
@@ -135,14 +136,14 @@ export type WorkflowActionStep = {
 	label: string;
 	tool: string;
 	params?: Record<string, WorkflowOperand>;
-	/** エディタの「カテゴリ→対象」選択で選んだカテゴリキー（例: 'search' / 'summarize'）。
-	 *  toolが複数カテゴリから参照される場合に、再読込時どちらのカテゴリで表示するかを覚えておくため。
-	 *  未設定（AI生成・旧データ）の場合は findWorkflowActionCategory による逆引きにフォールバックする。 */
+	/** The category key chosen via the editor's "category -> target" selection (e.g. 'search' / 'summarize').
+	 *  Remembers which category to display under on reload, for tools referenced from multiple categories.
+	 *  If unset (AI-generated or legacy data), falls back to a reverse lookup via findWorkflowActionCategory. */
 	category?: string;
-	/** 失敗時に自動再試行する回数（0または未指定=リトライなし）。WORKFLOW_MAX_RETRIESが上限。
-	 *  設定不備等の即時中断エラー（WorkflowAbortError）はリトライ対象外——一時的な障害のみを想定。 */
+	/** Number of automatic retries on failure (0 or unset = no retry). WORKFLOW_MAX_RETRIES is the cap.
+	 *  Immediate-abort errors from misconfiguration etc. (WorkflowAbortError) are not retried — only transient failures are assumed. */
 	maxRetries?: number;
-	/** リトライしても最終的に失敗した場合、ワークフロー全体を中断せず次のステップに進む場合true。 */
+	/** If true, proceed to the next step instead of aborting the whole workflow when this step ultimately fails even after retries. */
 	continueOnError?: boolean;
 };
 
@@ -159,9 +160,9 @@ export type WorkflowConditionStep = {
 };
 
 /**
- * 配列型の結果（resultListを持つアクション）を1件ずつ処理する。無限ループ回避のため
- * while相当の仕組みは提供しない。body内では現在の項目を `@item:<field>` で参照できる
- * （body専用スコープ。外からは参照不可）。
+ * Processes an array-shaped result (an action with a listResult) one item at a time. There is no
+ * while-equivalent construct, to avoid infinite loops. Inside body, the current item can be referenced
+ * as `@item:<field>` (a body-only scope; not referenceable from outside).
  */
 export type WorkflowForeachStep = {
 	id: string;
@@ -174,10 +175,10 @@ export type WorkflowForeachStep = {
 export type WorkflowResultValueType = 'scalar' | 'array';
 
 /**
- * ワークフロー全体の実行結果（run_workflow_*のMCPレスポンス、「今すぐ実行」の結果表示）にキーをセットする。
- * 同じキーを複数回セットすると後に実行された方で上書きされる。
- * valueTypeが'array'の場合、valueはJSON.stringifyされた文字列配列（各要素は@step:/@item:等の参照 or 直接入力）。
- * オブジェクト型（ネスト）は現状非対応。
+ * Sets a key on the workflow's overall execution result (the run_workflow_* MCP response, the "run now"
+ * result display). Setting the same key more than once overwrites it with the value from whichever ran later.
+ * When valueType is 'array', value is a JSON.stringify'd string array (each element is either a @step:/@item:
+ * etc. reference or a literal). Object types (nesting) are currently unsupported.
  */
 export type WorkflowResultStep = {
 	id: string;

@@ -8,7 +8,7 @@ export const load: PageServerLoad = async ({ params, platform }) => {
 	if (!platform?.env?.DB) error(500);
 	const db = createDb(platform.env.DB);
 	const app = await getEntityTypeById(db, params.tableId);
-	if (!app) error(404, 'テーブルが見つかりません');
+	if (!app) error(404, 'Table not found');
 	const [fields, records] = await Promise.all([
 		getFieldsByEntityTypeId(db, params.tableId),
 		listRecordsByEntityTypeId(db, params.tableId)

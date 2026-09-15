@@ -1,6 +1,6 @@
--- bookmarks を entity_type 単位から apps 単位に変更する。
--- entity_type_id は「1アプリ=1テーブル」時代の値で、0004_apps.sql 以降は
--- entityTypes.appId 経由で対応する app_id に変換する必要がある。
+-- Change bookmarks from being scoped per entity_type to being scoped per app.
+-- entity_type_id is a value from the "1 app = 1 table" era; since 0004_apps.sql it needs to be
+-- converted to the corresponding app_id via entityTypes.appId.
 PRAGMA defer_foreign_keys=true;
 --> statement-breakpoint
 

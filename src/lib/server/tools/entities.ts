@@ -9,52 +9,52 @@ import { parseJson, now } from './shared';
 export const tools: Tool[] = [
 	{
 		name: 'list_entity_types',
-		description: 'ユーザーが定義したカスタムテーブル（エンティティ種別）の一覧を取得する。',
+		description: 'Get the list of custom tables (entity types) defined by the user.',
 		input_schema: { type: 'object', properties: {}, required: [] }
 	},
 	{
 		name: 'create_app',
 		description:
-			'チャットで「○○管理アプリを作って」のような業務アプリ作成の依頼を受けた場合に使う。カスタムテーブル（エンティティ種別）とそのフィールド定義を一括で作成し、任意でサンプルデータも登録する。作成後はアプリ画面（/apps/{id}）でテーブルのデータ（一覧・登録・編集）を管理できる。既存のカスタムテーブルにフィールドを追加したいだけの場合は add_entity_field を使う。',
+			'Use this when receiving a request to build a business app in chat, such as "create a ○○ management app". Creates a custom table (entity type) and its field definitions in one batch, and optionally registers sample data as well. After creation, the table\'s data (list/create/edit) can be managed from the app screen (/apps/{id}). If you just want to add a field to an existing custom table, use add_entity_field instead.',
 		input_schema: {
 			type: 'object',
 			properties: {
 				name: {
 					type: 'string',
-					description: 'テーブルの識別名（英小文字・数字・アンダースコアのみ、例: sales_pipeline）'
+					description: 'Identifier name for the table (lowercase letters, digits, underscores only, e.g. sales_pipeline)'
 				},
-				label: { type: 'string', description: 'アプリ・テーブルの表示名（例: 販売管理）' },
-				icon: { type: 'string', description: 'アイコン（絵文字推奨 例: 📈）' },
+				label: { type: 'string', description: 'Display name for the app/table (e.g. Sales Management)' },
+				icon: { type: 'string', description: 'Icon (emoji recommended, e.g. 📈)' },
 				fields: {
 					type: 'array',
-					description: 'フィールド定義の一覧（表示順）',
+					description: 'List of field definitions (display order)',
 					items: {
 						type: 'object',
 						properties: {
 							key: {
 								type: 'string',
-								description: 'フィールドキー（英小文字・数字・アンダースコアのみ）'
+								description: 'Field key (lowercase letters, digits, underscores only)'
 							},
-							label: { type: 'string', description: 'フィールドの表示名' },
+							label: { type: 'string', description: 'Display name of the field' },
 							type: {
 								type: 'string',
 								enum: ['text', 'number', 'select', 'date', 'email', 'tel', 'textarea', 'recordSelect', 'account'],
 								description:
-									'フィールドの型。recordSelect は他テーブルのレコードを参照する関係フィールド。account はアカウント（ユーザー）を参照する関係フィールドで、ref_table は不要（自動で accounts を参照し、表示・選択肢ではアカウント名を表示）'
+									'Field type. recordSelect is a relational field that references a record in another table. account is a relational field that references an account (user); ref_table is not needed for it (it automatically references accounts, and the display/options show the account name)'
 							},
-							required: { type: 'boolean', description: '必須フィールドかどうか' },
+							required: { type: 'boolean', description: 'Whether the field is required' },
 							options: {
 								type: 'array',
 								items: {
 									type: 'object',
 									properties: { value: { type: 'string' }, label: { type: 'string' } }
 								},
-								description: 'type が select のときの選択肢'
+								description: 'Choices to use when type is select'
 							},
 							ref_table: {
 								type: 'string',
 								description:
-									'type が recordSelect のときの関係先テーブル名。list_entity_types で取得したテーブルの name を指定する'
+									'The name of the related table when type is recordSelect. Specify the name of a table obtained from list_entity_types'
 							}
 						},
 						required: ['key', 'label']
@@ -62,8 +62,8 @@ export const tools: Tool[] = [
 				},
 				seed_records: {
 					type: 'array',
-					items: { type: 'object', description: 'フィールドキー: 値の組' },
-					description: '初期投入するサンプルデータ（任意。デモでの即時運用感のため2〜3件程度を推奨）'
+					items: { type: 'object', description: 'Field key: value pairs' },
+					description: 'Sample data to seed initially (optional; 2-3 records recommended so a demo feels immediately usable)'
 				}
 			},
 			required: ['name', 'label', 'fields']
@@ -71,11 +71,11 @@ export const tools: Tool[] = [
 	},
 	{
 		name: 'get_entity_fields',
-		description: '指定したカスタムテーブルのフィールド定義を取得する。',
+		description: 'Get the field definitions of the specified custom table.',
 		input_schema: {
 			type: 'object',
 			properties: {
-				entity_type_id: { type: 'string', description: 'エンティティ種別のID' }
+				entity_type_id: { type: 'string', description: 'ID of the entity type' }
 			},
 			required: ['entity_type_id']
 		}
@@ -83,45 +83,45 @@ export const tools: Tool[] = [
 	{
 		name: 'create_entity_type',
 		description:
-			'ユーザー定義のカスタムテーブルを新規作成する。例: 在庫管理・プロジェクト管理など。',
+			'Create a new user-defined custom table. Examples: inventory management, project management, etc.',
 		input_schema: {
 			type: 'object',
 			properties: {
-				name: { type: 'string', description: 'テーブルの識別名（英小文字・アンダースコア推奨）' },
-				label: { type: 'string', description: 'テーブルの表示名（例: 在庫管理）' },
-				icon: { type: 'string', description: 'アイコン（絵文字推奨 例: 📦）' }
+				name: { type: 'string', description: 'Identifier name for the table (lowercase letters and underscores recommended)' },
+				label: { type: 'string', description: 'Display name for the table (e.g. Inventory Management)' },
+				icon: { type: 'string', description: 'Icon (emoji recommended, e.g. 📦)' }
 			},
 			required: ['name', 'label']
 		}
 	},
 	{
 		name: 'add_entity_field',
-		description: 'カスタムテーブルにフィールドを追加する。',
+		description: 'Add a field to a custom table.',
 		input_schema: {
 			type: 'object',
 			properties: {
-				entity_type_id: { type: 'string', description: 'エンティティ種別のID（必須）' },
-				key: { type: 'string', description: 'フィールドキー（英小文字・アンダースコア推奨）' },
-				label: { type: 'string', description: 'フィールドの表示名' },
+				entity_type_id: { type: 'string', description: 'ID of the entity type (required)' },
+				key: { type: 'string', description: 'Field key (lowercase letters and underscores recommended)' },
+				label: { type: 'string', description: 'Display name of the field' },
 				type: {
 					type: 'string',
 					enum: ['text', 'number', 'select', 'date', 'email', 'tel', 'textarea', 'recordSelect', 'account'],
 					description:
-						'フィールドの型。recordSelect は他テーブルのレコードを参照する関係フィールド。account はアカウント（ユーザー）を参照する関係フィールドで、ref_table は不要（自動で accounts を参照し、表示・選択肢ではアカウント名を表示）'
+						'Field type. recordSelect is a relational field that references a record in another table. account is a relational field that references an account (user); ref_table is not needed for it (it automatically references accounts, and the display/options show the account name)'
 				},
-				required: { type: 'boolean', description: '必須フィールドかどうか' },
+				required: { type: 'boolean', description: 'Whether the field is required' },
 				options: {
 					type: 'array',
 					items: {
 						type: 'object',
 						properties: { value: { type: 'string' }, label: { type: 'string' } }
 					},
-					description: 'type が select のときの選択肢'
+					description: 'Choices to use when type is select'
 				},
 				ref_table: {
 					type: 'string',
 					description:
-						'type が recordSelect のときの関係先テーブル名。list_entity_types で取得したテーブルの name を指定する'
+						'The name of the related table when type is recordSelect. Specify the name of a table obtained from list_entity_types'
 				}
 			},
 			required: ['entity_type_id', 'key', 'label']
@@ -129,36 +129,36 @@ export const tools: Tool[] = [
 	},
 	{
 		name: 'get_entities',
-		description: 'カスタムテーブルのレコード一覧を取得する。',
+		description: 'Get the list of records in a custom table.',
 		input_schema: {
 			type: 'object',
 			properties: {
-				entity_type_id: { type: 'string', description: 'エンティティ種別のID（必須）' },
-				limit: { type: 'number', description: '取得件数の上限（デフォルト: 50）' }
+				entity_type_id: { type: 'string', description: 'ID of the entity type (required)' },
+				limit: { type: 'number', description: 'Maximum number of records to retrieve (default: 50)' }
 			},
 			required: ['entity_type_id']
 		}
 	},
 	{
 		name: 'create_entity',
-		description: 'カスタムテーブルにレコードを登録する。',
+		description: 'Register a record in a custom table.',
 		input_schema: {
 			type: 'object',
 			properties: {
-				entity_type_id: { type: 'string', description: 'エンティティ種別のID（必須）' },
-				data: { type: 'object', description: 'レコードのデータ（フィールドキー: 値）' }
+				entity_type_id: { type: 'string', description: 'ID of the entity type (required)' },
+				data: { type: 'object', description: 'Record data (field key: value)' }
 			},
 			required: ['entity_type_id', 'data']
 		}
 	},
 	{
 		name: 'update_entity',
-		description: 'カスタムテーブルのレコードを更新する。',
+		description: 'Update a record in a custom table.',
 		input_schema: {
 			type: 'object',
 			properties: {
-				id: { type: 'string', description: 'レコードID（必須）' },
-				data: { type: 'object', description: '更新するデータ（既存データとマージされる）' }
+				id: { type: 'string', description: 'Record ID (required)' },
+				data: { type: 'object', description: 'Data to update (merged with the existing data)' }
 			},
 			required: ['id', 'data']
 		}
@@ -166,39 +166,39 @@ export const tools: Tool[] = [
 	{
 		name: 'create_table',
 		description:
-			'現在編集中のアプリにテーブルを追加する。テーブル名・フィールド定義を指定して新しいデータテーブルを作成する。作成すると自動的にデータ管理画面が使えるようになる。',
+			'Add a table to the app currently being edited. Creates a new data table with the specified table name and field definitions. Once created, the data management screen becomes automatically available.',
 		input_schema: {
 			type: 'object',
 			properties: {
-				app_id: { type: 'string', description: '追加先のアプリID' },
+				app_id: { type: 'string', description: 'ID of the app to add the table to' },
 				name: {
 					type: 'string',
-					description: 'テーブルの識別名（英小文字・数字・アンダースコアのみ、例: customers）'
+					description: 'Identifier name for the table (lowercase letters, digits, underscores only, e.g. customers)'
 				},
-				label: { type: 'string', description: 'テーブルの表示名（例: 顧客）' },
-				icon: { type: 'string', description: 'アイコン（絵文字推奨 例: 👥）' },
+				label: { type: 'string', description: 'Display name for the table (e.g. Customers)' },
+				icon: { type: 'string', description: 'Icon (emoji recommended, e.g. 👥)' },
 				fields: {
 					type: 'array',
-					description: 'フィールド定義の一覧（表示順）',
+					description: 'List of field definitions (display order)',
 					items: {
 						type: 'object',
 						properties: {
-							key: { type: 'string', description: 'フィールドキー（英小文字・数字・アンダースコアのみ）' },
-							label: { type: 'string', description: 'フィールドの表示名' },
+							key: { type: 'string', description: 'Field key (lowercase letters, digits, underscores only)' },
+							label: { type: 'string', description: 'Display name of the field' },
 							type: {
 								type: 'string',
 								enum: ['text', 'number', 'select', 'date', 'email', 'tel', 'textarea', 'recordSelect', 'account'],
-								description: 'フィールドの型。account はアカウント（ユーザー）を参照する関係フィールド（ref_table 不要）'
+								description: 'Field type. account is a relational field that references an account (user) (ref_table not needed)'
 							},
-							required: { type: 'boolean', description: '必須フィールドかどうか' },
+							required: { type: 'boolean', description: 'Whether the field is required' },
 							options: {
 								type: 'array',
 								items: { type: 'object', properties: { value: { type: 'string' }, label: { type: 'string' } } },
-								description: 'type が select のときの選択肢'
+								description: 'Choices to use when type is select'
 							},
 							ref_table: {
 								type: 'string',
-								description: 'type が recordSelect のときの関係先テーブル名'
+								description: 'The name of the related table when type is recordSelect'
 							}
 						},
 						required: ['key', 'label']
@@ -211,7 +211,7 @@ export const tools: Tool[] = [
 ];
 
 const createEntityTypeSchema = z.object({
-	name: z.string().min(1).regex(/^[a-z0-9_]+$/, '英小文字・数字・アンダースコアのみ使用可'),
+	name: z.string().min(1).regex(/^[a-z0-9_]+$/, 'Only lowercase letters, digits, and underscores are allowed'),
 	label: z.string().min(1),
 	icon: z.string().optional()
 });
@@ -250,7 +250,7 @@ const updateEntitySchema = z.object({
 
 const createTableSchema = z.object({
 	app_id: z.string(),
-	name: z.string().min(1).regex(/^[a-z0-9_]+$/, '英小文字・数字・アンダースコアのみ使用可'),
+	name: z.string().min(1).regex(/^[a-z0-9_]+$/, 'Only lowercase letters, digits, and underscores are allowed'),
 	label: z.string().min(1),
 	icon: z.string().optional(),
 	fields: z.array(
@@ -268,7 +268,7 @@ const createTableSchema = z.object({
 });
 
 const createAppFieldSchema = z.object({
-	key: z.string().min(1).regex(/^[a-z0-9_]+$/, '英小文字・数字・アンダースコアのみ使用可'),
+	key: z.string().min(1).regex(/^[a-z0-9_]+$/, 'Only lowercase letters, digits, and underscores are allowed'),
 	label: z.string().min(1),
 	type: z
 		.enum(['text', 'number', 'select', 'date', 'email', 'tel', 'textarea', 'recordSelect', 'account'])
@@ -282,7 +282,7 @@ const createAppFieldSchema = z.object({
 });
 
 const createAppSchema = z.object({
-	name: z.string().min(1).regex(/^[a-z0-9_]+$/, '英小文字・数字・アンダースコアのみ使用可'),
+	name: z.string().min(1).regex(/^[a-z0-9_]+$/, 'Only lowercase letters, digits, and underscores are allowed'),
 	label: z.string().min(1),
 	icon: z.string().optional(),
 	fields: z.array(createAppFieldSchema).min(1),
@@ -351,7 +351,7 @@ export async function handleAddEntityField(db: Db, input: unknown) {
 		.select()
 		.from(entityTypes)
 		.where(eq(entityTypes.id, data.entity_type_id));
-	if (!type) throw new Error(`エンティティ種別が見つかりません: ${data.entity_type_id}`);
+	if (!type) throw new Error(`Entity type not found: ${data.entity_type_id}`);
 
 	const [maxRow] = await db
 		.select({ sortOrder: entityFields.sortOrder })
@@ -405,7 +405,7 @@ export async function handleCreateEntity(db: Db, input: unknown, accountId?: str
 export async function handleUpdateEntity(db: Db, input: unknown, accountId?: string) {
 	const { id, data } = updateEntitySchema.parse(input);
 	const [existing] = await db.select().from(entities).where(eq(entities.id, id));
-	if (!existing) throw new Error(`レコードが見つかりません: ${id}`);
+	if (!existing) throw new Error(`Record not found: ${id}`);
 
 	const merged = JSON.stringify({ ...parseJson(existing.data), ...data });
 	const set: Record<string, unknown> = { data: merged, updatedAt: now() };

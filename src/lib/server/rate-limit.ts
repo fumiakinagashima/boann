@@ -1,4 +1,4 @@
-// Cloudflare KVを使った固定ウィンドウ方式のレート制限。
+// Fixed-window rate limiting using Cloudflare KV.
 // Falls back to allow if KV is not configured.
 
 const DEFAULT_WINDOW_SECONDS = 60;

@@ -1,5 +1,5 @@
--- ファイル取り込みによるアプリ生成の非同期ジョブ。
--- apply は Queue consumer で実行し、進捗・結果をここで追跡する。
+-- The async job for app generation via file import.
+-- apply runs in a Queue consumer; progress and results are tracked here.
 CREATE TABLE `import_jobs` (
   `id` text PRIMARY KEY NOT NULL,
   `account_id` text NOT NULL,

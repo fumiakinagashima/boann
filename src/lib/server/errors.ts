@@ -6,12 +6,12 @@ export function apiError(message: string, status: number, code?: string): Respon
 
 export const errors = {
 	badRequest: (msg: string) => apiError(msg, 400, 'BAD_REQUEST'),
-	forbidden: (msg = 'アクセス権限がありません') => apiError(msg, 403, 'FORBIDDEN'),
-	notFound: (msg = 'リソースが見つかりません') => apiError(msg, 404, 'NOT_FOUND'),
+	forbidden: (msg = 'You do not have permission to access this') => apiError(msg, 403, 'FORBIDDEN'),
+	notFound: (msg = 'Resource not found') => apiError(msg, 404, 'NOT_FOUND'),
 	tooManyRequests: (retryAfter: number) =>
 		new Response(
 			JSON.stringify({
-				error: `レート制限を超えました。${retryAfter}秒後に再試行してください。`,
+				error: `Rate limit exceeded. Please try again in ${retryAfter} seconds.`,
 				code: 'RATE_LIMITED'
 			}),
 			{
@@ -24,5 +24,5 @@ export const errors = {
 		),
 	serviceUnavailable: (msg: string) => apiError(msg, 503, 'SERVICE_UNAVAILABLE'),
 	internal: (e?: unknown) =>
-		apiError(e instanceof Error ? e.message : String(e ?? '内部エラーが発生しました'), 500, 'INTERNAL_ERROR')
+		apiError(e instanceof Error ? e.message : String(e ?? 'An internal error occurred'), 500, 'INTERNAL_ERROR')
 };

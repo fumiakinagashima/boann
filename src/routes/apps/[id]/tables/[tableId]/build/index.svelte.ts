@@ -3,15 +3,15 @@ import { tick, untrack } from 'svelte';
 import type { PageData } from './$types';
 
 export const FIELD_TYPES = [
-	{ value: 'text',         label: 'テキスト' },
-	{ value: 'textarea',     label: '長文テキスト' },
-	{ value: 'number',       label: '数値' },
-	{ value: 'date',         label: '日付' },
-	{ value: 'select',       label: '選択肢' },
-	{ value: 'email',        label: 'メールアドレス' },
-	{ value: 'tel',          label: '電話番号' },
-	{ value: 'recordSelect', label: 'リレーション' },
-	{ value: 'account',      label: 'アカウント' },
+	{ value: 'text',         label: 'Text' },
+	{ value: 'textarea',     label: 'Long text' },
+	{ value: 'number',       label: 'Number' },
+	{ value: 'date',         label: 'Date' },
+	{ value: 'select',       label: 'Select' },
+	{ value: 'email',        label: 'Email address' },
+	{ value: 'tel',          label: 'Phone number' },
+	{ value: 'recordSelect', label: 'Relation' },
+	{ value: 'account',      label: 'Account' },
 ] as const;
 
 export type SelectOption = { label: string; value: string };
@@ -36,8 +36,8 @@ function slugify(s: string): string {
 		.replace(/^_+|_+$/g, '');
 }
 
-// 日本語ラベル等、slugify結果が空になる入力に対するフォールバック。
-// 生のラベルをそのままkeyにしてしまうと日本語キーになってしまうため、ランダムな文字列にする。
+// Fallback for input (e.g. Japanese labels) that produces an empty slugify result.
+// Using the raw label as the key would create a non-ASCII key, so use a random string instead.
 function randomSlug(prefix: string): string {
 	return prefix + crypto.randomUUID().replace(/-/g, '').slice(0, 8);
 }
@@ -51,7 +51,7 @@ export function createTableBuildState(getData: () => PageData) {
 	let mcpUpdate = $state(getData().app.mcpUpdate);
 	let mcpDelete = $state(getData().app.mcpDelete);
 
-	// サーバーデータが変わったとき、未保存変更がなければラベル・MCP設定を同期する
+	// Sync the label/MCP settings when the server data changes, if there are no unsaved changes
 	$effect(() => {
 		const server = getData().app;
 		if (!untrack(() => dirty) && !untrack(() => saving)) {
@@ -86,7 +86,7 @@ export function createTableBuildState(getData: () => PageData) {
 	let saveError = $state('');
 	let expandedId = $state<string | null>(null);
 
-	// dirty=true または saving=true のときはリセットしない（AIチャットのinvalidateAll等で変更が消えないよう）
+	// Don't reset while dirty=true or saving=true (so changes aren't lost to invalidateAll from the AI chat, etc.)
 	$effect(() => {
 		const serverKeys = getData().fields.map((f) => f.key).sort().join(',');
 		const localKeys = untrack(() => rows.map((r) => r.key).sort().join(','));
@@ -129,7 +129,7 @@ export function createTableBuildState(getData: () => PageData) {
 			});
 			if (!res.ok) {
 				const body = (await res.json()) as { error?: string };
-				saveError = body.error ?? '保存に失敗しました';
+				saveError = body.error ?? 'Failed to save';
 				return;
 			}
 			rows = validRows;

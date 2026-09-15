@@ -14,22 +14,22 @@
 		if (format === 'currency') {
 			const num = typeof value === 'string' ? parseFloat(value) : value;
 			if (isNaN(num as number)) return String(value);
-			return new Intl.NumberFormat('ja-JP', { style: 'currency', currency: 'JPY' }).format(num as number);
+			return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'JPY' }).format(num as number);
 		}
 
 		if (format === 'number') {
 			const num = typeof value === 'string' ? parseFloat(value) : value;
 			if (isNaN(num as number)) return String(value);
-			return new Intl.NumberFormat('ja-JP').format(num as number);
+			return new Intl.NumberFormat('en-US').format(num as number);
 		}
 
 		if (format === 'date' || format === 'datetime') {
 			const date = typeof value === 'number' ? new Date(value * 1000) : new Date(value as string);
 			if (isNaN(date.getTime())) return String(value);
 			if (format === 'date') {
-				return new Intl.DateTimeFormat('ja-JP', { year: 'numeric', month: 'long', day: 'numeric' }).format(date);
+				return new Intl.DateTimeFormat('en-US', { year: 'numeric', month: 'long', day: 'numeric' }).format(date);
 			}
-			return new Intl.DateTimeFormat('ja-JP', {
+			return new Intl.DateTimeFormat('en-US', {
 				year: 'numeric', month: 'long', day: 'numeric',
 				hour: '2-digit', minute: '2-digit'
 			}).format(date);

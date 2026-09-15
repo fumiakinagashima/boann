@@ -1,7 +1,7 @@
 import { goto, invalidateAll } from '$app/navigation';
 import type { PageData } from './$types';
 
-// テーブル／ワークフローの2種別（D&D並べ替えのキーに使用）
+// Two kinds: tables and workflows (used as the key for D&D reordering)
 export type AppTab = 'tables' | 'workflows';
 
 export function createAppBuilderState(getData: () => PageData) {
@@ -39,7 +39,7 @@ export function createAppBuilderState(getData: () => PageData) {
 	}
 
 	async function deleteApp() {
-		if (!confirm(`「${appLabel}」を削除しますか？この操作は元に戻せません。`)) return;
+		if (!confirm(`Delete "${appLabel}"? This action cannot be undone.`)) return;
 		deleting = true;
 		try {
 			const res = await fetch(`/api/apps/${getData().app.id}`, { method: 'DELETE' });
@@ -50,7 +50,7 @@ export function createAppBuilderState(getData: () => PageData) {
 	}
 
 	// ── List ordering (drag & drop) ──────────────────────────────
-	// data からローカルにコピーし、D&D 中は楽観的に並べ替える。保存後 invalidateAll で確定。
+	// Copied locally from data; reorders optimistically during D&D, confirmed via invalidateAll after saving.
 	let tables = $state(getData().tables);
 	let workflows = $state(getData().workflows);
 
@@ -126,7 +126,7 @@ export function createAppBuilderState(getData: () => PageData) {
 		const res = await fetch('/api/database/tables', {
 			method: 'POST',
 			headers: { 'Content-Type': 'application/json' },
-			body: JSON.stringify({ name, label: '新しいテーブル', appId: getData().app.id, fields: [] })
+			body: JSON.stringify({ name, label: 'New table', appId: getData().app.id, fields: [] })
 		});
 		if (res.ok) {
 			await invalidateAll();
@@ -143,7 +143,7 @@ export function createAppBuilderState(getData: () => PageData) {
 			const res = await fetch('/api/workflows', {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ name: '新しいワークフロー', appId: getData().app.id })
+				body: JSON.stringify({ name: 'New workflow', appId: getData().app.id })
 			});
 			if (res.ok) await invalidateAll();
 		} finally {
@@ -151,10 +151,10 @@ export function createAppBuilderState(getData: () => PageData) {
 		}
 	}
 
-	// ── トークン管理（MCP連携） ─────────────────────────────────────
+	// ── Token management (MCP integration) ─────────────────────────
 	let mcpStatus = $state(getData().mcpStatus);
 	let issuingMcpToken = $state(false);
-	let issuedMcpToken = $state<string | null>(null); // 発行直後の平文。表示後は破棄する
+	let issuedMcpToken = $state<string | null>(null); // Plaintext right after issuance; discarded once shown
 	let mcpTokenCopied = $state(false);
 
 	$effect(() => {
@@ -176,12 +176,12 @@ export function createAppBuilderState(getData: () => PageData) {
 	}
 
 	async function reissueMcpToken() {
-		if (!confirm('トークンを再発行しますか？現在のトークンは無効になります。')) return;
+		if (!confirm('Reissue the token? The current token will be invalidated.')) return;
 		await issueMcpToken();
 	}
 
 	async function deleteMcpToken() {
-		if (!confirm('MCPトークンを削除しますか？連携中のエージェントからアクセスできなくなります。')) return;
+		if (!confirm('Delete the MCP token? Connected agents will lose access.')) return;
 		await fetch(`/api/apps/${getData().app.id}/mcp-token`, { method: 'DELETE' });
 		await invalidateAll();
 	}

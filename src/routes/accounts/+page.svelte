@@ -36,7 +36,7 @@
 		});
 		if (res.ok) {
 			const row = await res.json() as AccountRow;
-			rows = [...rows, row].sort((a, b) => a.name.localeCompare(b.name, 'ja'));
+			rows = [...rows, row].sort((a, b) => a.name.localeCompare(b.name, 'en'));
 			addName = ''; addEmail = ''; addRole = ''; addPermission = 'general';
 			showAdd = false;
 		}
@@ -68,7 +68,7 @@
 	}
 
 	async function deleteRow(id: string) {
-		if (!confirm('このアカウントを削除しますか？')) return;
+		if (!confirm('Delete this account?')) return;
 		await fetch(`/api/accounts/${id}`, { method: 'DELETE' });
 		rows = rows.filter(r => r.id !== id);
 	}
@@ -77,40 +77,40 @@
 <div class="page">
 	<header class="page-header">
 		<div class="breadcrumb">
-			<a href="/">ホーム</a>
+			<a href="/">Home</a>
 			<span class="sep">/</span>
-			<span>アカウント</span>
+			<span>Accounts</span>
 		</div>
-		<button class="btn-primary" onclick={() => { showAdd = !showAdd; }}>+ 追加</button>
+		<button class="btn-primary" onclick={() => { showAdd = !showAdd; }}>+ Add</button>
 	</header>
 
 	{#if showAdd}
 		<div class="add-form">
-			<input type="text" bind:value={addName} placeholder="名前 *" class="add-input" />
-			<input type="text" bind:value={addRole} placeholder="役職" class="add-input" />
-			<input type="email" bind:value={addEmail} placeholder="メール" class="add-input" />
+			<input type="text" bind:value={addName} placeholder="Name *" class="add-input" />
+			<input type="text" bind:value={addRole} placeholder="Role" class="add-input" />
+			<input type="email" bind:value={addEmail} placeholder="Email" class="add-input" />
 			<select bind:value={addPermission} class="add-select">
-				<option value="general">一般</option>
-				<option value="admin">管理者</option>
+				<option value="general">Standard</option>
+				<option value="admin">Admin</option>
 			</select>
 			<button class="btn-primary" onclick={addAccount} disabled={adding || !addName.trim()}>
-				{adding ? '...' : '登録'}
+				{adding ? '...' : 'Add'}
 			</button>
-			<button class="btn-ghost" onclick={() => showAdd = false}>キャンセル</button>
+			<button class="btn-ghost" onclick={() => showAdd = false}>Cancel</button>
 		</div>
 	{/if}
 
 	{#if rows.length === 0}
-		<p class="status">アカウントが登録されていません。</p>
+		<p class="status">No accounts registered.</p>
 	{:else}
 		<div class="table-wrap">
 			<table>
 				<thead>
 					<tr>
-						<th>名前</th>
-						<th>役職</th>
-						<th>メール</th>
-						<th>権限</th>
+						<th>Name</th>
+						<th>Role</th>
+						<th>Email</th>
+						<th>Permission</th>
 						<th></th>
 					</tr>
 				</thead>
@@ -119,17 +119,17 @@
 						{#if editId === row.id}
 							<tr class="edit-row">
 								<td><input type="text" bind:value={editName} class="edit-input" /></td>
-								<td><input type="text" bind:value={editRole} placeholder="役職" class="edit-input" /></td>
-								<td><input type="email" bind:value={editEmail} placeholder="メール" class="edit-input" /></td>
+								<td><input type="text" bind:value={editRole} placeholder="Role" class="edit-input" /></td>
+								<td><input type="email" bind:value={editEmail} placeholder="Email" class="edit-input" /></td>
 								<td class="perm-cell">
 									<select bind:value={editPermission} class="edit-input edit-select">
-										<option value="general">一般</option>
-										<option value="admin">管理者</option>
+										<option value="general">Standard</option>
+										<option value="admin">Admin</option>
 									</select>
 								</td>
 								<td class="actions">
-									<button class="action-save" onclick={saveEdit} disabled={saving}>保存</button>
-									<button class="action-link" onclick={() => editId = null}>キャンセル</button>
+									<button class="action-save" onclick={saveEdit} disabled={saving}>Save</button>
+									<button class="action-link" onclick={() => editId = null}>Cancel</button>
 								</td>
 							</tr>
 						{:else}
@@ -139,12 +139,12 @@
 								<td class="muted">{row.email ?? '—'}</td>
 								<td class="perm-cell">
 									<span class="perm-badge" class:perm-admin={row.permission === 'admin'}>
-										{row.permission === 'admin' ? '管理者' : '一般'}
+										{row.permission === 'admin' ? 'Admin' : 'Standard'}
 									</span>
 								</td>
 								<td class="actions">
-									<button class="action-link" onclick={() => startEdit(row)}>編集</button>
-									<button class="action-del" onclick={() => deleteRow(row.id)}>削除</button>
+									<button class="action-link" onclick={() => startEdit(row)}>Edit</button>
+									<button class="action-del" onclick={() => deleteRow(row.id)}>Delete</button>
 								</td>
 							</tr>
 						{/if}

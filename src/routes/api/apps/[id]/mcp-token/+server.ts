@@ -7,31 +7,31 @@ import { canManageApp } from '$lib/server/authz';
 import { getMcpTokenStatus, issueMcpToken, deleteMcpToken } from '$lib/server/mcp/auth';
 
 export const GET: RequestHandler = async ({ params, platform, locals }) => {
-	if (!platform?.env?.DB) return errors.serviceUnavailable('利用できません');
+	if (!platform?.env?.DB) return errors.serviceUnavailable('Not available');
 	const db = createDb(platform.env.DB);
 	const app = await getAppById(db, params.id);
-	if (!app) return errors.notFound('アプリが見つかりません');
+	if (!app) return errors.notFound('App not found');
 	if (!canManageApp(app, locals.account)) return errors.forbidden();
 
 	return json({ status: await getMcpTokenStatus(db, params.id), endpoint: `/api/apps/${params.id}/mcp` });
 };
 
 export const POST: RequestHandler = async ({ params, platform, locals }) => {
-	if (!platform?.env?.DB) return errors.serviceUnavailable('利用できません');
+	if (!platform?.env?.DB) return errors.serviceUnavailable('Not available');
 	const db = createDb(platform.env.DB);
 	const app = await getAppById(db, params.id);
-	if (!app) return errors.notFound('アプリが見つかりません');
+	if (!app) return errors.notFound('App not found');
 	if (!canManageApp(app, locals.account)) return errors.forbidden();
 
 	const token = await issueMcpToken(db, params.id, locals.account?.id);
-	return json({ token }); // 平文トークンはこのレスポンスのみに含まれる。以後は再取得不可
+	return json({ token }); // The plaintext token is included only in this response; it cannot be retrieved again afterward
 };
 
 export const DELETE: RequestHandler = async ({ params, platform, locals }) => {
-	if (!platform?.env?.DB) return errors.serviceUnavailable('利用できません');
+	if (!platform?.env?.DB) return errors.serviceUnavailable('Not available');
 	const db = createDb(platform.env.DB);
 	const app = await getAppById(db, params.id);
-	if (!app) return errors.notFound('アプリが見つかりません');
+	if (!app) return errors.notFound('App not found');
 	if (!canManageApp(app, locals.account)) return errors.forbidden();
 
 	await deleteMcpToken(db, params.id);

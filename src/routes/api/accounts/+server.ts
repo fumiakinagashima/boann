@@ -15,7 +15,7 @@ export const POST: RequestHandler = async ({ request, platform }) => {
 	const db = createDb(platform.env.DB);
 	try {
 		const data = await request.json() as { name: string; email?: string; role?: string; permission?: 'general' | 'admin' };
-		if (!data.name?.trim()) return json({ error: '名前は必須です' }, { status: 400 });
+		if (!data.name?.trim()) return json({ error: 'Name is required' }, { status: 400 });
 		const row = await createAccount(db, { name: data.name.trim(), email: data.email?.trim(), role: data.role?.trim(), permission: data.permission });
 		return json(row, { status: 201 });
 	} catch (e) {

@@ -16,16 +16,16 @@ const updateSchema = z.object({
 });
 
 export const PATCH: RequestHandler = async ({ params, request, platform }) => {
-	if (!platform?.env?.DB) return errors.serviceUnavailable('利用できません');
+	if (!platform?.env?.DB) return errors.serviceUnavailable('Not available');
 	const db = createDb(platform.env.DB);
 	const data = updateSchema.parse(await request.json());
 	const row = await updateExternalApiConnection(db, params.id, data);
-	if (!row) return errors.notFound('連携先が見つかりません');
+	if (!row) return errors.notFound('Connection not found');
 	return json({ ...row, headers: maskHeaders(row.headers) });
 };
 
 export const DELETE: RequestHandler = async ({ params, platform }) => {
-	if (!platform?.env?.DB) return errors.serviceUnavailable('利用できません');
+	if (!platform?.env?.DB) return errors.serviceUnavailable('Not available');
 	const db = createDb(platform.env.DB);
 	await deleteExternalApiConnection(db, params.id);
 	return json({ deleted: true });

@@ -1,7 +1,7 @@
 // ─────────────────────────────────────────
 // Semantic / status colors (fixed across themes)
-// ステータスバッジ・リスク表示・承認結果などで共通利用する配色。
-// 各コンポーネントで直接 hex を書かず、これらの変数を参照する。
+// Shared colors used for status badges, risk indicators, approval results, etc.
+// Reference these variables instead of writing raw hex values directly in each component.
 // ─────────────────────────────────────────
 
 :root {

@@ -11,17 +11,20 @@ crons = ["* * * * *"]
 [[d1_databases]]
 binding = "DB"
 database_name = "boann"
-database_id = "fe23d201-b6ad-4077-949d-275ff2be582d"
+# Replace with the database_id of your own D1 database (`wrangler d1 create boann`).
+database_id = "REPLACE_WITH_YOUR_D1_DATABASE_ID"
 migrations_dir = "drizzle"
 
 [[kv_namespaces]]
 binding = "KV"
-id = "bc134c6752074c459622d7c32c360268"
+# Replace with the id of your own KV namespace (`wrangler kv namespace create KV`).
+id = "REPLACE_WITH_YOUR_KV_NAMESPACE_ID"
 
-# @cloudflare/workers-oauth-provider の必須バインディング(固定名"OAUTH_KV")。
+# Required binding name ("OAUTH_KV") mandated by @cloudflare/workers-oauth-provider.
+# Replace with the id of your own KV namespace (`wrangler kv namespace create OAUTH_KV`).
 [[kv_namespaces]]
 binding = "OAUTH_KV"
-id = "9625073ea6824f179746426936b7d7fc"
+id = "REPLACE_WITH_YOUR_OAUTH_KV_NAMESPACE_ID"
 
 [[r2_buckets]]
 binding = "R2"
@@ -39,11 +42,12 @@ max_retries = 3
 [vars]
 MOCK_AI = "false"
 
-# ローカル開発用の環境（`vite dev`/`wrangler dev` はこちらを使う。svelte.config.js の
-# platformProxy.environment = "dev" で選択している）。
-# 本番リソースIDと分離するため、値は実在しないダミーでよい（--remote を使わない限り検証されない）。
-# Wrangler の環境は d1_databases/kv_namespaces/r2_buckets/queues を継承しないため、
-# 上のトップレベル定義とは別に、ここで local 用の値を明示的に定義する。
+# Local development environment (used by `vite dev`/`wrangler dev`; selected via
+# svelte.config.js's platformProxy.environment = "dev").
+# Values may be nonexistent dummies to keep them separate from production resource IDs
+# (they're only validated when using --remote).
+# Wrangler environments don't inherit d1_databases/kv_namespaces/r2_buckets/queues from
+# the top-level definitions above, so the local values are defined explicitly here.
 [[env.dev.d1_databases]]
 binding = "DB"
 database_name = "boann"

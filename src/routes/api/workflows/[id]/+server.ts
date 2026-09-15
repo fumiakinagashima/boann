@@ -16,7 +16,7 @@ export const PATCH: RequestHandler = async ({ params, request, platform, locals 
 		const existing = await getWorkflow(db, params.id);
 		if (!existing) return json({ error: 'Not found' }, { status: 404 });
 		if (existing.accountId && existing.accountId !== locals.account?.id) {
-			return json({ error: '権限がありません' }, { status: 403 });
+			return json({ error: 'No permission' }, { status: 403 });
 		}
 		const body = (await request.json()) as {
 			name?: string;
@@ -74,7 +74,7 @@ export const DELETE: RequestHandler = async ({ params, platform, locals }) => {
 		const workflow = await getWorkflow(db, params.id);
 		if (!workflow) return json({ error: 'Not found' }, { status: 404 });
 		if (workflow.accountId && workflow.accountId !== locals.account?.id) {
-			return json({ error: '権限がありません' }, { status: 403 });
+			return json({ error: 'No permission' }, { status: 403 });
 		}
 		await deleteWorkflow(db, params.id);
 		return json({ ok: true });

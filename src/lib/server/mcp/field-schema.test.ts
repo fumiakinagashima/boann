@@ -3,11 +3,11 @@ import { buildEntityDataSchema, toJsonSchema } from './field-schema';
 import type { FieldDef } from '../db/table-service';
 
 const fields: FieldDef[] = [
-	{ key: 'name', label: '名前', type: 'text', required: true },
-	{ key: 'age', label: '年齢', type: 'number', required: false },
-	{ key: 'status', label: 'ステータス', type: 'select', required: true, options: [{ value: 'open', label: '対応中' }, { value: 'done', label: '完了' }] },
-	{ key: 'due', label: '期日', type: 'date', required: false },
-	{ key: 'customer', label: '顧客', type: 'recordSelect', required: true, refTable: 'customers' }
+	{ key: 'name', label: 'Name', type: 'text', required: true },
+	{ key: 'age', label: 'Age', type: 'number', required: false },
+	{ key: 'status', label: 'Status', type: 'select', required: true, options: [{ value: 'open', label: 'In Progress' }, { value: 'done', label: 'Done' }] },
+	{ key: 'due', label: 'Due Date', type: 'date', required: false },
+	{ key: 'customer', label: 'Customer', type: 'recordSelect', required: true, refTable: 'customers' }
 ];
 
 describe('buildEntityDataSchema', () => {
@@ -19,19 +19,19 @@ describe('buildEntityDataSchema', () => {
 
 	it('accepts a valid full payload in create mode', () => {
 		const schema = buildEntityDataSchema(fields, 'create');
-		const result = schema.safeParse({ name: '田中', age: 20, status: 'open', due: '2026-08-01', customer: 'cust-1' });
+		const result = schema.safeParse({ name: 'Tanaka', age: 20, status: 'open', due: '2026-08-01', customer: 'cust-1' });
 		expect(result.success).toBe(true);
 	});
 
 	it('rejects an invalid select value', () => {
 		const schema = buildEntityDataSchema(fields, 'create');
-		const result = schema.safeParse({ name: '田中', status: 'unknown', customer: 'cust-1' });
+		const result = schema.safeParse({ name: 'Tanaka', status: 'unknown', customer: 'cust-1' });
 		expect(result.success).toBe(false);
 	});
 
 	it('rejects unknown keys (strict)', () => {
 		const schema = buildEntityDataSchema(fields, 'create');
-		const result = schema.safeParse({ name: '田中', status: 'open', customer: 'cust-1', extra: 'nope' });
+		const result = schema.safeParse({ name: 'Tanaka', status: 'open', customer: 'cust-1', extra: 'nope' });
 		expect(result.success).toBe(false);
 	});
 

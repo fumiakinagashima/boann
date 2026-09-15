@@ -19,7 +19,7 @@ export const POST: RequestHandler = async ({ request, platform, locals }) => {
 	const mockMode = platform?.env?.MOCK_AI === 'true' || env.MOCK_AI === 'true';
 
 	if (!platform?.env?.DB) {
-		return json({ error: 'D1データベースが設定されていません。wrangler dev で起動してください。' }, { status: 500 });
+		return json({ error: 'D1 database is not configured. Please start with wrangler dev.' }, { status: 500 });
 	}
 
 	const ip = request.headers.get('CF-Connecting-IP') ?? request.headers.get('X-Forwarded-For') ?? '';
@@ -32,7 +32,7 @@ export const POST: RequestHandler = async ({ request, platform, locals }) => {
 	if (!mockMode) {
 		const apiKey = platform?.env?.ANTHROPIC_API_KEY ?? env.ANTHROPIC_API_KEY ?? '';
 		if (!apiKey) {
-			return json({ error: 'ANTHROPIC_API_KEY が設定されていません。' }, { status: 500 });
+			return json({ error: 'ANTHROPIC_API_KEY is not set.' }, { status: 500 });
 		}
 	}
 
@@ -56,7 +56,7 @@ export const POST: RequestHandler = async ({ request, platform, locals }) => {
 		appId: body.context?.appId
 	};
 
-	// フォーム送信（tool + data）はJSONで返す
+	// Form submissions (tool + data) are returned as JSON
 	if (body.tool && body.data) {
 		try {
 			const result = await dispatchTool(db, body.tool as never, body.data, toolEnv, platform.ctx);
@@ -64,13 +64,13 @@ export const POST: RequestHandler = async ({ request, platform, locals }) => {
 			if (body.tool === 'send_email') {
 				const sent = result as { to: string; subject: string };
 				const contents: MessageContent[] = [
-					{ type: 'text', text: `${sent.to} 宛にメールを送信しました。` },
+					{ type: 'text', text: `Email sent to ${sent.to}.` },
 					{
 						type: 'values',
-						title: '送信内容',
+						title: 'Sent content',
 						items: [
-							{ label: '宛先', value: sent.to, format: 'text' },
-							{ label: '件名', value: sent.subject, format: 'text' }
+							{ label: 'To', value: sent.to, format: 'text' },
+							{ label: 'Subject', value: sent.subject, format: 'text' }
 						]
 					}
 				];
@@ -78,7 +78,7 @@ export const POST: RequestHandler = async ({ request, platform, locals }) => {
 			}
 
 			const contents: MessageContent[] = [
-				{ type: 'text', text: `登録が完了しました。` },
+				{ type: 'text', text: `Registration complete.` },
 				{
 					type: 'table',
 					columns: Object.keys(result as object).map((key) => ({ key, label: key })),
@@ -88,15 +88,15 @@ export const POST: RequestHandler = async ({ request, platform, locals }) => {
 			return json({ contents });
 		} catch (e) {
 			return json({
-				contents: [{ type: 'text', text: `エラー: ${e instanceof Error ? e.message : String(e)}` }]
+				contents: [{ type: 'text', text: `Error: ${e instanceof Error ? e.message : String(e)}` }]
 			});
 		}
 	}
 
-	// チャットメッセージはSSEストリームで返す
+	// Chat messages are returned as an SSE stream
 	const userMessage = body.message?.trim() ?? '';
 	if (!userMessage) {
-		return json({ error: 'メッセージが空です。' }, { status: 400 });
+		return json({ error: 'Message is empty.' }, { status: 400 });
 	}
 
 	const history: MessageParam[] = (body.history ?? [])
@@ -108,16 +108,17 @@ export const POST: RequestHandler = async ({ request, platform, locals }) => {
 				.join('\n')
 				.trim();
 			if (text) return [{ role: m.role as 'user' | 'assistant', content: text }];
-			// UIのみ（テキストなし）のアシスタント応答も履歴に残す。
-			// 落とすと直前のユーザー要求が未応答に見え、AIが次の応答で過去分まで再表示（累積）してしまう。
+			// Keep assistant responses that are UI-only (no text) in the history too.
+			// Dropping them makes the prior user request look unanswered, causing the AI to
+			// re-display past content (accumulating) in its next response.
 			if (m.role === 'assistant' && m.contents.length > 0) {
-				return [{ role: 'assistant', content: '（依頼された内容をUIで表示しました）' }];
+				return [{ role: 'assistant', content: '(Displayed the requested content in the UI)' }];
 			}
 			return [];
 		});
 	history.push({ role: 'user', content: userMessage });
 
-	// モックモード: 文字単位でストリームをシミュレート
+	// Mock mode: simulate the stream character by character
 	if (mockMode) {
 		const stream = new ReadableStream({
 			async start(controller) {

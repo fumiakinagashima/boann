@@ -21,7 +21,7 @@
 			class="bookmark-btn"
 			class:bookmarked
 			onclick={onToggleBookmark}
-			aria-label={bookmarked ? 'ブックマーク解除' : 'ブックマーク'}
+			aria-label={bookmarked ? 'Remove bookmark' : 'Bookmark'}
 		>
 			<Star size={15} fill={bookmarked ? 'currentColor' : 'none'} />
 		</button>
@@ -31,7 +31,7 @@
 		<p class="card-name">{app.name}</p>
 	</div>
 	<div class="card-footer">
-		<a href={`/apps/${app.id}`} class="settings-link">アプリ設定</a>
+		<a href={`/apps/${app.id}`} class="settings-link">App settings</a>
 	</div>
 </div>
 

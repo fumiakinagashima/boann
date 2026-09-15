@@ -1,3 +1,3 @@
--- set_resultアクションで組み立てられた結果オブジェクト（JSON）。run_workflow_*のMCPレスポンス
--- （structuredContent）と「今すぐ実行」の結果表示に使う。未使用のワークフローはnullのまま。
+-- The result object (JSON) assembled by the set_result action. Used for the run_workflow_* MCP response
+-- (structuredContent) and the "Run now" result display. Stays null for workflows that don't use it.
 ALTER TABLE workflow_runs ADD COLUMN result TEXT;

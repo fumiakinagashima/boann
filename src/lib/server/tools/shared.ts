@@ -32,6 +32,6 @@ export function now(): Date {
 
 export function toDate(s: string): Date {
 	const d = new Date(s);
-	if (isNaN(d.getTime())) throw new Error(`無効な日付: ${s}`);
+	if (isNaN(d.getTime())) throw new Error(`Invalid date: ${s}`);
 	return d;
 }

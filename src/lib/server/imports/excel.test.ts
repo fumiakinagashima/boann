@@ -31,7 +31,7 @@ describe('extractExcelContent', () => {
 		]);
 
 		const content = await extractExcelContent(buffer, 'empty.xlsx');
-		expect(content).toContain('見出し: X');
+		expect(content).toContain('Headers: X');
 	});
 
 	it('throws when the workbook has no sheets', async () => {

@@ -32,8 +32,8 @@
 	});
 </script>
 
-<nav class="pagination" aria-label="ページナビゲーション">
-	<button class="nav" onclick={() => go(page - 1)} disabled={page <= 1} aria-label="前のページ">
+<nav class="pagination" aria-label="Page navigation">
+	<button class="nav" onclick={() => go(page - 1)} disabled={page <= 1} aria-label="Previous page">
 		<ChevronLeft size={14} />
 	</button>
 
@@ -45,7 +45,7 @@
 		{/if}
 	{/each}
 
-	<button class="nav" onclick={() => go(page + 1)} disabled={page >= totalPages} aria-label="次のページ">
+	<button class="nav" onclick={() => go(page + 1)} disabled={page >= totalPages} aria-label="Next page">
 		<ChevronRight size={14} />
 	</button>
 </nav>

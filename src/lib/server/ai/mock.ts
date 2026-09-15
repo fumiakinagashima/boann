@@ -2,40 +2,40 @@ import type { MessageContent } from '$lib/types/chat';
 
 const MOCK_RESPONSES: MessageContent[][] = [
 	[
-		{ type: 'text', text: 'アプリを作成します。以下のフィールド構成で「在庫管理」テーブルを作成してよいですか？' },
+		{ type: 'text', text: 'I\'ll create the app. Is it OK to create an "Inventory Management" table with the following field configuration?' },
 		{
 			type: 'table',
 			columns: [
-				{ key: 'label', label: 'フィールド名' },
-				{ key: 'type', label: '型' },
-				{ key: 'required', label: '必須' }
+				{ key: 'label', label: 'Field name' },
+				{ key: 'type', label: 'Type' },
+				{ key: 'required', label: 'Required' }
 			],
 			rows: [
-				{ label: '商品名', type: '文字', required: '必須' },
-				{ label: '在庫数', type: '数値', required: '任意' },
-				{ label: '単価', type: '数値', required: '任意' },
-				{ label: 'カテゴリ', type: '選択', required: '任意' }
+				{ label: 'Product name', type: 'Text', required: 'Required' },
+				{ label: 'Stock', type: 'Number', required: 'Optional' },
+				{ label: 'Unit price', type: 'Number', required: 'Optional' },
+				{ label: 'Category', type: 'Select', required: 'Optional' }
 			]
 		}
 	],
 	[
-		{ type: 'text', text: '登録済みのテーブル一覧です。' },
+		{ type: 'text', text: 'Here is the list of registered tables.' },
 		{
 			type: 'table',
 			columns: [
 				{ key: 'icon', label: '' },
-				{ key: 'label', label: 'テーブル名' },
-				{ key: 'name', label: '識別名' }
+				{ key: 'label', label: 'Table name' },
+				{ key: 'name', label: 'Identifier' }
 			],
 			rows: [
-				{ icon: '📦', label: '在庫管理', name: 'inventory' },
-				{ icon: '📋', label: 'タスク管理', name: 'tasks' },
-				{ icon: '📞', label: '問い合わせ管理', name: 'inquiries' }
+				{ icon: '📦', label: 'Inventory Management', name: 'inventory' },
+				{ icon: '📋', label: 'Task Management', name: 'tasks' },
+				{ icon: '📞', label: 'Inquiry Management', name: 'inquiries' }
 			]
 		}
 	],
 	[
-		{ type: 'text', text: 'こんにちは！Boannです。何をお手伝いしましょうか？' }
+		{ type: 'text', text: 'Hello! This is Boann. How can I help you?' }
 	]
 ];
 

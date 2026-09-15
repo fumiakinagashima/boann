@@ -35,7 +35,7 @@
 <div class="dialog" role="dialog" aria-modal="true" aria-label={title}>
 	<div class="dialog-header">
 		<span class="dialog-title">{title}</span>
-		<button class="close-btn" onclick={onclose} aria-label="閉じる">
+		<button class="close-btn" onclick={onclose} aria-label="Close">
 			<X size={16} />
 		</button>
 	</div>

@@ -13,13 +13,13 @@ const resetPasswordInputSchema = z.object({
 });
 
 export const POST: RequestHandler = async ({ request, platform }) => {
-	if (!platform?.env?.DB || !platform.env.KV) return errors.serviceUnavailable('利用できません');
+	if (!platform?.env?.DB || !platform.env.KV) return errors.serviceUnavailable('Not available');
 
 	const data = resetPasswordInputSchema.parse(await request.json());
 
 	const accountId = await getPasswordResetAccountId(platform.env.KV, data.token);
 	if (!accountId) {
-		return errors.badRequest('リンクが無効、または有効期限が切れています');
+		return errors.badRequest('The link is invalid or has expired');
 	}
 
 	const db = createDb(platform.env.DB);

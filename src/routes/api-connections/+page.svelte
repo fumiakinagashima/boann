@@ -3,9 +3,10 @@
 	import Textbox from '$lib/components/ui/Textbox.svelte';
 	import type { PageData } from './$types';
 
-	// TODO: 接続確認用のテスト送信機能(2026-07-22、ユーザー要望)。UIをどうするか未検討のため保留。
-	// 実装時はここ(一覧の各行、または編集フォーム内)にボタンを追加し、サーバー側でheadersを付けて
-	// 実際にurlへ疎通確認リクエストを送る新規APIエンドポイントが必要になる想定。
+	// TODO: A test-send feature for verifying connections (2026-07-22, requested by the user). On hold
+	// since the UI hasn't been decided. When implemented, add a button here (in each list row, or
+	// inside the edit form), which will need a new API endpoint that attaches the headers server-side
+	// and actually sends a connectivity-check request to the url.
 
 	let { data }: { data: PageData } = $props();
 
@@ -101,25 +102,25 @@
 	}
 
 	async function remove(id: string) {
-		if (!confirm('この連携設定を削除しますか？')) return;
+		if (!confirm('Delete this connection?')) return;
 		await fetch(`/api/api-connections/${id}`, { method: 'DELETE' });
 		items = items.filter((i) => i.id !== id);
 	}
 </script>
 
-<svelte:head><title>連携設定 — BOANN</title></svelte:head>
+<svelte:head><title>API connections — BOANN</title></svelte:head>
 
 <div class="page">
 	<div class="header">
-		<h1>連携設定</h1>
-		<button class="add-btn" onclick={openAdd}>+ 追加</button>
+		<h1>API connections</h1>
+		<button class="add-btn" onclick={openAdd}>+ Add</button>
 	</div>
 	<p class="intro">
-		ワークフローの「外部APIを呼び出す」アクションから使う、外部APIへの接続設定です（システム全体で共有されます）。
+		Connection settings for external APIs, used by the workflow "Call external API" action (shared across the whole system).
 	</p>
 
 	{#if items.length === 0 && !showForm}
-		<p class="empty">まだ連携設定がありません</p>
+		<p class="empty">No connections yet</p>
 	{/if}
 
 	<ul class="list">
@@ -130,9 +131,9 @@
 					<span class="item-url">{item.url}</span>
 				</div>
 				<div class="item-meta">
-					<span class="badge">ヘッダー{Object.keys(item.headers).length}件</span>
-					<button class="link-btn" onclick={() => openEdit(item)}>編集</button>
-					<button class="link-btn danger" onclick={() => remove(item.id)}>削除</button>
+					<span class="badge">{Object.keys(item.headers).length} header(s)</span>
+					<button class="link-btn" onclick={() => openEdit(item)}>Edit</button>
+					<button class="link-btn danger" onclick={() => remove(item.id)}>Delete</button>
 				</div>
 			</li>
 		{/each}
@@ -140,26 +141,26 @@
 
 	{#if showForm}
 		<div class="form-card">
-			<h2>{editingId ? '連携設定を編集' : '連携設定を追加'}</h2>
+			<h2>{editingId ? 'Edit connection' : 'Add connection'}</h2>
 			<div class="fields">
-				<Textbox label="APIの名前" bind:value={form.name} required />
+				<Textbox label="API name" bind:value={form.name} required />
 				<Textbox label="URL" bind:value={form.url} placeholder="https://api.example.com" required />
 
 				<div class="headers-field">
-					<span class="headers-label">ヘッダー情報</span>
+					<span class="headers-label">Headers</span>
 					{#each form.headers as row, i (i)}
 						<div class="header-row">
-							<input class="header-key" type="text" placeholder="キー（例: Authorization）" bind:value={row.key} />
-							<input class="header-value" type="text" placeholder="値" bind:value={row.value} />
-							<button class="header-del" onclick={() => removeHeaderRow(i)} title="削除">×</button>
+							<input class="header-key" type="text" placeholder="Key (e.g. Authorization)" bind:value={row.key} />
+							<input class="header-value" type="text" placeholder="Value" bind:value={row.value} />
+							<button class="header-del" onclick={() => removeHeaderRow(i)} title="Delete">×</button>
 						</div>
 					{/each}
-					<button class="add-header-btn" onclick={addHeaderRow}>＋ ヘッダーを追加</button>
+					<button class="add-header-btn" onclick={addHeaderRow}>+ Add header</button>
 				</div>
 			</div>
 			<div class="form-actions">
-				<button class="cancel-btn" onclick={cancel}>キャンセル</button>
-				<button class="save-btn" onclick={save} disabled={saving || !form.name || !form.url}>保存</button>
+				<button class="cancel-btn" onclick={cancel}>Cancel</button>
+				<button class="save-btn" onclick={save} disabled={saving || !form.name || !form.url}>Save</button>
 			</div>
 		</div>
 	{/if}

@@ -14,7 +14,7 @@
 
 	let page = $state(1);
 	const totalPages = $derived(Math.max(1, Math.ceil(rows.length / LIST_PAGE_SIZE)));
-	// rows が変わった時に範囲外ページを補正
+	// Clamp the page back into range when rows change
 	$effect(() => {
 		if (page > totalPages) page = totalPages;
 	});

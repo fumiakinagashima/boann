@@ -9,7 +9,7 @@ export const PATCH: RequestHandler = async ({ params, request, platform, locals 
 
 	const body = (await request.json()) as { title?: string };
 	const title = body.title?.trim();
-	if (!title) return errors.badRequest('title は必須です。');
+	if (!title) return errors.badRequest('title is required.');
 
 	const db = createDb(platform.env.DB);
 

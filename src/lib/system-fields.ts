@@ -1,7 +1,7 @@
-/** 一覧・詳細ビューで表示できるシステムフィールド（entity_fields には存在しない） */
+/** System fields displayable in list/detail views (not present in entity_fields) */
 export const SYSTEM_DISPLAY_FIELDS = [
-	{ key: 'createdBy', label: '登録者', type: 'account' as const, required: false as const, refTable: 'accounts', refLabelKey: 'name' },
-	{ key: 'createdAt', label: '登録日時', type: 'timestamp' as const, required: false as const },
-	{ key: 'updatedBy', label: '更新者', type: 'account' as const, required: false as const, refTable: 'accounts', refLabelKey: 'name' },
-	{ key: 'updatedAt', label: '更新日時', type: 'timestamp' as const, required: false as const },
+	{ key: 'createdBy', label: 'Created by', type: 'account' as const, required: false as const, refTable: 'accounts', refLabelKey: 'name' },
+	{ key: 'createdAt', label: 'Created at', type: 'timestamp' as const, required: false as const },
+	{ key: 'updatedBy', label: 'Updated by', type: 'account' as const, required: false as const, refTable: 'accounts', refLabelKey: 'name' },
+	{ key: 'updatedAt', label: 'Updated at', type: 'timestamp' as const, required: false as const },
 ];

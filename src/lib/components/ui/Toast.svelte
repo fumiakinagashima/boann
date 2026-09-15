@@ -6,7 +6,7 @@
 </script>
 
 {#if toast.items.length > 0}
-	<div class="toast-container" role="region" aria-live="polite" aria-label="通知">
+	<div class="toast-container" role="region" aria-live="polite" aria-label="Notifications">
 		{#each toast.items as item (item.id)}
 			<div class="toast" class:toast-success={item.type === 'success'} class:toast-error={item.type === 'error'} class:toast-info={item.type === 'info'}>
 				{#if item.type === 'success'}

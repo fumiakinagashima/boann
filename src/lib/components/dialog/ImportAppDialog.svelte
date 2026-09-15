@@ -26,14 +26,14 @@
 			const res = await fetch('/api/imports', { method: 'POST', body });
 			const data = (await res.json()) as { jobId: string } | { error: string };
 			if (!res.ok || !('jobId' in data)) {
-				error = 'error' in data ? data.error : '取り込みに失敗しました';
+				error = 'error' in data ? data.error : 'Import failed.';
 				uploading = false;
 				return;
 			}
-			// 設計（読み取り＋AI設計）は非同期。プランページへ遷移して進捗を表示する。
+			// Design (reading + AI design) is asynchronous. Navigate to the plan page to show progress.
 			await goto(`/imports/${data.jobId}`);
 		} catch {
-			error = 'ネットワークエラーが発生しました';
+			error = 'A network error occurred.';
 			uploading = false;
 		}
 	}
@@ -47,31 +47,31 @@
 
 <div class="overlay" role="presentation" onclick={onclose}></div>
 
-<div class="dialog" role="dialog" aria-modal="true" aria-label="ファイルからアプリを作成">
+<div class="dialog" role="dialog" aria-modal="true" aria-label="Create app from file">
 	<div class="dialog-header">
-		<span class="dialog-title">ファイルからアプリを作成</span>
-		<button class="close-btn" onclick={onclose} aria-label="閉じる">
+		<span class="dialog-title">Create app from file</span>
+		<button class="close-btn" onclick={onclose} aria-label="Close">
 			<X size={16} />
 		</button>
 	</div>
 
 	<div class="dialog-body">
 		<FileUpload
-			label="仕様メモやドキュメントをアップロード"
+			label="Upload spec notes or documents"
 			accept=".txt,.md,.markdown,.xlsx"
 			disabled={uploading}
 			onchange={handleFiles}
 		/>
-		<p class="hint">現在はテキスト/Markdown（.txt, .md）、Excel（.xlsx）のみ対応。最大5MB。</p>
-		<p class="hint">Excelは見出し行とサンプル行から構造を設計します（データそのものは登録されません）。</p>
-		<p class="hint">アップロード後、AIがアプリ構造を設計します（完了は通知でもお知らせします）。</p>
+		<p class="hint">Currently supports text/Markdown (.txt, .md) and Excel (.xlsx) only. Max 5MB.</p>
+		<p class="hint">For Excel, the structure is designed from the header row and sample rows (the data itself is not imported).</p>
+		<p class="hint">After uploading, the AI will design the app structure (you'll also get a notification when it's done).</p>
 
-		{#if uploading}<p class="status">アップロード中…</p>{/if}
+		{#if uploading}<p class="status">Uploading…</p>{/if}
 		{#if error}<p class="error">{error}</p>{/if}
 	</div>
 
 	<div class="dialog-footer">
-		<button class="btn-ghost" onclick={onclose}>閉じる</button>
+		<button class="btn-ghost" onclick={onclose}>Close</button>
 	</div>
 </div>
 

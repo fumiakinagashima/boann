@@ -6,7 +6,7 @@ export const apps = sqliteTable('apps', {
 	name: text('name').notNull(),
 	label: text('label').notNull(),
 	icon: text('icon'),
-	// 作成者のアカウントID。null は既存データ（移行前）または所有者を問わない共有アプリを表す。
+	// Creator's account ID. null represents legacy data (pre-migration) or a shared app with no specific owner.
 	accountId: text('account_id'),
 	createdAt: integer('created_at', { mode: 'timestamp' })
 		.notNull()
@@ -16,8 +16,8 @@ export const apps = sqliteTable('apps', {
 		.default(sql`(unixepoch())`)
 });
 
-// アプリを外部MCPサーバーとして公開するためのBearerトークン。1アプリにつき1トークン
-// （app_id をPKにして1:1を強制、再発行は既存行をupsert）。平文は保存せずハッシュのみ保持する。
+// Bearer token for exposing an app as an external MCP server. One token per app
+// (app_id is the PK, enforcing a 1:1 relationship; reissuing upserts the existing row). Only the hash is stored, never the plaintext.
 export const appMcpTokens = sqliteTable('app_mcp_tokens', {
 	appId: text('app_id')
 		.primaryKey()
@@ -38,13 +38,13 @@ export const entityTypes = sqliteTable(
 	'entity_types',
 	{
 		id: text('id').primaryKey(),
-		// name はアプリ内で一意（グローバルではない）。同名テーブルを別アプリで持てる。
+		// name is unique within an app (not globally). Different apps can have tables with the same name.
 		name: text('name').notNull(),
 		label: text('label').notNull(),
 		icon: text('icon'),
 		appId: text('app_id').references(() => apps.id),
 		sortOrder: integer('sort_order').notNull().default(0),
-		// 外部MCPサーバー経由で許可するCRUD操作（デフォルト全許可）。「閲覧」はlist_/get_の両方をまとめて制御する。
+		// CRUD operations permitted via the external MCP server (all enabled by default). "Read" controls both list_/get_ together.
 		mcpCreate: integer('mcp_create', { mode: 'boolean' }).notNull().default(true),
 		mcpRead: integer('mcp_read', { mode: 'boolean' }).notNull().default(true),
 		mcpUpdate: integer('mcp_update', { mode: 'boolean' }).notNull().default(true),
@@ -111,9 +111,9 @@ export const integrations = sqliteTable('integrations', {
 		.default(sql`(unixepoch())`)
 });
 
-// ワークフローの「外部APIを呼び出す」アクション専用の連携設定。上の`integrations`（Slack通知等、
-// 通知目的の連携）とは目的が別のシステム単位の設定（2026-07-22、ユーザー方針）。
-// 認証はauthType別のフィールドではなく、汎用的なヘッダーのkey/valueのみ（headers列にJSON保存）。
+// Connection settings dedicated to the workflow "call external API" action. A separate,
+// per-system config with a different purpose from `integrations` above (Slack notifications etc., which is for notification purposes) (2026-07-22, user's design decision).
+// Auth is not split into per-authType fields, just generic header key/value pairs (stored as JSON in the headers column).
 export const externalApiConnections = sqliteTable('external_api_connections', {
 	id: text('id').primaryKey(),
 	name: text('name').notNull(),
@@ -188,9 +188,9 @@ export const importJobs = sqliteTable('import_jobs', {
 	status: text('status').notNull().default('designing'),
 	filename: text('filename'),
 	content: text('content'),
-	// 設計完了で埋まる ImportPlan の JSON。チャット修正で可変。
+	// JSON of the ImportPlan, populated once design completes. Mutable via the refinement chat.
 	plan: text('plan'),
-	// プラン修正チャットの履歴（MessageContent ベース）の JSON。
+	// JSON of the plan-refinement chat history (MessageContent-based).
 	chat: text('chat').notNull().default('[]'),
 	appId: text('app_id'),
 	error: text('error'),
@@ -229,7 +229,7 @@ export const chatMessages = sqliteTable('chat_messages', {
 export const workflows = sqliteTable('workflows', {
 	id: text('id').primaryKey(),
 	name: text('name').notNull(),
-	// MCPツールとして公開する際のdescriptionに使う自由記述の説明文（未設定ならフォールバック文言を使う）。
+	// Free-text description used as the description when exposed as an MCP tool (falls back to a default phrase when unset).
 	description: text('description'),
 	steps: text('steps').notNull().default('[]'),
 	inputSchema: text('input_schema').notNull().default('[]'),
@@ -256,8 +256,8 @@ export const workflowRuns = sqliteTable('workflow_runs', {
 	ok: integer('ok', { mode: 'boolean' }).notNull(),
 	error: text('error'),
 	log: text('log'),
-	// set_resultアクションで組み立てられた結果オブジェクト（JSON）。run_workflow_*のMCPレスポンス
-	// （structuredContent）と「今すぐ実行」の結果表示に使う。未使用のワークフローはnullのまま。
+	// Result object (JSON) built by the set_result action. Used for the run_workflow_* MCP response
+	// (structuredContent) and the "Run now" result display. Stays null for workflows that don't use it.
 	result: text('result'),
 	startedAt: integer('started_at', { mode: 'timestamp' }).notNull(),
 	finishedAt: integer('finished_at', { mode: 'timestamp' }).notNull()

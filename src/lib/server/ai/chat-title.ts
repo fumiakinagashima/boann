@@ -10,6 +10,6 @@ export async function generateChatTitle(apiKey: string, message: string, model =
 		messages: [{ role: 'user', content: message }]
 	});
 	const text = response.content[0]?.type === 'text' ? response.content[0].text.trim() : '';
-	if (!text) throw new Error('タイトルの生成に失敗しました。');
+	if (!text) throw new Error('Failed to generate title.');
 	return text;
 }

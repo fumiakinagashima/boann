@@ -11,11 +11,12 @@ function unauthorized(): Response {
 	});
 }
 
-// 静的Bearerトークンでの認証はここで行う。OAuthアクセストークンで来たリクエストはこのルートに
-// 到達する前にworker.ts(OAuthProvider)側のapiHandlerで処理される(有効なOAuthトークンが無い
-// 場合のみdefaultHandler経由でここに落ちてくる)。詳細は`mcp/oauth-config.ts`のコメント参照。
+// Authentication with the static Bearer token happens here. Requests arriving with an OAuth
+// access token are handled by the apiHandler on the worker.ts (OAuthProvider) side before
+// reaching this route (they only fall through to here via defaultHandler when there is no
+// valid OAuth token). See the comment in `mcp/oauth-config.ts` for details.
 export const POST: RequestHandler = async ({ params, request, platform }) => {
-	if (!platform?.env?.DB) return errors.serviceUnavailable('利用できません');
+	if (!platform?.env?.DB) return errors.serviceUnavailable('Not available');
 	const db = createDb(platform.env.DB);
 
 	const auth = await verifyAppMcpToken(db, params.id, request.headers.get('Authorization'));

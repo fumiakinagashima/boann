@@ -5,13 +5,13 @@ import { buildSystemBlocks, type AppContext } from './prompt';
 import { tools as allTools, dispatchTool } from '$lib/server/tools';
 import { entityTypes } from '$lib/server/db/schema';
 
-// メインチャットはSELECTのみ。create_* / update_* / delete_* はダイアログ経由でユーザーが実行する。
+// The main chat is SELECT-only. create_* / update_* / delete_* are run by the user via a dialog.
 const WRITE_TOOL_PREFIX = ['create_', 'update_', 'delete_'];
 const mainChatTools = allTools.filter(
 	(t) => !WRITE_TOOL_PREFIX.some((prefix) => t.name.startsWith(prefix))
 );
 
-// アプリビルダーモード: スキーマ生成（create_table, add_entity_field）を許可し、レコード操作のみ禁止
+// App builder mode: allow schema generation (create_table, add_entity_field) and only forbid record operations
 const APP_BUILDER_BLOCKED = new Set([
 	'create_entity', 'update_entity',
 	'create_app', 'create_entity_type',
@@ -19,8 +19,8 @@ const APP_BUILDER_BLOCKED = new Set([
 ]);
 const appBuilderTools = allTools.filter((t) => !APP_BUILDER_BLOCKED.has(t.name));
 
-// ツール定義は固定なので、配列末尾に cache_control を付けて全体をプロンプトキャッシュ対象にする。
-// 元配列は変更せず、末尾ツールだけ複製してマーカーを付与したコピーを使う。
+// Tool definitions are fixed, so attaching cache_control to the last array element makes the whole thing subject to prompt caching.
+// The original array is left unchanged; we use a copy where only the last tool is cloned with the marker attached.
 function withToolCache(toolList: typeof allTools): typeof allTools {
 	if (toolList.length === 0) return toolList;
 	const copy = [...toolList];
@@ -40,7 +40,7 @@ export type StreamEvent =
 	| { type: 'done' }
 	| { type: 'error'; message: string };
 
-// テキストストリームを処理し、<ui>ブロックをバッファリングしてdeltaとuiイベントに分離
+// Processes the text stream, buffering <ui> blocks and splitting them into delta and ui events
 export class TextStreamProcessor {
 	private buf = '';
 	private inUi = false;
@@ -88,8 +88,8 @@ export class TextStreamProcessor {
 	}
 }
 
-// AIが steps の params/left/right に数値・真偽値をそのまま出力することがあるが、
-// 型上は常に文字列（WorkflowOperand）のため、後段の parseStepRef 等が壊れないよう文字列化する。
+// The AI sometimes outputs a number or boolean as-is for steps' params/left/right,
+// but the type is always a string (WorkflowOperand), so we stringify it here to keep downstream code like parseStepRef from breaking.
 function sanitizeWorkflowSteps(steps: unknown): WorkflowStep[] {
 	if (!Array.isArray(steps)) return steps as WorkflowStep[];
 	return steps.map((s) => {
@@ -132,12 +132,12 @@ function sanitizeWorkflowSteps(steps: unknown): WorkflowStep[] {
 	});
 }
 
-// get_entities はカスタムテーブル名（entity_type_id → name）を DB から解決して entity を補完する。
-// entity 未指定のレコード一覧テーブルへのフォールバック（rows に id がある場合のみ）。
+// get_entities resolves the custom table name (entity_type_id → name) from the DB and fills in entity.
+// A fallback for record-list tables that don't specify entity (only when rows have an id).
 const RECORD_LIST_TOOL_ENTITY: Record<string, string> = {};
 
-// entity 未指定のレコード一覧テーブルに、ヒント entity を補完する。
-// 行クリックで詳細ダイアログを開けるようにするためのフォールバック（rows に id がある場合のみ）。
+// Fills in a hint entity for record-list tables that don't specify entity.
+// A fallback so a row click can open the detail dialog (only when rows have an id).
 function applyEntityHint(events: StreamEvent[], entity: string | undefined): void {
 	if (!entity) return;
 	for (const e of events) {
@@ -188,7 +188,7 @@ export function parseUITag(tag: string): MessageContent | null {
 			return {
 				type: 'workflow',
 				id,
-				name: name ?? '新規ワークフロー',
+				name: name ?? 'New workflow',
 				triggerType: triggerType ?? 'schedule',
 				triggerHour,
 				triggerMinute,
@@ -216,10 +216,10 @@ export async function streamChat(
 	const anthropic = new Anthropic({ apiKey });
 	let messages: MessageParam[] = [...history];
 	let lastTurnEvents: StreamEvent[] = [];
-	// ターン単位で entity を追跡する。
-	// 「最後に単一エンティティ種別だけを使ったターン」の entity を記憶し、
-	// 最終ターンで entity 未指定テーブルへのフォールバックに使う。
-	// 複数エンティティを同一ターンで使った場合は undefined（どれかわからないため補完しない）。
+	// Track entity on a per-turn basis.
+	// Remember the entity of "the last turn that used only a single entity type",
+	// and use it as a fallback for tables that don't specify entity in the final turn.
+	// If multiple entities were used in the same turn, this is undefined (we don't know which one, so we don't fill it in).
 	let hintEntity: string | undefined;
 
 	for (let turn = 0; turn < 10; turn++) {
@@ -257,13 +257,13 @@ export async function streamChat(
 		turnEvents.push(...processor.flush());
 		lastTurnEvents = turnEvents;
 
-		// このターンで使ったレコード一覧系ツールの entity を収集する
+		// Collect the entity of record-list tools used in this turn
 		const turnEntities = new Set<string>();
 		for (const b of toolBlocks) {
 			const ent = RECORD_LIST_TOOL_ENTITY[b.name];
 			if (ent) turnEntities.add(ent);
 		}
-		// get_entities はカスタムテーブル名（entity_type_id → name）を DB から解決して補完する
+		// get_entities resolves the custom table name (entity_type_id → name) from the DB and fills it in
 		await Promise.all(
 			toolBlocks
 				.filter((b) => b.name === 'get_entities')
@@ -280,7 +280,7 @@ export async function streamChat(
 					} catch { /* ignore */ }
 				})
 		);
-		// hintEntity を更新: 単一ならその entity、複数なら ambiguous で undefined、ゼロなら維持
+		// Update hintEntity: if there's exactly one, use that entity; if multiple, it's ambiguous so undefined; if zero, keep the current value
 		if (turnEntities.size === 1) {
 			hintEntity = [...turnEntities][0];
 		} else if (turnEntities.size > 1) {
@@ -294,7 +294,7 @@ export async function streamChat(
 			return;
 		}
 
-		// ツール呼び出しを伴う中間ターンのテキスト・UIは進行状況の実況なのでユーザーには表示しない
+		// Text/UI from an intermediate turn involving a tool call is just progress narration, so it isn't shown to the user
 
 		const toolResults = await Promise.all(
 			toolBlocks.map(async (b) => {
@@ -306,7 +306,7 @@ export async function streamChat(
 					return {
 						type: 'tool_result' as const,
 						tool_use_id: b.id,
-						content: `エラー: ${e instanceof Error ? e.message : String(e)}`,
+						content: `Error: ${e instanceof Error ? e.message : String(e)}`,
 						is_error: true
 					};
 				}
@@ -320,7 +320,7 @@ export async function streamChat(
 		];
 	}
 
-	// ターン上限に達した場合は最後のターンの内容を表示する
+	// If the turn limit is reached, show the content of the last turn
 	applyEntityHint(lastTurnEvents, hintEntity);
 	for (const e of lastTurnEvents) emit(e);
 }

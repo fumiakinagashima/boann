@@ -18,12 +18,12 @@ function fieldToZod(f: FieldDef): z.ZodTypeAny {
 			break;
 		case 'recordSelect':
 		case 'account':
-			// 参照先レコードのID。Phase1では参照整合性チェックは行わない。
+			// ID of the referenced record. Phase1 does not perform referential integrity checks.
 			base = z.string().min(1);
 			break;
 		default:
 			// text / tel / textarea
-			// 必須の場合は空文字も拒否する（キーの存在だけでなく値の有無も検証する）
+			// When required, also reject an empty string (validate not just the key's presence but the value's presence too)
 			base = f.required ? z.string().min(1) : z.string();
 	}
 	if (f.description || f.label) base = base.describe(f.description || f.label);
@@ -31,10 +31,11 @@ function fieldToZod(f: FieldDef): z.ZodTypeAny {
 }
 
 /**
- * entity_fields の定義から、MCPツールのtools/call引数を検証するZodスキーマを組み立てる。
- * create: 必須フィールドは必須のまま。update: 差分更新に対応するため全フィールドを任意にする。
- * 未知キーはエラーにする（LLMのタイプミスを自己修正させるため、record.dataの値自体は
- * 従来どおり緩く保存できるが、MCPツール経由の入力はこのスキーマで厳格に弾く）。
+ * Builds a Zod schema from entity_fields definitions to validate MCP tool tools/call arguments.
+ * create: required fields stay required. update: all fields become optional to support partial updates.
+ * Unknown keys are an error (to make an LLM self-correct typos — record.data values themselves
+ * can still be stored loosely as before, but input coming through MCP tools is strictly rejected
+ * by this schema).
  */
 export function buildEntityDataSchema(fields: FieldDef[], mode: 'create' | 'update') {
 	const shape: Record<string, z.ZodTypeAny> = {};
@@ -46,10 +47,11 @@ export function buildEntityDataSchema(fields: FieldDef[], mode: 'create' | 'upda
 }
 
 /**
- * entity_fields の定義から、MCPツールのtools/call結果（outputSchema）を説明するZodスキーマを組み立てる。
- * 入力検証用の buildEntityDataSchema とは異なり、既存レコードの実データを説明するものなので
- * 全フィールドoptional（データ欠損があり得る）にし、.strict()ではなく.passthrough()にする
- * （フィールド定義から削除された古いキーが実データに残っている場合があるため、追加プロパティを許容する）。
+ * Builds a Zod schema from entity_fields definitions describing an MCP tool's tools/call result
+ * (outputSchema). Unlike buildEntityDataSchema (for input validation), this describes the actual
+ * data of an existing record, so every field is made optional (data can be missing) and
+ * .passthrough() is used instead of .strict() (to allow additional properties, since old keys
+ * removed from the field definitions may still remain in the actual data).
  */
 export function buildRecordOutputSchema(fields: FieldDef[]) {
 	const dataShape = buildEntityDataSchema(fields, 'update').shape;
@@ -66,12 +68,13 @@ export function buildRecordOutputSchema(fields: FieldDef[]) {
 }
 
 /**
- * tools/list の inputSchema/outputSchema として渡す素のJSON Schemaに変換する（$schemaフィールドは除去）。
- * MCPのTool.inputSchema/outputSchemaはJSON Schemaオブジェクトそのもの(仕様:
- * https://modelcontextprotocol.io/specification/2025-06-18/server/tools)なので変換自体はMCP由来の要件。
- * ただしZod側の挙動として、z.toJSONSchema()は.strict()の有無に関わらずデフォルトで
- * additionalProperties:falseを出力する(Zod本体の仕様、MCPとは無関係)。buildRecordOutputSchema
- * が.passthrough()を明示しているのはこのZodの挙動に対する回避策。
+ * Converts to a plain JSON Schema to pass as tools/list's inputSchema/outputSchema (the $schema
+ * field is stripped). MCP's Tool.inputSchema/outputSchema is itself a JSON Schema object (spec:
+ * https://modelcontextprotocol.io/specification/2025-06-18/server/tools), so the conversion
+ * itself is an MCP-derived requirement. However, as a Zod-side behavior, z.toJSONSchema() emits
+ * additionalProperties:false by default regardless of whether .strict() was used (a Zod-core
+ * behavior, unrelated to MCP). buildRecordOutputSchema's explicit .passthrough() is a workaround
+ * for this Zod behavior.
  */
 export function toJsonSchema(schema: z.ZodTypeAny): Record<string, unknown> {
 	const { $schema: _drop, ...rest } = z.toJSONSchema(schema) as Record<string, unknown>;

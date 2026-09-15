@@ -1,6 +1,6 @@
-// 「新しいチャット」クリック時にチャット画面の状態をリセットするための合図
-// +page.svelte はクライアント側インメモリ状態を保持するため、同じ "/" への遷移では
-// SvelteKitがコンポーネントインスタンスを再利用し自動リセットされない
+// A signal to reset the chat screen's state when "New chat" is clicked.
+// +page.svelte holds client-side in-memory state, so navigating to the same "/" reuses the
+// SvelteKit component instance instead of resetting it automatically.
 class ChatSessionStore {
 	resetToken = $state(0);
 

@@ -1,5 +1,5 @@
--- ページリデザイン: 既存ページの table_id を components[0].tableId から補完する
--- components の JSON 形式変換はアプリ層で後方互換処理するため SQL では行わない
+-- Page redesign: backfill existing pages' table_id from components[0].tableId
+-- The components JSON format conversion is handled with backward-compat logic in the app layer, not in SQL
 
 UPDATE app_pages
 SET table_id = json_extract(components, '$[0].tableId')

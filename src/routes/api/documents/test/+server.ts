@@ -9,36 +9,36 @@ import {
 	saveGeneratedDocument
 } from '$lib/server/documents';
 
-const MESSAGE = 'こんにちは！Middleton！';
+const MESSAGE = 'Hello, Middleton!';
 
 const requestSchema = z.object({ format: z.enum(['docx', 'xlsx', 'pptx']) });
 
 export const POST: RequestHandler = async ({ request, platform }) => {
-	if (!platform?.env?.R2) return errors.serviceUnavailable('R2が設定されていません');
+	if (!platform?.env?.R2) return errors.serviceUnavailable('R2 is not configured');
 
 	const { format } = requestSchema.parse(await request.json());
 
 	if (format === 'docx') {
 		const buffer = await generateWordDocument({
-			title: 'テスト文書',
+			title: 'Test Document',
 			blocks: [{ type: 'paragraph', text: MESSAGE }]
 		});
-		const link = await saveGeneratedDocument(platform.env.R2, buffer, 'こんにちは.docx', 'docx');
+		const link = await saveGeneratedDocument(platform.env.R2, buffer, 'hello.docx', 'docx');
 		return json(link);
 	} else if (format === 'xlsx') {
 		const buffer = await generateExcelWorkbook([
-			{ name: 'Sheet1', columns: [{ key: 'message', label: 'メッセージ' }], rows: [{ message: MESSAGE }] }
+			{ name: 'Sheet1', columns: [{ key: 'message', label: 'Message' }], rows: [{ message: MESSAGE }] }
 		]);
-		const link = await saveGeneratedDocument(platform.env.R2, buffer, 'こんにちは.xlsx', 'xlsx');
+		const link = await saveGeneratedDocument(platform.env.R2, buffer, 'hello.xlsx', 'xlsx');
 		return json(link);
 	} else if (format === 'pptx') {
 		const buffer = await generatePowerpointPresentation({
-			title: 'テスト',
-			slides: [{ title: 'テスト', body: [MESSAGE] }]
+			title: 'Test',
+			slides: [{ title: 'Test', body: [MESSAGE] }]
 		});
-		const link = await saveGeneratedDocument(platform.env.R2, buffer, 'こんにちは.pptx', 'pptx');
+		const link = await saveGeneratedDocument(platform.env.R2, buffer, 'hello.pptx', 'pptx');
 		return json(link);
 	}
 
-	return errors.badRequest('format は docx / xlsx / pptx のいずれかを指定してください');
+	return errors.badRequest('format must be one of docx / xlsx / pptx');
 };

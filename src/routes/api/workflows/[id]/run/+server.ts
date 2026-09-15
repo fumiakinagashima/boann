@@ -11,16 +11,16 @@ export const POST: RequestHandler = async ({ params, request, platform, locals }
 	const workflow = await getWorkflow(db, params.id);
 	if (!workflow) return json({ error: 'Not found' }, { status: 404 });
 	if (workflow.accountId && workflow.accountId !== locals.account?.id) {
-		return json({ error: '権限がありません' }, { status: 403 });
+		return json({ error: 'No permission' }, { status: 403 });
 	}
 
 	let body: { triggerRecordId?: string; inputArgs?: Record<string, unknown> } = {};
-	try { body = await request.json(); } catch { /* body は省略可 */ }
+	try { body = await request.json(); } catch { /* body is optional */ }
 
 	let triggerContext: TriggerContext | undefined;
 	if (workflow.triggerType === 'event') {
 		const recordId = body.triggerRecordId?.trim() ?? '';
-		// @trigger:<field> のテスト実行用に、指定されたレコードIDの現在のフィールド値を読み込む
+		// For test-running @trigger:<field>, read the current field values of the specified record ID
 		const record = recordId ? await getRecord(db, '', recordId) : null;
 		triggerContext = {
 			event: workflow.triggerEvent ?? 'create',

@@ -18,7 +18,7 @@ export async function chat(
 	let messages: MessageParam[] = [...history];
 	const contents: MessageContent[] = [];
 
-	// ツールコールのループ（最大5回）
+	// Tool-call loop (up to 5 iterations)
 	for (let i = 0; i < 5; i++) {
 		const response = await anthropic.messages.create({
 			model: model ?? DEFAULT_MODEL,
@@ -28,7 +28,7 @@ export async function chat(
 			messages
 		});
 
-		// テキストと<ui>タグをパース
+		// Parse text and <ui> tags
 		for (const block of response.content) {
 			if (block.type === 'text') {
 				const parsed = parseTextContent(block.text);
@@ -36,10 +36,10 @@ export async function chat(
 			}
 		}
 
-		// ツールコールがなければ終了
+		// Stop if there's no tool call
 		if (response.stop_reason !== 'tool_use') break;
 
-		// ツールを実行してループ継続
+		// Run the tool and continue the loop
 		const toolUseBlocks = response.content.filter((b) => b.type === 'tool_use');
 		const toolResults = await Promise.all(
 			toolUseBlocks.map(async (block) => {
@@ -55,7 +55,7 @@ export async function chat(
 					return {
 						type: 'tool_result' as const,
 						tool_use_id: block.id,
-						content: `エラー: ${e instanceof Error ? e.message : String(e)}`,
+						content: `Error: ${e instanceof Error ? e.message : String(e)}`,
 						is_error: true
 					};
 				}
@@ -79,7 +79,7 @@ function parseTextContent(text: string): MessageContent[] {
 	let match;
 
 	while ((match = uiRegex.exec(text)) !== null) {
-		// UIタグより前のテキスト
+		// Text before the UI tag
 		if (match.index > lastIndex) {
 			const before = text.slice(lastIndex, match.index).trim();
 			if (before) contents.push({ type: 'text', text: before });
@@ -109,7 +109,7 @@ function parseTextContent(text: string): MessageContent[] {
 		lastIndex = match.index + match[0].length;
 	}
 
-	// UIタグより後のテキスト
+	// Text after the UI tag
 	if (lastIndex < text.length) {
 		const after = text.slice(lastIndex).trim();
 		if (after) contents.push({ type: 'text', text: after });

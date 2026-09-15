@@ -10,9 +10,9 @@
 	let { data }: { data: PageData } = $props();
 	const s = createAppBuilderState(() => data);
 
-	// アプリ自体の名称・アイコン変更／削除は、作成者本人か管理者のみ許可する
-	// （accountId が null の既存データは所有者不明の共有アプリとして誰でも操作可）。
-	// テーブル・ページ・ワークフローの追加はこれとは別に全員に開放したまま。
+	// Changing the app's own name/icon, or deleting it, is only allowed for the creator or an admin
+	// (existing data with a null accountId is treated as an ownerless shared app that anyone can operate on).
+	// Adding tables, pages, and workflows remains open to everyone, separately from this.
 	const canManageApp = $derived(
 		!data.app.accountId || data.account?.permission === 'admin' || data.app.accountId === data.account?.id
 	);
@@ -22,13 +22,13 @@
 	{#snippet main()}
 		<div class="panel-header">
 			<div class="header-top">
-				<a href="/" class="back-link"><ChevronLeft size={15} />アプリ一覧</a>
+				<a href="/" class="back-link"><ChevronLeft size={15} />Apps</a>
 				{#if canManageApp}
 					<div class="header-actions">
-						{#if s.saved}<span class="saved-msg">✓ 保存しました</span>{/if}
-						<button class="btn-danger-ghost" onclick={s.deleteApp} disabled={s.deleting}>削除</button>
+						{#if s.saved}<span class="saved-msg">✓ Saved</span>{/if}
+						<button class="btn-danger-ghost" onclick={s.deleteApp} disabled={s.deleting}>Delete</button>
 						<button class="btn-save" onclick={s.save} disabled={s.saving || !s.dirty}>
-							{s.saving ? '保存中…' : '保存'}
+							{s.saving ? 'Saving…' : 'Save'}
 						</button>
 					</div>
 				{/if}
@@ -53,16 +53,16 @@
 						bind:value={s.appLabel}
 						oninput={s.markDirty}
 						disabled={!canManageApp}
-						placeholder="アプリ名"
+						placeholder="App name"
 					/>
 				</div>
 			</div>
 		</div>
 
 		<div class="panel-body">
-			<!-- テーブル -->
+			<!-- Tables -->
 			<section class="list-section">
-				<h2 class="section-label">テーブル</h2>
+				<h2 class="section-label">Tables</h2>
 				<div class="item-list">
 					{#each s.tables as table (table.id)}
 						<div
@@ -80,20 +80,20 @@
 								<p class="item-label">{table.label}</p>
 							</div>
 							<div class="item-footer">
-								<a href="/apps/{data.app.id}/tables/{table.id}/build" class="item-action">テーブル設定</a>
-								<a href={`/apps/${data.app.id}/tables/${table.id}`} class="item-action">データ管理</a>
+								<a href="/apps/{data.app.id}/tables/{table.id}/build" class="item-action">Table settings</a>
+								<a href={`/apps/${data.app.id}/tables/${table.id}`} class="item-action">Manage data</a>
 							</div>
 						</div>
 					{/each}
 					<button class="btn-add-table" onclick={s.addTable} disabled={s.addingTable}>
-						{s.addingTable ? '作成中…' : '+ テーブルを追加'}
+						{s.addingTable ? 'Creating…' : '+ Add table'}
 					</button>
 				</div>
 			</section>
 
-			<!-- ワークフロー -->
+			<!-- Workflows -->
 			<section class="list-section">
-				<h2 class="section-label">ワークフロー</h2>
+				<h2 class="section-label">Workflows</h2>
 				<div class="item-list">
 					{#each s.workflows as wf (wf.id)}
 						<div
@@ -111,57 +111,57 @@
 								<p class="item-label">{wf.name}</p>
 							</div>
 							<div class="item-footer">
-								<a href="/apps/{data.app.id}/workflows/{wf.id}/build" class="item-action">ワークフロー設定</a>
+								<a href="/apps/{data.app.id}/workflows/{wf.id}/build" class="item-action">Workflow settings</a>
 							</div>
 						</div>
 					{/each}
 					<button class="btn-add-table" onclick={s.addWorkflow} disabled={s.addingWorkflow}>
-						{s.addingWorkflow ? '作成中…' : '+ ワークフローを追加'}
+						{s.addingWorkflow ? 'Creating…' : '+ Add workflow'}
 					</button>
 				</div>
 			</section>
 
-			<!-- トークン管理 -->
+			<!-- Token management -->
 			<section class="list-section">
-				<h2 class="section-label">トークン管理</h2>
+				<h2 class="section-label">Token management</h2>
 				{#if s.issuedMcpToken}
 					<div class="mcp-token-reveal">
-						<p class="mcp-token-reveal-note">発行されたトークンです。閉じたら二度と表示されません。</p>
+						<p class="mcp-token-reveal-note">This is the issued token. It will never be shown again once closed.</p>
 						<div class="mcp-token-reveal-row">
 							<code class="mcp-token-value">{s.issuedMcpToken}</code>
 							<button class="btn-secondary" onclick={s.copyMcpToken}>
-								{s.mcpTokenCopied ? 'コピーしました' : 'コピーする'}
+								{s.mcpTokenCopied ? 'Copied' : 'Copy'}
 							</button>
 						</div>
 						<div class="mcp-panel-actions">
-							<button class="btn-secondary" onclick={s.dismissIssuedMcpToken}>閉じる</button>
+							<button class="btn-secondary" onclick={s.dismissIssuedMcpToken}>Close</button>
 						</div>
 					</div>
 				{/if}
 				<div class="mcp-panel">
 					<div class="mcp-endpoint-row">
-						<span class="mcp-label">エンドポイント</span>
+						<span class="mcp-label">Endpoint</span>
 						<code class="mcp-endpoint">/api/apps/{data.app.id}/mcp</code>
 					</div>
 					<div class="mcp-status-row">
 						{#if s.mcpStatus.issued}
-							<span class="mcp-label">トークン</span>
+							<span class="mcp-label">Token</span>
 							<span class="mcp-token-prefix">{s.mcpStatus.tokenPrefix}</span>
-							<span class="mcp-badge">有効</span>
+							<span class="mcp-badge">Active</span>
 						{:else}
-							<span class="empty-hint">まだトークンが発行されていません</span>
+							<span class="empty-hint">No token has been issued yet</span>
 						{/if}
 					</div>
 					<div class="mcp-panel-actions">
 						{#if !s.mcpStatus.issued}
 							<button class="btn-save" onclick={s.issueMcpToken} disabled={s.issuingMcpToken}>
-								{s.issuingMcpToken ? '発行中…' : '発行する'}
+								{s.issuingMcpToken ? 'Issuing…' : 'Issue'}
 							</button>
 						{:else}
 							<button class="btn-secondary" onclick={s.reissueMcpToken} disabled={s.issuingMcpToken}>
-								再発行する
+								Reissue
 							</button>
-							<button class="btn-danger-ghost" onclick={s.deleteMcpToken}>削除する</button>
+							<button class="btn-danger-ghost" onclick={s.deleteMcpToken}>Delete</button>
 						{/if}
 					</div>
 				</div>
@@ -171,7 +171,7 @@
 
 	{#snippet chat()}
 		<ChatPanel
-			placeholder="テーブル追加・修正の指示を入力…"
+			placeholder="Enter instructions to add or edit tables…"
 			onAction={() => invalidateAll()}
 			context={s.chatContext}
 		/>
@@ -393,7 +393,7 @@
 		margin: 0;
 	}
 
-	/* ── トークン管理 ──────────────────────────────────────────── */
+	/* ── Token management ──────────────────────────────────────── */
 	.btn-secondary {
 		padding: 5px 12px;
 		border-radius: 6px;

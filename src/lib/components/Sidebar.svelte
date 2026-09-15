@@ -60,7 +60,7 @@
 	<nav class="nav">
 		<a href="/" class="nav-item" class:active={isActive('/')}>
 			<span class="nav-icon"><LayoutGrid size={15} /></span>
-			<span>アプリ一覧</span>
+			<span>Apps</span>
 		</a>
 
 		{#if bookmarkedApps.length > 0}
@@ -71,7 +71,7 @@
 					aria-expanded={bookmarksOpen}
 				>
 					<span class="nav-icon"><Star size={14} /></span>
-					<span>ブックマーク</span>
+					<span>Bookmarks</span>
 					<span class="chevron" class:open={bookmarksOpen}>
 						<ChevronRight size={12} />
 					</span>
@@ -94,7 +94,7 @@
 		{/if}
 		<!--<a href="/workflows" class="nav-item" class:active={isUnderPath('/workflows')}>
 			<span class="nav-icon"><Workflow size={15} /></span>
-			<span>ワークフロー</span>
+			<span>Workflows</span>
 		</a>-->
 	</nav>
 
@@ -110,11 +110,11 @@
 		{#if account.permission === 'admin'}
 			<a href="/accounts" class="footer-item" class:active={isUnderPath('/accounts')}>
 				<Users size={15} />
-				アカウント
+				Accounts
 			</a>
 			<a href="/api-connections" class="footer-item" class:active={isUnderPath('/api-connections')}>
 				<Plug size={15} />
-				連携設定
+				Integration settings
 			</a>
 		{/if}
 

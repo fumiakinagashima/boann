@@ -1,7 +1,7 @@
--- entity_types.name のグローバル UNIQUE を (app_id, name) の複合 UNIQUE に変更する。
--- name はインライン UNIQUE 制約（SQLite の auto-index）なので直接 DROP できず、テーブルを再作成する。
--- app_pages.table_id / entity_fields.entity_type_id 等が entity_types.id を参照するため、
--- id を保持したまま再作成し、defer_foreign_keys で COMMIT 時まで FK チェックを遅延させる。
+-- Change entity_types.name's global UNIQUE constraint into a composite UNIQUE on (app_id, name).
+-- name is an inline UNIQUE constraint (a SQLite auto-index), so it can't be dropped directly — the table must be recreated.
+-- Since app_pages.table_id / entity_fields.entity_type_id etc. reference entity_types.id,
+-- it's recreated while preserving id, deferring FK checks until COMMIT via defer_foreign_keys.
 PRAGMA defer_foreign_keys=true;
 --> statement-breakpoint
 

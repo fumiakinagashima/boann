@@ -9,7 +9,7 @@ export const PATCH: RequestHandler = async ({ params, request, platform, locals 
 	if (!platform?.env?.DB) return json({ error: 'DB not available' }, { status: 500 });
 	const db = createDb(platform.env.DB);
 	const app = await getAppById(db, params.id);
-	if (!app) return errors.notFound('アプリが見つかりません');
+	if (!app) return errors.notFound('App not found');
 	if (!canManage(app, locals.account)) return errors.forbidden();
 	const body = await request.json() as { label?: string; icon?: string };
 	if (body.label !== undefined || body.icon !== undefined) {
@@ -22,7 +22,7 @@ export const DELETE: RequestHandler = async ({ params, platform, locals }) => {
 	if (!platform?.env?.DB) return json({ error: 'DB not available' }, { status: 500 });
 	const db = createDb(platform.env.DB);
 	const app = await getAppById(db, params.id);
-	if (!app) return errors.notFound('アプリが見つかりません');
+	if (!app) return errors.notFound('App not found');
 	if (!canManage(app, locals.account)) return errors.forbidden();
 	await deleteApp(db, params.id);
 	return new Response(null, { status: 204 });

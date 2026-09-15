@@ -17,7 +17,7 @@
 	type Props = {
 		contextTitle: string;
 		contextFields: { key: string; label: string }[];
-		// 詳細表示中のレコード。指示語「この顧客」等を解決できるようにする
+		// The record currently shown in detail. Lets references like "this customer" be resolved.
 		recordContext?: RecordContext | null;
 	};
 
@@ -65,7 +65,7 @@
 			if (!res.ok || !res.body) {
 				chatMessages = [
 					...chatMessages.slice(0, -1),
-					{ role: 'assistant', text: 'エラーが発生しました。' }
+					{ role: 'assistant', text: 'An error occurred.' }
 				];
 				return;
 			}
@@ -110,14 +110,14 @@
 </script>
 
 <div class="chat-side">
-	<div class="chat-header">AI アシスタント</div>
+	<div class="chat-header">AI Assistant</div>
 	<div class="chat-messages" bind:this={chatListEl}>
 		{#if chatMessages.length === 0}
 			<p class="chat-empty">
 				{#if recordContext}
-					「{recordContext.label}」について質問できます（関連する案件・活動の集計など）。
+					You can ask about "{recordContext.label}" (e.g. summaries of related deals or activities).
 				{:else}
-					ご質問・ご相談があればどうぞ。
+					Feel free to ask a question.
 				{/if}
 			</p>
 		{/if}
@@ -139,7 +139,7 @@
 		<textarea
 			bind:value={chatInput}
 			onkeydown={handleChatKey}
-			placeholder="質問・相談をどうぞ..."
+			placeholder="Ask your question..."
 			rows="2"
 			disabled={chatLoading}
 		></textarea>
@@ -147,7 +147,7 @@
 			class="chat-send"
 			onclick={sendChat}
 			disabled={chatLoading || !chatInput.trim()}
-			aria-label="送信"
+			aria-label="Send"
 		>
 			<ArrowUp size={14} />
 		</button>

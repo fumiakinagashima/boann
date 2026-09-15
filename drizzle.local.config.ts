@@ -3,8 +3,9 @@ import { resolve } from 'path';
 import type { Config } from 'drizzle-kit';
 
 const d1Dir = '.wrangler/state/v3/d1/miniflare-D1DatabaseObject';
-// wrangler.toml の env.dev の binding 変更やクリーンアップの度に別ハッシュのファイルが
-// 増えうるため、最も新しく更新されたものを採用する（= 現在の設定で実際に使われているDB）。
+// A new differently-hashed file can appear each time wrangler.toml's env.dev bindings change
+// or state is cleaned up, so pick whichever was most recently updated (= the DB actually in use
+// under the current config).
 const sqliteFile = readdirSync(d1Dir)
 	.filter((f) => f.endsWith('.sqlite') && !f.includes('metadata'))
 	.map((f) => ({ f, mtime: statSync(resolve(d1Dir, f)).mtimeMs }))

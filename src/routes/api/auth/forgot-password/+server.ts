@@ -13,7 +13,7 @@ const forgotPasswordInputSchema = z.object({
 });
 
 export const POST: RequestHandler = async ({ request, platform, url }) => {
-	if (!platform?.env?.DB || !platform.env.KV) return errors.serviceUnavailable('利用できません');
+	if (!platform?.env?.DB || !platform.env.KV) return errors.serviceUnavailable('Not available');
 
 	const ip = request.headers.get('CF-Connecting-IP') ?? request.headers.get('X-Forwarded-For') ?? 'unknown';
 	const rl = await checkRateLimit(platform.env.KV, 'forgot-password', ip, { windowSeconds: 3600, maxRequests: 5 });
@@ -22,7 +22,7 @@ export const POST: RequestHandler = async ({ request, platform, url }) => {
 	const data = forgotPasswordInputSchema.parse(await request.json());
 
 	const setup = getEmailSetupFromEnv(platform.env);
-	if (!setup) return errors.serviceUnavailable('パスワードリセット機能は現在利用できません');
+	if (!setup) return errors.serviceUnavailable('The password reset feature is currently unavailable');
 
 	const db = createDb(platform.env.DB);
 	const account = await getAccountByEmailWithPassword(db, data.email);
@@ -33,8 +33,8 @@ export const POST: RequestHandler = async ({ request, platform, url }) => {
 			from: setup.from,
 			fromName: setup.fromName,
 			to: data.email,
-			subject: '【Boann】パスワード再設定のご案内',
-			text: `パスワード再設定のご案内\n\n以下のリンクから新しいパスワードを設定してください。\n${resetUrl}\n\nこのリンクの有効期限は1時間です。\n\nこのメールに心当たりがない場合は、このメールを無視してください。`
+			subject: '[Boann] Password Reset Instructions',
+			text: `Password Reset Instructions\n\nPlease set a new password using the link below.\n${resetUrl}\n\nThis link expires in 1 hour.\n\nIf you did not request this email, please disregard it.`
 		});
 	}
 

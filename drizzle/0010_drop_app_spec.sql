@@ -1,2 +1,2 @@
--- 仕様書欄（apps.spec）を廃止。ファイル取り込み方式へ移行するため不要。
+-- Drop the spec field (apps.spec). No longer needed since we're moving to the file-import approach.
 ALTER TABLE `apps` DROP COLUMN `spec`;

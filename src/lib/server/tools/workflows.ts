@@ -62,21 +62,21 @@ export const tools: Tool[] = [
 	{
 		name: 'save_workflow',
 		description:
-			'ワークフロー定義をDBに保存する。提案した workflow コンポーネントの内容をそのまま保存する場合に使う（ユーザーがUIで編集した後の保存は「保存」ボタンで行われるため、AIがこのツールを呼ぶ必要はない）。既存ワークフローを編集した場合は、get_workflowで取得したidを必ず指定する（idを省略すると新規作成になり、重複してしまう）。保存後はアプリのワークフロー一覧で確認・管理できる（新規作成時は実行には別途有効化が必要）。',
+			'Save a workflow definition to the DB. Use this to persist the content of a proposed workflow component as-is (saving after the user has edited it in the UI is done via the "Save" button, so the AI does not need to call this tool for that). When editing an existing workflow, you must always specify the id obtained from get_workflow (omitting id creates a new workflow, resulting in a duplicate). After saving, it can be checked/managed from the app\'s workflow list (for a newly created workflow, it must be separately enabled before it will run).',
 		input_schema: {
 			type: 'object',
 			properties: {
-				id: { type: 'string', description: '既存ワークフローを更新する場合のID（get_workflowで取得した値）。新規作成時は指定しない' },
-				name: { type: 'string', description: 'ワークフロー名' },
-				description: { type: 'string', description: 'このワークフローが何をするかの説明文。外部MCPエージェントがこのワークフローを呼ぶべきか判断する材料になるため、triggerTypeがmcp_toolの場合は具体的に書く（例: 「指定した顧客に見積作成完了の通知を送る」）' },
-				triggerType: { type: 'string', enum: ['schedule', 'event', 'mcp_tool'], description: 'トリガー種別。schedule=毎日指定時刻、event=レコード操作時、mcp_tool=外部MCPエージェントからの呼び出し時（スケジュール・イベントの設定は不要）。省略時はmcp_tool' },
-				triggerHour: { type: 'number', description: '実行時刻（時、0-23、JST）。schedule時のみ有効' },
-				triggerMinute: { type: 'number', description: '実行時刻（分、0-59、JST）。schedule時のみ有効' },
-				triggerEvent: { type: 'string', enum: ['create', 'update', 'delete'], description: 'event時のみ。対象操作（create=作成、update=更新、delete=削除）' },
-				triggerEntityTypeId: { type: 'string', description: 'event時のみ。監視するテーブルのentity_types.id（UUIDキー）' },
+				id: { type: 'string', description: 'ID to use when updating an existing workflow (the value obtained from get_workflow). Do not specify when creating a new one' },
+				name: { type: 'string', description: 'Workflow name' },
+				description: { type: 'string', description: 'Description of what this workflow does. This is the material an external MCP agent uses to decide whether to call this workflow, so write it concretely when triggerType is mcp_tool (e.g. "Sends the specified customer a notification that the quote has been completed")' },
+				triggerType: { type: 'string', enum: ['schedule', 'event', 'mcp_tool'], description: 'Trigger type. schedule = a fixed time every day, event = on record operations, mcp_tool = when called by an external MCP agent (no schedule/event settings needed). Defaults to mcp_tool if omitted' },
+				triggerHour: { type: 'number', description: 'Execution hour (0-23, JST). Only applies for schedule' },
+				triggerMinute: { type: 'number', description: 'Execution minute (0-59, JST). Only applies for schedule' },
+				triggerEvent: { type: 'string', enum: ['create', 'update', 'delete'], description: 'Only for event. The target operation (create = creation, update = update, delete = deletion)' },
+				triggerEntityTypeId: { type: 'string', description: 'Only for event. The entity_types.id (UUID key) of the table to watch' },
 				inputSchema: {
 					type: 'array',
-					description: '宣言する入力パラメータの一覧（呼び出す側が渡す値）。各要素は{key, label, type, required, options, description}。ステップ内で@input:<key>として参照できる',
+					description: 'The list of input parameters to declare (values supplied by the caller). Each element is {key, label, type, required, options, description}. Can be referenced within steps as @input:<key>',
 					items: {
 						type: 'object',
 						properties: {
@@ -92,7 +92,7 @@ export const tools: Tool[] = [
 				},
 				steps: {
 					type: 'array',
-					description: 'ステップの配列（action または condition）。eventトリガーでは@trigger:idで操作されたレコードのID、@trigger:eventでイベント種別、@trigger:<フィールドキー>（例: @trigger:createdBy）でそのレコードの他のフィールド値を、条件の判定対象（先頭ステップの条件でも）を含め参照できる。@self:account_idはワークフロー登録者自身のアカウントIDを表し、@trigger:createdBy != @self:account_id のように「自分以外が操作したか」を判定できる。inputSchemaで宣言した入力パラメータは@input:<key>で参照できる'
+					description: 'Array of steps (action or condition). For an event trigger, you can reference the ID of the record that was operated on via @trigger:id, the event type via @trigger:event, and other field values of that record via @trigger:<field key> (e.g. @trigger:createdBy) — including as the target of a condition (even in the first step). @self:account_id represents the account ID of the person who registered the workflow, letting you check things like "was this operated on by someone other than me" via @trigger:createdBy != @self:account_id. Input parameters declared in inputSchema can be referenced via @input:<key>'
 				}
 			},
 			required: ['name', 'triggerHour', 'triggerMinute', 'steps']
@@ -101,18 +101,18 @@ export const tools: Tool[] = [
 	{
 		name: 'list_workflows',
 		description:
-			'保存済みのワークフロー一覧を取得する。「どんなワークフローが設定されているか」「定期実行の設定を確認したい」などに使う。',
+			'Get the list of saved workflows. Use this for things like "what workflows are configured" or "I want to check the scheduled-run settings".',
 		input_schema: { type: 'object', properties: {} }
 	},
 	{
 		name: 'get_workflow',
 		description:
-			'既存のワークフローを名前またはIDで1件取得する。「〇〇ワークフローを編集して」「〇〇の設定を直して」など既存ワークフローの確認・編集依頼があった場合に使う。取得した内容は workflow コンポーネント（同じidを指定）で表示し、ユーザーの指示に応じて更新後の構成を提案する。',
+			'Get a single existing workflow by name or ID. Use this when there is a request to check or edit an existing workflow, such as "edit the ○○ workflow" or "fix the settings for ○○". Display the retrieved content with the workflow component (specifying the same id), and propose an updated configuration according to the user\'s instructions.',
 		input_schema: {
 			type: 'object',
 			properties: {
-				id: { type: 'string', description: 'ワークフローのID（分かっている場合）' },
-				name: { type: 'string', description: 'ワークフロー名（部分一致）。idが分からない場合に使う' }
+				id: { type: 'string', description: 'Workflow ID (if known)' },
+				name: { type: 'string', description: 'Workflow name (partial match). Use this when the id is not known' }
 			},
 			required: []
 		}
@@ -120,12 +120,12 @@ export const tools: Tool[] = [
 	{
 		name: 'run_workflow',
 		description:
-			'指定したワークフローを今すぐ実行する。「〇〇ワークフローを実行して」「今すぐ動かして」などの依頼に使う。実行結果（成功/失敗・エラー内容）を返す。get_workflowのinputSchemaに入力パラメータがある場合はinputArgsで値を渡す。',
+			'Run the specified workflow right now. Use this for requests like "run the ○○ workflow" or "run it now". Returns the execution result (success/failure and error details). If get_workflow\'s inputSchema has input parameters, pass their values via inputArgs.',
 		input_schema: {
 			type: 'object',
 			properties: {
-				id: { type: 'string', description: '実行するワークフローのID（list_workflows または get_workflow で取得）' },
-				inputArgs: { type: 'object', description: 'get_workflowのinputSchemaで宣言されている入力パラメータのkeyと値のペア（例: {"customer_name": "田中"}）。入力パラメータがないワークフローでは不要' }
+				id: { type: 'string', description: 'ID of the workflow to run (obtained from list_workflows or get_workflow)' },
+				inputArgs: { type: 'object', description: 'Key/value pairs for the input parameters declared in get_workflow\'s inputSchema (e.g. {"customer_name": "Tanaka"}). Not needed for workflows without input parameters' }
 			},
 			required: ['id']
 		}
@@ -133,12 +133,12 @@ export const tools: Tool[] = [
 	{
 		name: 'get_workflow_run_logs',
 		description:
-			'ワークフローの実行ログ（最近の実行履歴）を取得する。「最後に実行した結果は？」「エラーの詳細を見せて」などの依頼に使う。各ステップの成否も含む。',
+			'Get a workflow\'s execution logs (recent run history). Use this for requests like "what was the result of the last run?" or "show me the error details". Includes the success/failure of each step.',
 		input_schema: {
 			type: 'object',
 			properties: {
-				id: { type: 'string', description: '対象ワークフローのID' },
-				limit: { type: 'number', description: '取得する件数（デフォルト: 5）' }
+				id: { type: 'string', description: 'ID of the target workflow' },
+				limit: { type: 'number', description: 'Number of records to retrieve (default: 5)' }
 			},
 			required: ['id']
 		}
@@ -154,21 +154,21 @@ export async function handleSaveWorkflow(db: Db, input: unknown, env?: ToolEnv) 
 	]);
 	const validation = validateWorkflow(triggerType ?? 'schedule', triggerHour, triggerMinute, triggerEntityTypeId, steps, entityTypes, slackIntegrations, inputSchema ?? [], integrations);
 	if (!validation.ok) {
-		throw new Error(`ワークフローの内容に問題があります: ${validation.errors.join(' / ')}`);
+		throw new Error(`There is a problem with the workflow content: ${validation.errors.join(' / ')}`);
 	}
 
 	if (id) {
 		const existing = await getWorkflow(db, id);
-		if (!existing) throw new Error(`ワークフローが見つかりません（id: ${id}）`);
+		if (!existing) throw new Error(`Workflow not found (id: ${id})`);
 		if (existing.accountId && existing.accountId !== env?.accountId) {
-			throw new Error('このワークフローを更新する権限がありません。');
+			throw new Error('You do not have permission to update this workflow.');
 		}
 		const workflow = await updateWorkflow(db, id, { name, description: description ?? existing.description, steps, inputSchema: inputSchema as FieldDef[] | undefined, triggerType, triggerHour, triggerMinute, triggerEvent, triggerEntityTypeId });
 		return {
 			id: workflow.id,
 			name: workflow.name,
 			stepCount: workflow.steps.length,
-			message: `ワークフロー「${workflow.name}」を更新しました（ステップ${workflow.steps.length}件）。`
+			message: `Updated workflow "${workflow.name}" (${workflow.steps.length} step(s)).`
 		};
 	}
 
@@ -189,7 +189,7 @@ export async function handleSaveWorkflow(db: Db, input: unknown, env?: ToolEnv) 
 		id: workflow.id,
 		name: workflow.name,
 		stepCount: workflow.steps.length,
-		message: `ワークフロー「${workflow.name}」を保存しました（ステップ${workflow.steps.length}件）。アプリのワークフロー一覧から有効化すると実行されます。`
+		message: `Saved workflow "${workflow.name}" (${workflow.steps.length} step(s)). It will run once enabled from the app's workflow list.`
 	};
 }
 
@@ -198,7 +198,7 @@ export async function handleListWorkflows(db: Db, env?: ToolEnv) {
 		? await listWorkflowsByAppId(db, env.appId)
 		: await listWorkflows(db, env?.accountId);
 	if (rows.length === 0) {
-		return { workflows: [], message: '保存済みのワークフローはありません。' };
+		return { workflows: [], message: 'There are no saved workflows.' };
 	}
 	return {
 		workflows: rows.map((r) => ({
@@ -235,13 +235,13 @@ function toGetWorkflowResult(row: WorkflowRow) {
 
 export async function handleGetWorkflow(db: Db, input: unknown, env?: ToolEnv) {
 	const { id, name } = getWorkflowInputSchema.parse(input);
-	if (!id && !name) throw new Error('id または name のいずれかを指定してください。');
+	if (!id && !name) throw new Error('Specify either id or name.');
 
 	if (id) {
 		const row = await getWorkflow(db, id);
-		if (!row) throw new Error(`ワークフローが見つかりません（id: ${id}）`);
+		if (!row) throw new Error(`Workflow not found (id: ${id})`);
 		if (row.accountId && row.accountId !== env?.accountId) {
-			throw new Error(`ワークフローが見つかりません（id: ${id}）`);
+			throw new Error(`Workflow not found (id: ${id})`);
 		}
 		return toGetWorkflowResult(row);
 	}
@@ -249,12 +249,12 @@ export async function handleGetWorkflow(db: Db, input: unknown, env?: ToolEnv) {
 	const rows = await listWorkflows(db, env?.accountId);
 	const matches = rows.filter((r) => r.name.includes(name!));
 	if (matches.length === 0) {
-		throw new Error(`「${name}」に一致するワークフローが見つかりません。`);
+		throw new Error(`No workflow matching "${name}" was found.`);
 	}
 	if (matches.length > 1) {
 		return {
 			ambiguous: true,
-			message: `「${name}」に一致するワークフローが複数あります。どれを編集するか確認してください。`,
+			message: `There are multiple workflows matching "${name}". Please confirm which one to edit.`,
 			candidates: matches.map((r) => ({ id: r.id, name: r.name }))
 		};
 	}
@@ -269,7 +269,7 @@ const runWorkflowInputSchema = z.object({
 export async function handleRunWorkflow(db: Db, input: unknown, env?: ToolEnv) {
 	const { id, inputArgs } = runWorkflowInputSchema.parse(input);
 	const row = await getWorkflow(db, id);
-	if (!row) throw new Error(`ワークフローが見つかりません（id: ${id}）`);
+	if (!row) throw new Error(`Workflow not found (id: ${id})`);
 	const result = await runWorkflowNow(db, id, env, undefined, inputArgs);
 	return {
 		id: result.id,
@@ -278,8 +278,8 @@ export async function handleRunWorkflow(db: Db, input: unknown, env?: ToolEnv) {
 		...(result.error ? { error: result.error } : {}),
 		...(Object.keys(result.result).length > 0 ? { result: result.result } : {}),
 		message: result.ok
-			? `ワークフロー「${result.name}」を実行しました。`
-			: `ワークフロー「${result.name}」の実行に失敗しました: ${result.error}`
+			? `Ran workflow "${result.name}".`
+			: `Failed to run workflow "${result.name}": ${result.error}`
 	};
 }
 
@@ -291,10 +291,10 @@ const getWorkflowRunLogsInputSchema = z.object({
 export async function handleGetWorkflowRunLogs(db: Db, input: unknown) {
 	const { id, limit } = getWorkflowRunLogsInputSchema.parse(input);
 	const row = await getWorkflow(db, id);
-	if (!row) throw new Error(`ワークフローが見つかりません（id: ${id}）`);
+	if (!row) throw new Error(`Workflow not found (id: ${id})`);
 	const runs = await listWorkflowRuns(db, id, limit ?? 5);
 	if (runs.length === 0) {
-		return { runs: [], message: `ワークフロー「${row.name}」の実行ログはまだありません。` };
+		return { runs: [], message: `There are no run logs yet for workflow "${row.name}".` };
 	}
 	return {
 		workflowName: row.name,

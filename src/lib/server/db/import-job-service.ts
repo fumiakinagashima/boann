@@ -5,7 +5,7 @@ import type { ImportPlan } from '$lib/server/ai/import-plan';
 
 export type ImportJobStatus = 'designing' | 'ready' | 'applying' | 'done' | 'error';
 
-// プラン修正チャットの1メッセージ（軽量。MessageContent 全体は使わずテキストのみ）。
+// A single message in the plan-refinement chat (lightweight — just text, not the full MessageContent).
 export type ImportChatMessage = { role: 'user' | 'assistant'; text: string };
 
 export type ImportJob = {

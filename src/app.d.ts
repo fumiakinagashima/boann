@@ -15,8 +15,8 @@ declare global {
 				ANTHROPIC_API_KEY: string;
 				MOCK_AI: string;
 				KV?: KVNamespace;
-				// @cloudflare/workers-oauth-provider の必須バインディングと、worker.ts側で
-				// OAuthProviderがラップして渡す際にenvへ注入されるヘルパー(/oauth/authorizeで使用)。
+				// The required binding for @cloudflare/workers-oauth-provider, and the helper injected into
+				// env when OAuthProvider wraps the worker in worker.ts (used in /oauth/authorize).
 				OAUTH_KV?: KVNamespace;
 				OAUTH_PROVIDER?: import('@cloudflare/workers-oauth-provider').OAuthHelpers;
 				R2?: R2Bucket;

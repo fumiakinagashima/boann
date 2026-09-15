@@ -3,31 +3,31 @@ import type { Tool } from '@anthropic-ai/sdk/resources/messages';
 import { uploadR2 } from '../r2-service';
 import type { ToolEnv } from './shared';
 
-// AIに公開するツール（旧・直接生成ツールは非公開化済み）
+// Tools exposed to the AI (the old direct-generation tools have been made private)
 export const tools: Tool[] = [
 	{
 		name: 'build_handoff_data',
 		description:
-			'DBから取得したデータをCSV/Markdownファイルに整形してR2に保存し、ダウンロードリンクと外部AIツール向けのプロンプトをセットで返す。「Excelにまとめて」「資料を作って」などの資料作成依頼に使う。事前に get_entities 等のツールでデータを取得し、その内容を tables に構成して渡す。',
+			'Formats data retrieved from the DB into a CSV/Markdown file, saves it to R2, and returns a download link together with a prompt for external AI tools. Use this for document-creation requests like "put this together for Excel" or "make me a document". Fetch the data beforehand with a tool such as get_entities, then structure its content into tables and pass it in.',
 		input_schema: {
 			type: 'object',
 			properties: {
 				filename: {
 					type: 'string',
-					description: 'ファイル名（拡張子なし。例: "2026年6月_案件一覧"）'
+					description: 'File name (without extension, e.g. "June_2026_Deal_List")'
 				},
 				format: {
 					type: 'string',
 					enum: ['csv', 'markdown'],
-					description: 'csv: 表形式データ（Excel等で開く）/ markdown: 文章・複数テーブル混在に向く'
+					description: 'csv: tabular data (opened in Excel etc.) / markdown: suited for prose mixed with multiple tables'
 				},
 				tables: {
 					type: 'array',
-					description: 'テーブルの配列（CSV形式の場合は複数テーブルを連結、Markdown形式の場合は ## 見出し区切り）',
+					description: 'Array of tables (for CSV format, multiple tables are concatenated; for Markdown format, separated by ## headings)',
 					items: {
 						type: 'object',
 						properties: {
-							title: { type: 'string', description: 'テーブルのタイトル（任意）' },
+							title: { type: 'string', description: 'Table title (optional)' },
 							columns: {
 								type: 'array',
 								items: {
@@ -38,7 +38,7 @@ export const tools: Tool[] = [
 							},
 							rows: {
 								type: 'array',
-								items: { type: 'object', description: '列キー: 値の組' }
+								items: { type: 'object', description: 'Column key: value pairs' }
 							}
 						},
 						required: ['columns', 'rows']
@@ -46,7 +46,7 @@ export const tools: Tool[] = [
 				},
 				prompt: {
 					type: 'string',
-					description: 'このデータファイルをCopilot/Canvas/ChatGPT等の外部AIツールに渡す際のプロンプト（日本語で、ユーザーがそのままコピペして使える内容にする）'
+					description: 'The prompt to use when handing this data file off to an external AI tool such as Copilot/Canvas/ChatGPT (write it so the user can copy and paste it as-is)'
 				}
 			},
 			required: ['filename', 'format', 'tables', 'prompt']
@@ -104,7 +104,7 @@ function tablesToMarkdown(tables: z.infer<typeof handoffTableSchema>[]): string 
 }
 
 export async function handleBuildHandoffData(input: unknown, env?: ToolEnv) {
-	if (!env?.R2) throw new Error('R2が設定されていないためデータファイルを保存できません');
+	if (!env?.R2) throw new Error('Cannot save the data file because R2 is not configured');
 	const { filename, format, tables, prompt } = buildHandoffDataSchema.parse(input);
 
 	const ext = format === 'csv' ? 'csv' : 'md';

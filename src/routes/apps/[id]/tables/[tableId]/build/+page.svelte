@@ -11,7 +11,7 @@
 	const s = createTableBuildState(() => data);
 
 	function confirmDeleteTable(e: SubmitEvent) {
-		if (!confirm(`テーブル「${data.app.label}」を削除しますか？\n全てのレコードも削除されます。`)) {
+		if (!confirm(`Delete the table "${data.app.label}"?\nAll of its records will also be deleted.`)) {
 			e.preventDefault();
 		}
 	}
@@ -23,16 +23,16 @@
 		<div class="panel-header">
 			<a href="/apps/{data.appId}" class="back-link">
 				<ChevronLeft size={15} />
-				アプリ設定
+				App settings
 			</a>
 			<div class="meta-actions">
 				<form method="POST" action="?/delete" onsubmit={confirmDeleteTable} class="delete-form">
-					<button type="submit" class="btn-danger-sm" title="テーブルを削除">削除</button>
+					<button type="submit" class="btn-danger-sm" title="Delete table">Delete</button>
 				</form>
 				{#if s.saveError}<span class="save-error">{s.saveError}</span>{/if}
-				{#if s.saved}<span class="saved-msg">✓ 保存しました</span>{/if}
+				{#if s.saved}<span class="saved-msg">✓ Saved</span>{/if}
 				<button class="btn-save" onclick={s.save} disabled={s.saving || !s.dirty || !s.appLabel.trim()}>
-					{s.saving ? '保存中…' : '保存'}
+					{s.saving ? 'Saving…' : 'Save'}
 				</button>
 			</div>
 		</div>
@@ -40,14 +40,14 @@
 		<div class="panel-body">
 			<!-- App meta -->
 			<section>
-				<h2 class="section-title">テーブル情報</h2>
+				<h2 class="section-title">Table information</h2>
 				<div class="meta-row">
 					<div class="meta-label-wrap">
 						<input
 							type="text"
 							class="meta-label-input"
 							bind:value={s.appLabel}
-							placeholder="テーブル名"
+							placeholder="Table name"
 						/>
 						<span class="meta-name-hint">{data.app.name}</span>
 					</div>
@@ -58,32 +58,32 @@
 
 			<!-- MCP permissions -->
 			<section>
-				<h2 class="section-title">MCP公開設定</h2>
-				<p class="section-hint">外部MCPエージェントに許可する操作を選択します。オフにした操作のツールは一覧・実行のいずれからも利用できなくなります。</p>
+				<h2 class="section-title">MCP exposure settings</h2>
+				<p class="section-hint">Select the operations allowed for external MCP agents. Tools for disabled operations become unavailable from both listing and execution.</p>
 				<div class="mcp-toggle-list">
 					<label class="mcp-toggle-row">
-						<span>作成</span>
+						<span>Create</span>
 						<span class="toggle-wrap">
 							<input type="checkbox" bind:checked={s.mcpCreate} />
 							<span class="toggle"></span>
 						</span>
 					</label>
 					<label class="mcp-toggle-row">
-						<span>閲覧</span>
+						<span>Read</span>
 						<span class="toggle-wrap">
 							<input type="checkbox" bind:checked={s.mcpRead} />
 							<span class="toggle"></span>
 						</span>
 					</label>
 					<label class="mcp-toggle-row">
-						<span>更新</span>
+						<span>Update</span>
 						<span class="toggle-wrap">
 							<input type="checkbox" bind:checked={s.mcpUpdate} />
 							<span class="toggle"></span>
 						</span>
 					</label>
 					<label class="mcp-toggle-row">
-						<span>削除</span>
+						<span>Delete</span>
 						<span class="toggle-wrap">
 							<input type="checkbox" bind:checked={s.mcpDelete} />
 							<span class="toggle"></span>
@@ -95,7 +95,7 @@
 			<!-- Fields -->
 			<section>
 				<div class="fields-header">
-					<h2 class="section-title">フィールド</h2>
+					<h2 class="section-title">Fields</h2>
 				</div>
 
 				<div class="field-list">
@@ -126,11 +126,11 @@
 									aria-expanded={isOpen}
 								>
 								<span class="field-card-label" class:placeholder={!row.label}>
-									{row.label || 'フィールド名未入力'}
+									{row.label || 'No field name entered'}
 								</span>
 								<span class="field-type-badge">{s.typeLabel(row.type)}</span>
 								{#if row.required}
-									<span class="field-req-badge">必須</span>
+									<span class="field-req-badge">Required</span>
 								{/if}
 								<span class="field-chevron" class:rotated={isOpen}>›</span>
 								</button>
@@ -140,13 +140,13 @@
 							{#if isOpen}
 								<div class="field-card-body">
 									<div class="form-row">
-										<label class="form-label" for="label-{row._id}">フィールド名 <span class="req-mark">*</span></label>
+										<label class="form-label" for="label-{row._id}">Field name <span class="req-mark">*</span></label>
 										<input
 											id="label-{row._id}"
 											type="text"
 											class="form-input"
 											value={row.label}
-											placeholder="例: 担当者名、ステータス"
+											placeholder="e.g. Assignee, Status"
 											oninput={(e) => {
 												const input = e.currentTarget as HTMLInputElement;
 												if ((e as unknown as InputEvent).isComposing) {
@@ -159,13 +159,13 @@
 											oncompositionend={(e) => s.onLabelInput(row, (e.currentTarget as HTMLInputElement).value)}
 										/>
 										{#if row.key}
-											<p class="form-hint">識別キー: {row.key}</p>
+											<p class="form-hint">Key: {row.key}</p>
 										{/if}
 									</div>
 
 									<div class="form-row-2col">
 										<div class="form-row">
-											<label class="form-label" for="type-{row._id}">型</label>
+											<label class="form-label" for="type-{row._id}">Type</label>
 											<select
 												id="type-{row._id}"
 												class="form-select"
@@ -178,7 +178,7 @@
 											</select>
 										</div>
 										<div class="form-row form-row-check">
-											<label class="form-label" for="req-{row._id}">必須</label>
+											<label class="form-label" for="req-{row._id}">Required</label>
 											<label class="toggle-wrap">
 												<input
 													id="req-{row._id}"
@@ -193,13 +193,13 @@
 
 									{#if row.type === 'recordSelect'}
 										<div class="form-row">
-											<label class="form-label">参照先テーブル</label>
+											<label class="form-label">Referenced table</label>
 											<div class="combobox">
 												<input
 													type="text"
 													class="form-input combobox-input"
 													value={s.refTableDropdownOpen ? s.refTableQuery : s.refTableLabel(row.refTable)}
-													placeholder="テーブルを検索…"
+													placeholder="Search tables…"
 													autocomplete="off"
 													onfocus={() => { s.refTableQuery = ''; s.refTableDropdownOpen = true; }}
 													oninput={(e) => { s.refTableQuery = (e.currentTarget as HTMLInputElement).value; }}
@@ -213,7 +213,7 @@
 													)}
 													<div class="combobox-dropdown">
 														{#if filtered.length === 0}
-															<div class="combobox-empty">一致するテーブルがありません</div>
+															<div class="combobox-empty">No matching tables</div>
 														{:else}
 															{#each filtered as app}
 																<button
@@ -228,44 +228,44 @@
 												{/if}
 											</div>
 											{#if row.refTable}
-												<p class="form-hint">{row.refTable} のレコードIDを参照します</p>
+												<p class="form-hint">References record IDs in {row.refTable}</p>
 											{/if}
 										</div>
 
 										{@const refApp = data.otherApps.find(a => a.name === row.refTable)}
 										{#if refApp && refApp.fields.length > 0}
 											<div class="form-row">
-												<label class="form-label" for="reflabelkey-{row._id}">ラベルフィールド</label>
+												<label class="form-label" for="reflabelkey-{row._id}">Label field</label>
 												<select
 													id="reflabelkey-{row._id}"
 													class="form-select"
 													bind:value={row.refLabelKey}
 													onchange={s.markDirty}
 												>
-													<option value="">（先頭フィールド）</option>
+													<option value="">(First field)</option>
 													{#each refApp.fields as f}
 														<option value={f.key}>{f.label}</option>
 													{/each}
 												</select>
-												<p class="form-hint">選択肢・一覧に表示するフィールド</p>
+												<p class="form-hint">Field shown in select options and lists</p>
 											</div>
 										{/if}
 									{/if}
 
 									{#if row.type === 'account'}
 										<div class="form-row">
-											<p class="form-hint">アカウントを参照します。アカウントIDを保存し、選択肢・一覧では名前を表示します。</p>
+											<p class="form-hint">References an account. Stores the account ID; select options and lists show the name.</p>
 										</div>
 									{/if}
 
 									{#if row.type === 'select'}
 										<div class="form-row">
-											<label class="form-label">選択肢</label>
+											<label class="form-label">Options</label>
 											<div class="options-list">
 												{#if row.options.length > 0}
 													<div class="options-head">
-														<span>ラベル（表示名）</span>
-														<span>値（内部キー）</span>
+														<span>Label (display name)</span>
+														<span>Value (internal key)</span>
 													</div>
 												{/if}
 												{#each row.options as opt, oi (oi)}
@@ -274,28 +274,28 @@
 															class="form-input"
 															type="text"
 															value={opt.label}
-															placeholder="例: 進行中"
+															placeholder="e.g. In progress"
 															oninput={(e) => s.onOptionLabelInput(row, oi, (e.currentTarget as HTMLInputElement).value)}
 														/>
 														<input
 															class="form-input opt-value-input"
 															type="text"
 															value={opt.value}
-															placeholder="例: in_progress"
+															placeholder="e.g. in_progress"
 															oninput={(e) => s.onOptionValueInput(row, oi, (e.currentTarget as HTMLInputElement).value)}
 														/>
-														<button class="opt-del" onclick={() => s.removeOption(row, oi)} aria-label="削除">×</button>
+														<button class="opt-del" onclick={() => s.removeOption(row, oi)} aria-label="Delete">×</button>
 													</div>
 												{/each}
 												<button class="opt-add-btn" onclick={() => s.addOption(row)}>
-													+ 選択肢を追加
+													+ Add option
 												</button>
 											</div>
 										</div>
 									{/if}
 
 									<div class="form-row">
-										<label class="form-label" for="default-{row._id}">初期値</label>
+										<label class="form-label" for="default-{row._id}">Default value</label>
 										{#if row.type === 'select'}
 											<select
 												id="default-{row._id}"
@@ -303,7 +303,7 @@
 												bind:value={row.defaultValue}
 												onchange={s.markDirty}
 											>
-												<option value="">（なし）</option>
+												<option value="">(None)</option>
 												{#each row.options.filter(o => o.value) as opt}
 													<option value={opt.value}>{opt.label || opt.value}</option>
 												{/each}
@@ -314,19 +314,19 @@
 												type="text"
 												class="form-input"
 												bind:value={row.defaultValue}
-												placeholder="入力がない場合のデフォルト値"
+												placeholder="Default value when nothing is entered"
 												oninput={s.markDirty}
 											/>
 										{/if}
 									</div>
 
 									<div class="form-row">
-										<label class="form-label" for="desc-{row._id}">備考</label>
+										<label class="form-label" for="desc-{row._id}">Notes</label>
 										<textarea
 											id="desc-{row._id}"
 											class="form-textarea"
 											bind:value={row.description}
-											placeholder="このフィールドに関するメモや説明"
+											placeholder="Notes or a description of this field"
 											rows="4"
 											oninput={s.markDirty}
 										></textarea>
@@ -334,7 +334,7 @@
 
 									<div class="field-card-footer">
 										<button class="btn-remove-field" onclick={() => s.removeField(row._id)}>
-											このフィールドを削除
+											Delete this field
 										</button>
 									</div>
 								</div>
@@ -344,12 +344,12 @@
 
 					<button class="add-field-btn" onclick={s.addField}>
 						<span class="add-icon">+</span>
-						フィールドを追加
+						Add field
 					</button>
 				</div>
 
 				{#if s.rows.length === 0}
-					<p class="empty-hint">AIに「フィールドを追加して」と話しかけるか、「フィールドを追加」から手動で追加できます。</p>
+					<p class="empty-hint">Tell the AI "add a field" or add one manually via "Add field".</p>
 				{/if}
 			</section>
 		</div>
@@ -358,7 +358,7 @@
 
 	{#snippet chat()}
 		<ChatPanel
-			placeholder="フィールドを追加・変更する指示を入力…"
+			placeholder="Enter instructions to add or change fields…"
 			onAction={() => invalidateAll()}
 			context={{
 				appId: data.appId,

@@ -16,7 +16,7 @@
 	}
 
 	function formatDate(iso: string): string {
-		return new Intl.DateTimeFormat('ja-JP', {
+		return new Intl.DateTimeFormat('en-US', {
 			month: 'numeric',
 			day: 'numeric',
 			hour: '2-digit',
@@ -27,7 +27,7 @@
 	async function selectNotification(item: NotificationItem) {
 		onclose();
 		await notificationCenter.markRead(item.id);
-		// リンク型のシードを持つ通知（アプリ生成など）は対象ページへ直接遷移する。
+		// Notifications carrying a link-type seed (e.g. app generation) navigate directly to the target page.
 		const link = item.seedContent.find((c) => c.type === 'link');
 		if (link && link.type === 'link') {
 			await goto(link.href);
@@ -41,7 +41,7 @@
 <aside class="drawer" class:open aria-hidden={!open}>
 	<div class="drawer-header">
 		<h2>{m.notifications()}</h2>
-		<button class="close-btn" onclick={onclose} aria-label="閉じる">
+		<button class="close-btn" onclick={onclose} aria-label="Close">
 			<X size={16} />
 		</button>
 	</div>

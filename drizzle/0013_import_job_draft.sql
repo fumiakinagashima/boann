@@ -1,6 +1,6 @@
--- import_jobs を取り込みドラフト（ライフサイクル全体）に拡張する。
--- 設計フェーズも非同期化し、生成プラン・アップロード本文・修正チャット履歴を保持する。
--- status は 'designing' | 'ready' | 'applying' | 'done' | 'error' を取る（文字列なので移行不要）。
+-- Extend import_jobs into a full import draft covering the whole lifecycle.
+-- The design phase is now async too, and this holds the generated plan, the uploaded content, and the refinement chat history.
+-- status takes 'designing' | 'ready' | 'applying' | 'done' | 'error' (a string, so no migration needed for it).
 ALTER TABLE `import_jobs` ADD COLUMN `filename` text;
 --> statement-breakpoint
 ALTER TABLE `import_jobs` ADD COLUMN `content` text;

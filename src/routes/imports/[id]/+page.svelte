@@ -8,15 +8,15 @@
 	let { data }: { data: PageData } = $props();
 
 	const FIELD_TYPE_LABELS: Record<string, string> = {
-		text: 'テキスト',
-		number: '数値',
-		select: '選択',
-		date: '日付',
-		email: 'メール',
-		tel: '電話',
-		textarea: '長文',
-		recordSelect: '参照',
-		account: 'アカウント'
+		text: 'Text',
+		number: 'Number',
+		select: 'Select',
+		date: 'Date',
+		email: 'Email',
+		tel: 'Phone',
+		textarea: 'Long text',
+		recordSelect: 'Relation',
+		account: 'Account'
 	};
 
 	let status = $state<ImportJobStatus>(data.job.status);
@@ -92,13 +92,13 @@
 			});
 			const d = (await res.json()) as { plan: ImportPlan; chat: ImportChatMessage[] } | { error: string };
 			if (!res.ok || !('plan' in d)) {
-				chatError = 'error' in d ? d.error : 'プランの更新に失敗しました';
+				chatError = 'error' in d ? d.error : 'Failed to update the plan';
 				return;
 			}
 			plan = d.plan;
 			chat = d.chat;
 		} catch {
-			chatError = 'ネットワークエラーが発生しました';
+			chatError = 'A network error occurred';
 		} finally {
 			chatLoading = false;
 		}
@@ -118,13 +118,13 @@
 			const res = await fetch(`/api/imports/${jobId}/apply`, { method: 'POST' });
 			const d = (await res.json()) as { jobId: string } | { error: string };
 			if (!res.ok || !('jobId' in d)) {
-				applyError = 'error' in d ? d.error : 'アプリ作成の受付に失敗しました';
+				applyError = 'error' in d ? d.error : 'Failed to accept the app creation request';
 				status = 'ready';
 				return;
 			}
 			startPolling();
 		} catch {
-			applyError = 'ネットワークエラーが発生しました';
+			applyError = 'A network error occurred';
 			status = 'ready';
 		}
 	}
@@ -132,31 +132,31 @@
 
 <div class="page">
 	<div class="header">
-		<h1>アプリのプラン</h1>
+		<h1>App plan</h1>
 		{#if data.job.filename}<span class="filename">{data.job.filename}</span>{/if}
 	</div>
 
 	{#if status === 'designing'}
 		<div class="loading">
 			<div class="spinner"></div>
-			<p>ファイルからアプリ構造を設計中…</p>
-			<p class="sub">完了したら通知でもお知らせします。</p>
+			<p>Designing the app structure from the file…</p>
+			<p class="sub">We'll also notify you when it's done.</p>
 		</div>
 	{:else if status === 'error'}
 		<div class="error-box">
-			<p class="error-title">処理中にエラーが発生しました</p>
-			<p class="error-detail">{jobError ?? '不明なエラー'}</p>
+			<p class="error-title">An error occurred during processing</p>
+			<p class="error-detail">{jobError ?? 'Unknown error'}</p>
 		</div>
 	{:else if status === 'applying'}
 		<div class="loading">
 			<div class="spinner"></div>
-			<p>アプリを作成中…</p>
-			<p class="sub">このまま閉じても、完了したら通知でお知らせします。</p>
+			<p>Creating the app…</p>
+			<p class="sub">You can close this and we'll notify you when it's done.</p>
 		</div>
 	{:else if plan}
 		<div class="ready-layout">
 		<div class="plan-pane">
-		<p class="intro">以下の内容でアプリを作成します。チャットで修正を依頼でき、問題なければ「アプリを作成」を押してください。</p>
+		<p class="intro">We'll create the app with the following content. You can request changes via chat, and press "Create app" once it looks good.</p>
 
 		<div class="app-summary">
 			<span class="app-icon">{plan.app.icon ?? '📦'}</span>
@@ -167,7 +167,7 @@
 		</div>
 
 		<section>
-			<h2>テーブル（{plan.tables.length}）</h2>
+			<h2>Tables ({plan.tables.length})</h2>
 			{#each plan.tables as t (t.name)}
 				<div class="table-card">
 					<div class="table-head">
@@ -179,7 +179,7 @@
 							<span class="chip">
 								{f.label}
 								<span class="chip-type">{FIELD_TYPE_LABELS[f.type] ?? f.type}{#if f.type === 'recordSelect' && f.ref_table}→{tableLabel(f.ref_table)}{/if}</span>
-								{#if f.required}<span class="chip-req">必須</span>{/if}
+								{#if f.required}<span class="chip-req">Required</span>{/if}
 							</span>
 						{/each}
 					</div>
@@ -189,8 +189,8 @@
 
 		{#if plan.workflows.length > 0}
 			<section>
-				<h2>ワークフロー（{plan.workflows.length}）</h2>
-				<p class="wf-note">※ ワークフローは自動作成されません。アプリ作成後に手動で追加してください。</p>
+				<h2>Workflows ({plan.workflows.length})</h2>
+				<p class="wf-note">* Workflows are not created automatically. Add them manually after creating the app.</p>
 				{#each plan.workflows as w (w.name)}
 					<div class="row">
 						<span class="row-label">{w.name}</span>
@@ -203,32 +203,32 @@
 		{#if applyError}<p class="apply-error">{applyError}</p>{/if}
 
 		<div class="actions">
-			<a class="btn-ghost" href="/">キャンセル</a>
-			<button class="btn-primary" onclick={applyPlan}>この内容でアプリを作成</button>
+			<a class="btn-ghost" href="/">Cancel</a>
+			<button class="btn-primary" onclick={applyPlan}>Create app with this content</button>
 		</div>
 		</div>
 
 		<aside class="chat-pane">
-			<div class="chat-header">AIに修正を依頼</div>
+			<div class="chat-header">Ask AI for changes</div>
 			<div class="chat-list">
 				{#if chat.length === 0}
-					<p class="chat-empty">例:「顧客テーブルに電話番号を追加して」「活動履歴に金額フィールドを足して」</p>
+					<p class="chat-empty">e.g. "Add a phone number to the customer table" or "Add an amount field to the activity history"</p>
 				{/if}
 				{#each chat as msg, i (i)}
 					<div class="msg {msg.role}">{msg.text}</div>
 				{/each}
-				{#if chatLoading}<div class="msg assistant loading">更新中…</div>{/if}
+				{#if chatLoading}<div class="msg assistant loading">Updating…</div>{/if}
 			</div>
 			{#if chatError}<p class="chat-error">{chatError}</p>{/if}
 			<div class="chat-input">
 				<textarea
 					bind:value={chatInput}
 					onkeydown={onChatKeydown}
-					placeholder="修正したい内容を入力（Enterで送信）"
+					placeholder="Enter what you'd like to change (Enter to send)"
 					rows="2"
 					disabled={chatLoading}
 				></textarea>
-				<button class="send-btn" onclick={sendRefine} disabled={chatLoading || !chatInput.trim()}>送信</button>
+				<button class="send-btn" onclick={sendRefine} disabled={chatLoading || !chatInput.trim()}>Send</button>
 			</div>
 		</aside>
 		</div>

@@ -6,11 +6,12 @@ import { errors } from '$lib/server/errors';
 
 const PUBLIC_PATHS = new Set(['/signin', '/signin/forgot-password', '/signin/reset-password']);
 const PUBLIC_API_PREFIXES = ['/api/auth/'];
-// アプリを外部MCPサーバーとして公開するエンドポイント。ここだけはセッションCookieを持たない
-// 外部エージェントからアクセスされるため、認証自体はエンドポイント側のBearerトークン検証で行う。
+// The endpoint that exposes an app as an external MCP server. This is the only endpoint accessed
+// by external agents that don't carry a session cookie, so auth itself is handled by the
+// endpoint's own Bearer token verification.
 const MCP_ENDPOINT_RE = /^\/api\/apps\/[^/]+\/mcp$/;
 
-// 認証情報・権限変更を含むページ・APIはadmin権限のみアクセス可能
+// Pages/APIs involving auth info or permission changes are accessible to admins only
 const ADMIN_ONLY_PREFIXES = [
 	'/accounts',
 	'/api-connections',
@@ -54,7 +55,7 @@ export const handle: Handle = async ({ event, resolve }) => {
 
 	if (!event.locals.account && !isPublicPath(url.pathname)) {
 		if (url.pathname.startsWith('/api/')) {
-			return new Response(JSON.stringify({ error: '認証が必要です', code: 'UNAUTHORIZED' }), {
+			return new Response(JSON.stringify({ error: 'Authentication required', code: 'UNAUTHORIZED' }), {
 				status: 401,
 				headers: { 'Content-Type': 'application/json' }
 			});

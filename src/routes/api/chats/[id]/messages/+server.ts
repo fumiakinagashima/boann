@@ -14,7 +14,7 @@ export const POST: RequestHandler = async ({ params, request, platform, locals }
 		contents?: MessageContent[];
 		title?: string;
 	};
-	if (!body.id || !body.role || !body.contents) return errors.badRequest('id, role, contents は必須です。');
+	if (!body.id || !body.role || !body.contents) return errors.badRequest('id, role, and contents are required.');
 
 	const db = createDb(platform.env.DB);
 

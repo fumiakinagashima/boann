@@ -29,21 +29,21 @@ export type VisibleStep = {
 export type VisibleListStep = {
 	id: string;
 	label: string;
-	/** null = フィールド構成が事前にわからない(call_external_apiをforeachのsourceに@step:<id>.<path>で指定した場合等)。@item参照の存在チェックをスキップする。 */
+	/** null = the field structure isn't known in advance (e.g. when call_external_api is referenced as a foreach source via @step:<id>.<path>). Skips the @item reference existence check. */
 	itemFields: WorkflowListResultField[] | null;
 };
 
-/** ネストしたforeachのうち、いずれか1段の「現在の項目」スコープ。bodyの内側ではこのスタック（祖先のforeach全て）を全て参照できる。 */
+/** For one level of a nested foreach, the "current item" scope. Inside the body, the entire stack (all ancestor foreachs) is visible. */
 export type ItemScope = {
 	foreachStepId: string;
-	/** null = フィールド構成が事前にわからない(call_external_apiをforeachのsourceに@step:<id>.<path>で指定した場合等)。@item参照の存在チェックをスキップする。 */
+	/** null = the field structure isn't known in advance (e.g. when call_external_api is referenced as a foreach source via @step:<id>.<path>). Skips the @item reference existence check. */
 	itemFields: WorkflowListResultField[] | null;
 };
 
 /**
- * 各ステップの位置で「参照可能な先行ステップ（スカラー結果を持つアクションのみ）」を集める。
- * 条件の `then` ・ foreachの `body` の中だけで作られた結果は、そこを抜けた後の兄弟ステップからは
- * 見えない（その分岐・繰り返しが実行されたかどうか保証できないため）。
+ * For each step's position, collects the "preceding steps that can be referenced (only actions with scalar results)".
+ * Results created only inside a condition's `then` or a foreach's `body` are not visible to sibling steps
+ * after that block ends (because there's no guarantee the branch/loop actually ran).
  */
 export function collectVisibility(
 	steps: WorkflowStep[],
@@ -65,15 +65,15 @@ function walk(steps: WorkflowStep[], visibleBefore: VisibleStep[], out: Map<stri
 			}
 		} else if (step.kind === 'condition') {
 			walk(step.then, visible, out);
-			// then を抜けた後は、then 内で作られた結果を見せない（visible はここでは更新しない）
+			// After leaving `then`, results created inside it are not exposed (visible is not updated here)
 		} else if (step.kind === 'foreach') {
 			walk(step.body, visible, out);
-			// body を抜けた後は、body 内で作られた結果を見せない（visible はここでは更新しない）
+			// After leaving `body`, results created inside it are not exposed (visible is not updated here)
 		}
 	}
 }
 
-/** foreachの `source` として参照できる「一覧を返す先行アクション」を集める。スコープ規則はcollectVisibilityと同じ。 */
+/** Collects the "preceding actions that return a list" that can be referenced as a foreach's `source`. Scoping rules are the same as collectVisibility. */
 export function collectListVisibility(
 	steps: WorkflowStep[],
 	visibleBefore: VisibleListStep[] = [],
@@ -96,7 +96,7 @@ function walkList(
 		if (step.kind === 'action') {
 			const tool = getWorkflowActionTool(step.tool);
 			if (tool?.listResult) {
-				// get_entitiesはテーブルごとにフィールドが異なるため、選択中のentity_type_idから動的に解決する
+				// get_entities has different fields per table, so resolve them dynamically from the selected entity_type_id
 				const itemFields =
 					step.tool === 'get_entities'
 						? entityListItemFields(
@@ -106,8 +106,8 @@ function walkList(
 						: tool.listResult.itemFields;
 				visible = [...visible, { id: step.id, label: step.label, itemFields }];
 			}
-			// call_external_apiはlistVisibleに載せない: `@step:<id>`(パス無し)では一覧化されず、
-			// `@step:<id>.<path>`（パス指定）で参照する場合はcheckStepのforeach分岐で別途許可している。
+			// call_external_api is not added to listVisible: referencing `@step:<id>` (no path) does not list it,
+			// and referencing it with a path (`@step:<id>.<path>`) is separately allowed in checkStep's foreach branch.
 		} else if (step.kind === 'condition') {
 			walkList(step.then, visible, out, entityTypes);
 		} else if (step.kind === 'foreach') {
@@ -128,36 +128,37 @@ function resolveOperandType(
 		const scope = itemRef.foreachStepId
 			? itemScopes.find((s) => s.foreachStepId === itemRef.foreachStepId)
 			: itemScopes[itemScopes.length - 1];
-		if (!scope) return { ok: false, error: `@item参照はforeachの中でのみ使用できます: ${operand}` };
-		// itemFields===null は構成不明(call_external_apiをforeachのsourceに@step:<id>.<path>で指定した場合等)を
-		// 意味し、存在チェックをスキップする
+		if (!scope) return { ok: false, error: `The @item reference can only be used inside a foreach: ${operand}` };
+		// itemFields===null means the structure is unknown (e.g. when call_external_api is referenced as a foreach
+		// source via @step:<id>.<path>); skip the existence check in that case
 		if (scope.itemFields && !scope.itemFields.some((f) => f.key === itemRef.field)) {
-			return { ok: false, error: `存在しない項目フィールドです: ${itemRef.field}` };
+			return { ok: false, error: `No such item field: ${itemRef.field}` };
 		}
 		return { ok: true, type: 'string' };
 	}
 	const triggerField = parseTriggerRef(operand);
 	if (triggerField !== null) {
-		if (!triggerFields) return { ok: false, error: `@trigger参照はイベントトリガーでのみ使用できます: ${operand}` };
+		if (!triggerFields) return { ok: false, error: `The @trigger reference can only be used with an event trigger: ${operand}` };
 		if (!triggerFields.some((f) => f.key === triggerField)) {
-			return { ok: false, error: `トリガーレコードに存在しないフィールドです: ${triggerField}` };
+			return { ok: false, error: `No such field on the trigger record: ${triggerField}` };
 		}
 		return { ok: true, type: 'string' };
 	}
 	const inputField = parseInputRef(operand);
 	if (inputField !== null) {
 		if (!inputFields.some((f) => f.key === inputField)) {
-			return { ok: false, error: `宣言されていない入力パラメータです: ${inputField}` };
+			return { ok: false, error: `Undeclared input parameter: ${inputField}` };
 		}
 		return { ok: true, type: 'string' };
 	}
 	if (operand === SELF_ACCOUNT_ID_REF) return { ok: true, type: 'string' };
 	const stepRef = parseStepRef(operand);
-	if (stepRef === null) return { ok: true, type: 'string' }; // リテラルは文字列として扱う
+	if (stepRef === null) return { ok: true, type: 'string' }; // treat literals as strings
 	const found = visible.find((v) => v.id === stepRef.id);
-	if (!found) return { ok: false, error: `参照先のステップが見つかりません（または参照できる範囲外です）: ${stepRef.id}` };
-	// パス指定（@step:<id>.<path>）は静的に型を決められないためstring扱い(存在チェックもスキップ、
-	// @itemの構成不明ケースと同じ方針)。実行時のエラー（フィールドが無い等）はrun.ts側で検出する。
+	if (!found) return { ok: false, error: `Referenced step not found (or is out of scope): ${stepRef.id}` };
+	// A path reference (@step:<id>.<path>) can't have its type determined statically, so treat it as string
+	// (existence check skipped too, same policy as the @item unknown-structure case). Runtime errors
+	// (e.g. missing field) are caught on the run.ts side.
 	if (stepRef.path !== null) return { ok: true, type: 'string' };
 	return { ok: true, type: found.resultType };
 }
@@ -187,14 +188,14 @@ export function validateWorkflow(
 
 	if (triggerType === 'schedule') {
 		if (!Number.isInteger(triggerHour) || triggerHour < 0 || triggerHour > 23) {
-			errors.push('トリガーの時刻（時）が不正です');
+			errors.push('The trigger time (hour) is invalid');
 		}
 		if (!Number.isInteger(triggerMinute) || triggerMinute < 0 || triggerMinute > 59) {
-			errors.push('トリガーの時刻（分）が不正です');
+			errors.push('The trigger time (minute) is invalid');
 		}
 	}
 	if (steps.length === 0) {
-		errors.push('ステップが1つもありません');
+		errors.push('There are no steps');
 	}
 
 	const visibility = collectVisibility(steps);
@@ -205,53 +206,53 @@ export function validateWorkflow(
 		if (step.kind === 'action') {
 			const tool = getWorkflowActionTool(step.tool);
 			if (!tool) {
-				errors.push(`「${step.label}」のアクションが選択されていません`);
+				errors.push(`No action is selected for "${step.label}"`);
 				return;
 			}
 			if (tool.value === 'get_entities') {
 				const entityTypeId = step.params?.entity_type_id;
 				if (!entityTypeId || !entityTypeIds.has(entityTypeId)) {
-					errors.push(`「${step.label}」の対象テーブルが見つかりません（削除された可能性があります）`);
+					errors.push(`The target table for "${step.label}" was not found (it may have been deleted)`);
 				}
 			}
 			if (tool.value === 'send_slack_notification') {
 				const integrationId = step.params?.integration_id;
 				if (!integrationId || !slackIntegrationIds.has(integrationId)) {
-					errors.push(`「${step.label}」のSlack連携先が見つかりません（削除された可能性があります）`);
+					errors.push(`The Slack integration target for "${step.label}" was not found (it may have been deleted)`);
 				}
 			}
 			if (tool.value === 'call_external_api') {
 				const integrationId = step.params?.integration_id;
 				if (!integrationId || !integrationIds.has(integrationId)) {
-					errors.push(`「${step.label}」の外部API連携先が見つかりません（削除された可能性があります）`);
+					errors.push(`The external API integration target for "${step.label}" was not found (it may have been deleted)`);
 				}
 			}
 			if (step.maxRetries !== undefined && (!Number.isInteger(step.maxRetries) || step.maxRetries < 0 || step.maxRetries > WORKFLOW_MAX_RETRIES)) {
-				errors.push(`「${step.label}」のリトライ回数は0〜${WORKFLOW_MAX_RETRIES}の範囲で指定してください`);
+				errors.push(`The retry count for "${step.label}" must be between 0 and ${WORKFLOW_MAX_RETRIES}`);
 			}
 			for (const field of tool.params) {
 				const value = step.params?.[field.key];
 				if (field.required && !value) {
-					errors.push(`「${step.label}」の「${field.label}」が未入力です`);
+					errors.push(`"${field.label}" is required for "${step.label}"`);
 					continue;
 				}
 				if (value) {
 					const resolved = resolveOperandType(value, visible, itemScopes, triggerFields, inputSchema);
-					if (!resolved.ok) errors.push(`「${step.label}」の「${field.label}」: ${resolved.error}`);
-					// run.tsの実行時パース（preQuoteReferences→JSON.parse）と同じ規則で、保存時点でも
-					// JSON形式かどうかを検証する（実行時まで気づかないのを防ぐ）。
+					if (!resolved.ok) errors.push(`"${field.label}" of "${step.label}": ${resolved.error}`);
+					// Validated at save time using the same rules as run.ts's runtime parsing
+					// (preQuoteReferences -> JSON.parse), to catch JSON format issues before runtime.
 					if (field.jsonFormat) {
 						try {
 							JSON.parse(preQuoteReferences(value));
 						} catch {
-							errors.push(`「${step.label}」の「${field.label}」がJSON形式ではありません`);
+							errors.push(`"${field.label}" of "${step.label}" is not valid JSON`);
 						}
 					}
 				}
 			}
 		} else if (step.kind === 'condition') {
 			if (!step.left) {
-				errors.push(`「${step.label}」の判定対象が選択されていません`);
+				errors.push(`No condition target is selected for "${step.label}"`);
 			} else if (
 				parseStepRef(step.left) === null &&
 				parseItemRef(step.left) === null &&
@@ -259,32 +260,33 @@ export function validateWorkflow(
 				parseInputRef(step.left) === null &&
 				step.left !== SELF_ACCOUNT_ID_REF
 			) {
-				errors.push(`「${step.label}」の判定対象は先行ステップの結果・@item・@trigger・@input・@selfのいずれかを選択してください`);
+				errors.push(`The condition target for "${step.label}" must be one of: a preceding step's result, @item, @trigger, @input, or @self`);
 			} else {
 				const leftResolved = resolveOperandType(step.left, visible, itemScopes, triggerFields, inputSchema);
-				if (!leftResolved.ok) errors.push(`「${step.label}」の判定対象: ${leftResolved.error}`);
+				if (!leftResolved.ok) errors.push(`Condition target of "${step.label}": ${leftResolved.error}`);
 			}
 			if (!step.right) {
-				errors.push(`「${step.label}」の比較先が未入力です`);
+				errors.push(`The comparison value for "${step.label}" is empty`);
 			} else {
 				const rightResolved = resolveOperandType(step.right, visible, itemScopes, triggerFields, inputSchema);
-				if (!rightResolved.ok) errors.push(`「${step.label}」の比較先: ${rightResolved.error}`);
+				if (!rightResolved.ok) errors.push(`Comparison value of "${step.label}": ${rightResolved.error}`);
 			}
 			if (step.then.length === 0) {
-				errors.push(`「${step.label}」のYes時の処理が1つもありません`);
+				errors.push(`There are no steps for the "Yes" branch of "${step.label}"`);
 			}
 			for (const child of step.then) checkStep(child, itemScopes);
 		} else if (step.kind === 'result') {
 			if (!step.key) {
-				errors.push(`「${step.label}」のキー名が未入力です`);
+				errors.push(`The key name for "${step.label}" is empty`);
 			} else if (step.key.split('.').some((seg) => !seg)) {
-				// キーはドット区切りでネストを表す（例: "user.name"）。空のセグメント（先頭・末尾のドット、連続するドット）は不正。
-				errors.push(`「${step.label}」のキー名の形式が不正です（空のセグメントは使えません）`);
+				// The key uses dot notation to express nesting (e.g. "user.name"). Empty segments (leading/trailing
+				// dot, consecutive dots) are invalid.
+				errors.push(`The key name for "${step.label}" has an invalid format (empty segments are not allowed)`);
 			}
 			if (!step.value) {
-				errors.push(`「${step.label}」の値が未入力です`);
+				errors.push(`The value for "${step.label}" is empty`);
 			} else if (step.valueType === 'array') {
-				// エディタは常にJSON.stringifyされた文字列配列を書き込むため、それ以外（AI生成データ等）は保存時点で弾く
+				// The editor always writes a JSON.stringify'd string array, so reject anything else (e.g. AI-generated data) at save time
 				let parsedArray: unknown;
 				try {
 					parsedArray = JSON.parse(step.value);
@@ -292,26 +294,27 @@ export function validateWorkflow(
 					parsedArray = undefined;
 				}
 				if (!Array.isArray(parsedArray) || !parsedArray.every((v) => typeof v === 'string')) {
-					errors.push(`「${step.label}」の値は文字列の配列（JSON形式）で指定してください`);
+					errors.push(`The value for "${step.label}" must be an array of strings (in JSON format)`);
 				}
 			} else {
 				const resolved = resolveOperandType(step.value, visible, itemScopes, triggerFields, inputSchema);
-				if (!resolved.ok) errors.push(`「${step.label}」の値: ${resolved.error}`);
+				if (!resolved.ok) errors.push(`Value of "${step.label}": ${resolved.error}`);
 			}
 		} else {
 			const stepRef = parseStepRef(step.source);
 			const listVisible = listVisibility.get(step.id) ?? [];
 			const sourceStep = stepRef !== null && stepRef.path === null ? listVisible.find((v) => v.id === stepRef.id) : undefined;
-			// パス指定（@step:<id>.<path>）は実行時でないと配列かどうか判定できないため、静的には許可する
-			// （@itemの構成不明ケースと同じ方針。call_external_api以外を指定した場合等はrun.ts側でエラーになる）。
+			// A path reference (@step:<id>.<path>) can't be determined to be an array without running it, so
+			// allow it statically (same policy as the @item unknown-structure case; specifying something other
+			// than call_external_api etc. will error out on the run.ts side).
 			const pathBasedSource = stepRef !== null && stepRef.path !== null;
 			if (!step.source) {
-				errors.push(`「${step.label}」の対象（一覧）が選択されていません`);
+				errors.push(`No target (list) is selected for "${step.label}"`);
 			} else if (!sourceStep && !pathBasedSource) {
-				errors.push(`「${step.label}」の対象は一覧を返す先行ステップを選択してください`);
+				errors.push(`The target for "${step.label}" must be a preceding step that returns a list`);
 			}
 			if (step.body.length === 0) {
-				errors.push(`「${step.label}」の繰り返す内容が1つもありません`);
+				errors.push(`There is nothing to repeat for "${step.label}"`);
 			}
 			const bodyItemScopes = sourceStep
 				? [...itemScopes, { foreachStepId: step.id, itemFields: sourceStep.itemFields }]

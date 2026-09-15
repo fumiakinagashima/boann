@@ -37,7 +37,7 @@ export const POST: RequestHandler = async ({ request, platform, locals }) => {
 			async start(controller) {
 				const enqueue = (e: StreamEvent) => controller.enqueue(new TextEncoder().encode(sse(e)));
 				await new Promise((r) => setTimeout(r, 300));
-				for (const char of 'どのような自動化フローにしますか？') {
+				for (const char of 'What kind of automation flow would you like to build?') {
 					enqueue({ type: 'delta', text: char });
 					await new Promise((r) => setTimeout(r, 20));
 				}
@@ -127,7 +127,7 @@ export const POST: RequestHandler = async ({ request, platform, locals }) => {
 								return {
 									type: 'tool_result' as const,
 									tool_use_id: b.id,
-									content: `エラー: ${e instanceof Error ? e.message : String(e)}`,
+									content: `Error: ${e instanceof Error ? e.message : String(e)}`,
 									is_error: true
 								};
 							}

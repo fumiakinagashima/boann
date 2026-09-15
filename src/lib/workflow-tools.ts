@@ -1,5 +1,5 @@
-// ワークフローの「アクション」ステップで選択できるツールのカタログ。
-// クライアント（編集UI）・サーバー（実行エンジン）の両方から参照するため、DB等のサーバー専用依存は持たない。
+// Catalog of tools selectable for a workflow "action" step.
+// Referenced by both the client (editor UI) and server (execution engine), so it must not carry server-only dependencies like the DB.
 import type { WorkflowResultType, WorkflowStep } from './types/chat';
 
 export type WorkflowParamField = {
@@ -7,78 +7,79 @@ export type WorkflowParamField = {
 	label: string;
 	type: 'text' | 'textarea' | 'number' | 'select' | 'date';
 	required?: boolean;
-	/** 未入力でも省略可能だが、UI上は常に表示しておきたい任意パラメータの場合true（「＋オプションを追加」の裏に隠さない） */
+	/** true for an optional parameter that should always be shown in the UI even though it can be left blank (i.e. not hidden behind "+ Add option") */
 	alwaysShow?: boolean;
-	/** trueの場合、保存時にJSON形式（preQuoteReferences適用後にJSON.parse可能）かどうかを検証する（run.tsが実行時にJSON.parseする値と同じ規則） */
+	/** if true, validates at save time that the value is valid JSON (parseable with JSON.parse after preQuoteReferences is applied) — the same rule run.ts uses when it JSON.parses the value at runtime */
 	jsonFormat?: boolean;
-	/** type: 'select' の場合の選択肢 */
+	/** choices when type: 'select' */
 	options?: { value: string; label: string }[];
 };
 
 export type WorkflowListResultField = { key: string; label: string };
 
-/** foreachのsourceとして参照できる、配列形式の結果。 */
+/** An array-shaped result that can be referenced as a foreach's source. */
 export type WorkflowListResultDef = {
 	desc: string;
-	/** body内で `@item:<key>` として参照できるフィールド一覧（UI・AIへの案内に使う） */
+	/** the fields referenceable inside `body` as `@item:<key>` (used for UI/AI guidance) */
 	itemFields: WorkflowListResultField[];
-	/** ツールの生の戻り値から一覧（オブジェクトの配列）を取り出す */
+	/** extracts the list (an array of objects) from the tool's raw return value */
 	extractList: (raw: unknown) => Record<string, unknown>[];
 };
 
 export type WorkflowActionToolDef = {
 	value: string;
 	label: string;
-	/** ユーザーが入力するパラメータ（自動補完される値、例: send_email の to は含めない） */
+	/** parameters the user enters (excludes values that are auto-filled, e.g. `to` for send_email is not included) */
 	params: WorkflowParamField[];
-	/** 条件・他ステップの引数から参照可能なスカラー結果を返す場合に指定する */
+	/** set when this action returns a scalar result referenceable from conditions/other steps' arguments */
 	resultType?: WorkflowResultType;
 	resultDesc?: string;
-	/** ツールの生の戻り値からスカラー結果を取り出す（resultType指定時は必須） */
+	/** extracts the scalar result from the tool's raw return value (required when resultType is set) */
 	extractResult?: (raw: unknown) => boolean | number | string;
-	/** foreachのsourceとして使える配列結果を返す場合に指定する（resultTypeと併用可） */
+	/** set when this action returns an array result usable as a foreach source (can be combined with resultType) */
 	listResult?: WorkflowListResultDef;
-	/** AIへの説明文に添える補足（自動補完される値の説明など）。UI上には表示しない */
+	/** supplementary note appended to the AI-facing description (e.g. explaining auto-filled values). Not shown in the UI */
 	note?: string;
 };
 
 export const WORKFLOW_ACTION_TOOLS: WorkflowActionToolDef[] = [
 	{
 		value: 'send_email',
-		label: 'メール送信（自分宛て）',
+		label: 'Send email (to yourself)',
 		params: [
-			{ key: 'subject', label: '件名', type: 'text', required: true },
-			{ key: 'body', label: '本文', type: 'textarea', required: true }
+			{ key: 'subject', label: 'Subject', type: 'text', required: true },
+			{ key: 'body', label: 'Body', type: 'textarea', required: true }
 		],
-		note: '宛先は自動でユーザー自身のメールアドレスになる（to パラメータは不要）'
+		note: 'The recipient is automatically the user\'s own email address (no `to` parameter needed)'
 	},
 	{
 		value: 'send_notification',
-		label: '通知センターに通知',
+		label: 'Notify via notification center',
 		params: [
-			{ key: 'title', label: 'タイトル', type: 'text', required: true },
-			{ key: 'body', label: '本文', type: 'textarea', required: true }
+			{ key: 'title', label: 'Title', type: 'text', required: true },
+			{ key: 'body', label: 'Body', type: 'textarea', required: true }
 		],
-		note: '通知先は自動でワークフローの登録者になる'
+		note: 'The recipient is automatically the workflow\'s owner'
 	},
 	{
 		value: 'send_slack_notification',
-		label: 'Slackに通知',
-		params: [{ key: 'body', label: '本文', type: 'textarea', required: true }],
-		note: '宛先は「対象」で選択したSlack連携固定（integration_idは対象選択で直接設定されるため、AIがparamsで指定することはできない）'
+		label: 'Notify via Slack',
+		params: [{ key: 'body', label: 'Body', type: 'textarea', required: true }],
+		note: 'The destination is fixed to the Slack integration chosen as the "target" (integration_id is set directly by the target selection, so the AI cannot specify it via params)'
 	},
 	{
 		value: 'get_entities',
-		label: '自作テーブルを検索',
-		params: [{ key: 'limit', label: '取得件数の上限', type: 'number' }],
+		label: 'Search a custom table',
+		params: [{ key: 'limit', label: 'Max records to fetch', type: 'number' }],
 		resultType: 'number',
-		resultDesc: '該当するレコードの件数',
+		resultDesc: 'the number of matching records',
 		extractResult: (raw) => (Array.isArray(raw) ? raw.length : 0),
-		note: '対象テーブルは「対象」の選択で決まる（個々のカスタムテーブルが対象の選択肢に並ぶ。entity_type_idを直接paramsで指定することはできない）',
+		note: 'The target table is determined by the "target" selection (each custom table appears as a target choice; entity_type_id cannot be specified directly via params)',
 		listResult: {
-			desc: '該当するレコードの一覧（foreachで1件ずつ処理する場合に使う）',
-			// テーブルごとに実際のフィールドは異なるため、ここは器のみ。UI・検証では entityListItemFields() で
-			// このステップの entity_type_id から動的に解決した一覧を使う（このitemFieldsはフォールバック用）。
+			desc: 'the list of matching records (used to process them one by one in a foreach)',
+			// Actual fields differ per table, so this is just a placeholder. The UI and validation use
+			// entityListItemFields() to dynamically resolve the list from this step's entity_type_id
+			// (this itemFields value is only a fallback).
 			itemFields: [{ key: 'id', label: 'ID' }],
 			extractList: (raw) =>
 				Array.isArray(raw)
@@ -91,33 +92,33 @@ export const WORKFLOW_ACTION_TOOLS: WorkflowActionToolDef[] = [
 	},
 	{
 		value: 'create_entity',
-		label: '自作テーブルにレコード作成',
-		params: [{ key: 'data', label: 'フィールド値（JSON形式）', type: 'textarea', required: true }],
-		note: '対象テーブルは「対象」の選択で決まる。dataはフィールドキーと値のJSONオブジェクト（例: {"name":"田中","status":"active"}）'
+		label: 'Create a record in a custom table',
+		params: [{ key: 'data', label: 'Field values (JSON)', type: 'textarea', required: true }],
+		note: 'The target table is determined by the "target" selection. `data` is a JSON object of field keys and values (e.g. {"name":"Tanaka","status":"active"})'
 	},
 	{
 		value: 'update_entity',
-		label: '自作テーブルのレコードを更新',
+		label: 'Update a record in a custom table',
 		params: [
-			{ key: 'id', label: 'レコードID', type: 'text', required: true },
-			{ key: 'data', label: '更新フィールド値（JSON形式）', type: 'textarea', required: true }
+			{ key: 'id', label: 'Record ID', type: 'text', required: true },
+			{ key: 'data', label: 'Updated field values (JSON)', type: 'textarea', required: true }
 		],
-		note: '対象テーブルは「対象」の選択で決まる。idは更新対象のレコードID（@item:idなど）、dataは更新するフィールドキーと値のJSONオブジェクト'
+		note: 'The target table is determined by the "target" selection. `id` is the ID of the record to update (e.g. @item:id), and `data` is a JSON object of the field keys and values to update'
 	},
 	{
 		value: 'delete_entity',
-		label: '自作テーブルのレコードを削除',
-		params: [{ key: 'id', label: 'レコードID', type: 'text', required: true }],
-		note: '対象テーブルは「対象」の選択で決まる。idは削除対象のレコードID'
+		label: 'Delete a record from a custom table',
+		params: [{ key: 'id', label: 'Record ID', type: 'text', required: true }],
+		note: 'The target table is determined by the "target" selection. `id` is the ID of the record to delete'
 	},
 	{
 		value: 'call_external_api',
-		label: '外部APIを呼び出す',
+		label: 'Call an external API',
 		params: [
-			{ key: 'endpoint', label: 'エンドポイント（パスまたはURL）', type: 'text', required: true },
+			{ key: 'endpoint', label: 'Endpoint (path or URL)', type: 'text', required: true },
 			{
 				key: 'method',
-				label: 'HTTPメソッド',
+				label: 'HTTP method',
 				type: 'select',
 				required: true,
 				options: [
@@ -128,21 +129,22 @@ export const WORKFLOW_ACTION_TOOLS: WorkflowActionToolDef[] = [
 					{ value: 'DELETE', label: 'DELETE' }
 				]
 			},
-			{ key: 'body', label: 'リクエストボディ（JSON形式）', type: 'textarea', alwaysShow: true, jsonFormat: true }
+			{ key: 'body', label: 'Request body (JSON)', type: 'textarea', alwaysShow: true, jsonFormat: true }
 		],
 		resultType: 'string',
-		resultDesc: 'レスポンスボディ全体（オブジェクトはJSON文字列化）。特定のフィールドが必要な場合は @step:<id>.<path> で参照する（例: @step:sef.data.id）',
-		// extractResult/listResultは無し。結果は常にレスポンスボディ全体をraw保持し(run.ts参照)、
-		// フィールド抽出・配列アクセスはステップ定義時ではなく参照側で@step:<id>.<path>により行う。
-		note: '呼び出し先は「対象」の選択で決まる（設定済みの外部API連携。integration_idは対象選択で直接設定されるため、AIがparamsで指定することはできない）。レスポンスの中身を確認したい場合は、この値をconsole_logアクション（検証用）に渡すと生のレスポンスが見られる。特定のフィールドは@step:<id>.<path>（例: @step:sef.data.id）、配列はforeachのsourceに@step:<id>.<path>（例: @step:sfw.data.items）を指定して参照する（各要素はオブジェクトならそのフィールドを@item:<key>で、そうでない値の並びなら@item:valueで参照する）。外部APIのレスポンス構造はテーブルと違いBoann側で事前にわからないため、フィールド名の選択候補は出せない(手入力が必要)'
+		resultDesc: 'the entire response body (objects are JSON-stringified). To get a specific field, reference it with @step:<id>.<path> (e.g. @step:sef.data.id)',
+		// No extractResult/listResult. The result always keeps the full raw response body (see run.ts);
+		// field extraction/array access is done at the reference site via @step:<id>.<path>, not at step
+		// definition time.
+		note: 'The call destination is determined by the "target" selection (a configured external API integration; integration_id is set directly by the target selection, so the AI cannot specify it via params). To inspect the response contents, pass this value into a console_log action (for debugging) to see the raw response. Reference a specific field with @step:<id>.<path> (e.g. @step:sef.data.id), or an array as a foreach source with @step:<id>.<path> (e.g. @step:sfw.data.items) — each element can then be referenced as @item:<key> if it\'s an object, or @item:value if it\'s a plain value. Unlike tables, Boann has no advance knowledge of an external API\'s response shape, so field name choices cannot be offered (manual entry is required)'
 	},
 	{
 		value: 'console_log',
-		label: '（検証用）コンソール出力',
-		params: [{ key: 'value', label: '出力する値', type: 'text', required: true }],
+		label: '(Debug) Console output',
+		params: [{ key: 'value', label: 'Value to output', type: 'text', required: true }],
 		resultType: 'string',
-		resultDesc: '出力した値（そのまま）',
-		note: 'ワークフロー検証用の一時的なデバッグアクション。指定した値（@step:等の参照も解決した状態）をdevサーバーのターミナルにconsole.logする。実行ログの結果欄にも同じ値が表示される。本番では意味が無いため不要になったら削除してよい'
+		resultDesc: 'the output value (as-is)',
+		note: 'A temporary debugging action for workflow validation. console.logs the specified value (with @step: etc. references resolved) to the dev server terminal. The same value is also shown in the result column of the execution log. Meaningless in production, so it\'s fine to delete once no longer needed'
 	}
 ];
 
@@ -156,68 +158,68 @@ export type WorkflowActionCategory = {
 	key: string;
 	label: string;
 	targets: WorkflowActionCategoryTarget[];
-	/** trueの場合、各カスタムテーブル（entity_type）が対象の選択肢に追加される */
+	/** if true, each custom table (entity_type) is added as a target choice */
 	includeEntityTargets?: boolean;
-	/** includeEntityTargets時に使用するツール（未指定はget_entities） */
+	/** the tool to use when includeEntityTargets is set (defaults to get_entities if unspecified) */
 	entityTargetTool?: string;
-	/** trueの場合、設定済みのSlack連携（Incoming Webhook）が個別の対象選択肢として追加される（send_slack_notification固定） */
+	/** if true, configured Slack integrations (incoming webhooks) are added as individual target choices (fixed to send_slack_notification) */
 	includeSlackTargets?: boolean;
-	/** trueの場合、設定済みの外部API連携が個別の対象選択肢として追加される（call_external_api固定） */
+	/** if true, configured external API integrations are added as individual target choices (fixed to call_external_api) */
 	includeIntegrationTargets?: boolean;
 };
 
 /**
- * エディタ上で「カテゴリ→対象」の2段階選択にするためのグルーピング。
- * カタログ（WORKFLOW_ACTION_TOOLS）自体は変更せず、その上に被せる表示用の構造。
- * 対象の選択肢が増えるたびにツール一覧がフラットに増え続けるのを避けるため。
+ * Grouping used to present a two-step "category -> target" selection in the editor.
+ * The catalog itself (WORKFLOW_ACTION_TOOLS) is unchanged; this is a display-only structure layered on top of it,
+ * to avoid the tool list growing flatly every time a new target choice is added.
  */
 export const WORKFLOW_ACTION_CATEGORIES: WorkflowActionCategory[] = [
 	{
 		key: 'notify',
-		label: '通知',
+		label: 'Notify',
 		targets: [
-			{ value: 'notification', label: '通知センター', tool: 'send_notification' },
-			{ value: 'email', label: 'メール', tool: 'send_email' }
+			{ value: 'notification', label: 'Notification center', tool: 'send_notification' },
+			{ value: 'email', label: 'Email', tool: 'send_email' }
 		],
 		includeSlackTargets: true
 	},
 	{
 		key: 'search',
-		label: '検索',
+		label: 'Search',
 		targets: [],
 		includeEntityTargets: true
 	},
 	{
 		key: 'data_create',
-		label: 'データ作成',
+		label: 'Create data',
 		targets: [],
 		includeEntityTargets: true,
 		entityTargetTool: 'create_entity'
 	},
 	{
 		key: 'data_update',
-		label: 'データ更新',
+		label: 'Update data',
 		targets: [],
 		includeEntityTargets: true,
 		entityTargetTool: 'update_entity'
 	},
 	{
 		key: 'data_delete',
-		label: 'データ削除',
+		label: 'Delete data',
 		targets: [],
 		includeEntityTargets: true,
 		entityTargetTool: 'delete_entity'
 	},
 	{
 		key: 'external_api',
-		label: '外部API',
+		label: 'External API',
 		targets: [],
 		includeIntegrationTargets: true
 	},
 	{
 		key: 'debug',
-		label: '検証用',
-		targets: [{ value: 'console_log', label: 'コンソール出力', tool: 'console_log' }]
+		label: 'Debug',
+		targets: [{ value: 'console_log', label: 'Console output', tool: 'console_log' }]
 	}
 ];
 
@@ -232,9 +234,9 @@ export function findWorkflowActionCategory(tool: string): WorkflowActionCategory
 }
 
 /**
- * get_entitiesステップのforeach用itemFieldsを、選択中のテーブルの実際のフィールド定義から動的に組み立てる。
- * カタログ（WORKFLOW_ACTION_TOOLS）はテーブルごとの違いを知らないため、entityTypesを使ってここで解決する。
- * 常に id を先頭に含む。
+ * Builds a get_entities step's foreach itemFields dynamically from the selected table's actual field definitions.
+ * The catalog (WORKFLOW_ACTION_TOOLS) has no knowledge of per-table differences, so entityTypes is used to resolve it here.
+ * Always includes `id` first.
  */
 export function entityListItemFields(
 	entityTypes: { id: string; fields: WorkflowListResultField[] }[],
@@ -246,10 +248,10 @@ export function entityListItemFields(
 }
 
 /**
- * ドット区切りのパス（例: `data.items.0.id`）でオブジェクト/配列を辿る、簡易的なJSON path resolver。
- * JSONPathのようなワイルドカード・フィルタ式には対応しない。`@step:<id>.<path>`参照とforeachのsourceの
- * パス指定（run.tsのresolveOperand/resolveForeachSource）から使われる。パスが空ならvalueをそのまま返す。
- * 辿れない場合はundefined。
+ * A simple JSON path resolver that walks an object/array using a dot-separated path (e.g. `data.items.0.id`).
+ * Does not support JSONPath-style wildcards or filter expressions. Used from the `@step:<id>.<path>` reference
+ * and the foreach source path (run.ts's resolveOperand/resolveForeachSource). Returns value as-is if path is empty.
+ * Returns undefined if the path can't be walked.
  */
 export function resolveJsonPath(value: unknown, path: string): unknown {
 	const trimmed = path.trim();
@@ -270,11 +272,12 @@ export function resolveJsonPath(value: unknown, path: string): unknown {
 }
 
 /**
- * resultステップのkeyをドット区切り（例: "user.name"）でネストとして解釈し、targetの中にオブジェクトを
- * 掘り進めながら値をセットする。中間パスに既に値があり、それがプレーンオブジェクトでない場合
- * （スカラー・配列・未設定）は新しいオブジェクトで置き換える——同じキーへの再セットは後勝ちで上書きする、
- * という既存の（ネストしていない場合の）方針をネストにも一貫して適用したもの。
- * オブジェクト型（ネストしたキーの直接指定）自体は非対応のまま、キー側のドット記法だけでネストを表現する。
+ * Interprets a result step's key as nesting via dot notation (e.g. "user.name") and sets the value by digging
+ * into an object within target. If an intermediate path already has a value that isn't a plain object
+ * (a scalar, array, or unset), it's replaced with a new object — this consistently extends to nesting the
+ * existing policy (for the non-nested case) that setting the same key again overwrites it (last write wins).
+ * Object-typed values (specifying nested keys directly) are still unsupported; only dot notation on the key
+ * side expresses nesting.
  */
 export function setResultPath(target: Record<string, unknown>, key: string, value: unknown): void {
 	const segments = key.split('.');
@@ -291,10 +294,10 @@ export function setResultPath(target: Record<string, unknown>, key: string, valu
 }
 
 /**
- * ワークフロービルダーで、実行せずに「resultステップで何が組み立てられるか」をその場でプレビューするための
- * 静的な組み立て（実行時のrun.ts resolveOperandとは異なり、@step:等の参照は解決せずトークンのまま載せる）。
- * condition/foreachの中のresultステップも辿るが、実際にその分岐・繰り返しが実行されるかは考慮しない
- * （あくまで「このワークフローにどんなresultステップがあるか」の見取り図）。
+ * A static preview build for the workflow builder, to show "what a result step would assemble" without
+ * running it (unlike run.ts's resolveOperand at execution time, references like @step: are not resolved and
+ * are kept as tokens). Also walks into result steps inside condition/foreach, without considering whether that
+ * branch/loop would actually execute (this is simply a map of "what result steps exist in this workflow").
  */
 export function buildResultPreview(steps: WorkflowStep[]): Record<string, unknown> {
 	const out: Record<string, unknown> = {};
@@ -343,20 +346,21 @@ function formatPreviewValue(value: unknown, indent: string): string {
 }
 
 /**
- * buildResultPreviewの結果を表示用に整形する。@step:等の参照トークンはダブルクォートで囲まない
- * （実際の値ではなく式であることが分かるようにするための表示専用フォーマットで、構文的に有効なJSONではない）。
+ * Formats buildResultPreview's result for display. Reference tokens like @step: are not wrapped in double
+ * quotes (a display-only format meant to show they're expressions rather than literal values — this is not
+ * syntactically valid JSON).
  */
 export function formatResultPreview(preview: Record<string, unknown>): string {
 	return formatPreviewValue(preview, '');
 }
 
 /**
- * data フィールド（JSON テキスト）内のクォートされていない @trigger:xxx / @step:xxx / @item:xxx / @self:xxx / @input:xxx 参照を
- * クォートで囲んでから JSON.parse できるようにする。すでにクォート済みの場合は冪等。
- * JSON値の位置（`:` の直後〜`,`/`}` の直前）にある場合のみ対象とし、既存の文字列値の中に
- * 地の文として "@self:account_id" 等が含まれるケースを誤って壊さないようにする。
- * run.ts（実行時の解決）とworkflow-validation.ts（保存時のJSON形式チェック）の両方から使うため、
- * サーバー専用依存を持たないこのファイルに置く。
+ * Wraps unquoted @trigger:xxx / @step:xxx / @item:xxx / @self:xxx / @input:xxx references inside a `data`
+ * field (JSON text) in quotes so it can be parsed with JSON.parse. Idempotent if already quoted.
+ * Only applies at a JSON value position (right after `:` and right before `,`/`}`), to avoid corrupting an
+ * existing string value that happens to contain literal text like "@self:account_id".
+ * Lives in this file (no server-only dependencies) because it's used both from run.ts (runtime resolution)
+ * and workflow-validation.ts (JSON format check at save time).
  */
 export function preQuoteReferences(jsonStr: string): string {
 	return jsonStr.replace(
@@ -366,25 +370,25 @@ export function preQuoteReferences(jsonStr: string): string {
 }
 
 const RESULT_TYPE_LABELS: Record<WorkflowResultType, string> = {
-	boolean: '真偽値',
-	number: '数値',
-	string: '文字列'
+	boolean: 'boolean',
+	number: 'number',
+	string: 'string'
 };
 
-/** AIへのシステムプロンプトに埋め込む、カタログ1件分の説明文を生成する。 */
+/** Builds the description text for one catalog entry, embedded in the AI system prompt. */
 export function describeWorkflowActionToolForAI(t: WorkflowActionToolDef): string {
 	const paramsDesc =
 		t.params.length > 0
 			? JSON.stringify(Object.fromEntries(t.params.map((p) => [p.key, p.label])))
-			: 'params不要';
+			: 'no params needed';
 	const resultDesc = t.resultType
-		? `、結果は${RESULT_TYPE_LABELS[t.resultType]}${t.resultDesc ? `（${t.resultDesc}）` : ''}`
+		? `, result is a ${RESULT_TYPE_LABELS[t.resultType]}${t.resultDesc ? ` (${t.resultDesc})` : ''}`
 		: '';
-	const noteDesc = t.note ? `※${t.note}` : '';
+	const noteDesc = t.note ? `Note: ${t.note}` : '';
 	const listDesc = t.listResult
-		? `。foreachのsourceとして一覧（${t.listResult.desc}）も取得可能。body内では ${t.listResult.itemFields.map((f) => `@item:${f.key}（${f.label}）`).join(' / ')} が参照できる`
+		? `. Can also be used as a foreach source to get a list (${t.listResult.desc}). Inside body, ${t.listResult.itemFields.map((f) => `@item:${f.key} (${f.label})`).join(' / ')} can be referenced`
 		: '';
-	return `- \`${t.value}\`（${t.label}${resultDesc}）: params = ${paramsDesc}${noteDesc ? ` ${noteDesc}` : ''}${listDesc}`;
+	return `- \`${t.value}\` (${t.label}${resultDesc}): params = ${paramsDesc}${noteDesc ? ` ${noteDesc}` : ''}${listDesc}`;
 }
 
 export const WORKFLOW_OPERATORS: { value: string; label: string }[] = [
@@ -398,7 +402,7 @@ export const WORKFLOW_OPERATORS: { value: string; label: string }[] = [
 
 const REFERENCE_PREFIXES = ['@trigger:', '@step:', '@item:', '@self:', '@input:'] as const;
 
-/** 値が@trigger:/@step:/@item:/@self:/@input:のいずれかの参照記法かどうか。 */
+/** Whether a value uses one of the @trigger:/@step:/@item:/@self:/@input: reference notations. */
 export function isReferenceOperand(value: unknown): value is string {
 	return typeof value === 'string' && REFERENCE_PREFIXES.some((p) => value.startsWith(p));
 }
@@ -412,10 +416,10 @@ export function makeStepRef(id: string): string {
 export type ParsedStepRef = { id: string; path: string | null };
 
 /**
- * `@step:<id>`（従来通り、ステップの結果をそのまま参照）または`@step:<id>.<path>`
- * （例: `@step:sef.name`、`@step:sfw.0.id`）をパースする。pathはcall_external_api等が
- * 保持する生の値（オブジェクト/配列、StepResult.raw）をresolveJsonPathで辿るために使う。
- * ステップidはshortId()（ドットを含まない）で生成する前提のため、最初のドットをid/pathの区切りとする。
+ * Parses `@step:<id>` (the traditional form, referencing a step's result as-is) or `@step:<id>.<path>`
+ * (e.g. `@step:sef.name`, `@step:sfw.0.id`). `path` is used to walk the raw value held by call_external_api
+ * etc. (an object/array, StepResult.raw) via resolveJsonPath. Since step ids are generated by shortId()
+ * (which never contains a dot), the first dot is treated as the separator between id and path.
  */
 export function parseStepRef(value: string | undefined): ParsedStepRef | null {
 	if (!value || !value.startsWith(STEP_REF_PREFIX)) return null;
@@ -430,9 +434,10 @@ const ITEM_REF_PREFIX = '@item:';
 export type ParsedItemRef = { foreachStepId: string | null; field: string };
 
 /**
- * foreachのbody内で、現在処理中の項目のフィールドを参照する記法（`@item:<foreachのid>:<field>`）。
- * foreachStepIdを指定することで、ネストしたforeachのどちらの項目を指すかを区別する（エディタは常にこの形式で保存する）。
- * foreachStepIdを省略した旧形式（`@item:<field>`）はparseItemRefで読めるが、最も内側のforeachを指すものとして解釈する。
+ * Notation for referencing a field of the item currently being processed, inside a foreach's body
+ * (`@item:<foreach id>:<field>`). Specifying foreachStepId disambiguates which nested foreach's item is
+ * meant (the editor always saves in this form). The legacy form omitting foreachStepId (`@item:<field>`) can
+ * still be read by parseItemRef, and is interpreted as referring to the innermost foreach.
  */
 export function makeItemRef(foreachStepId: string, field: string): string {
 	return `${ITEM_REF_PREFIX}${foreachStepId}:${field}`;
@@ -449,8 +454,8 @@ export function parseItemRef(value: string | undefined): ParsedItemRef | null {
 const TRIGGER_REF_PREFIX = '@trigger:';
 
 /**
- * イベントトリガーで操作されたレコードのフィールドを参照する記法（`@trigger:<field>`）。
- * id/event（レコードID・イベント種別）に加え、createdBy等のシステムフィールドやテーブル固有フィールドを指す。
+ * Notation for referencing a field of the record operated on by the event trigger (`@trigger:<field>`).
+ * Refers to system fields like id/event, createdBy, etc. as well as table-specific fields.
  */
 export function makeTriggerRef(field: string): string {
 	return `${TRIGGER_REF_PREFIX}${field}`;
@@ -463,7 +468,7 @@ export function parseTriggerRef(value: string | undefined): string | null {
 
 const INPUT_REF_PREFIX = '@input:';
 
-/** ワークフローで宣言された入力パラメータ（inputSchema）を参照する記法（`@input:<key>`）。 */
+/** Notation for referencing a workflow's declared input parameters (inputSchema) (`@input:<key>`). */
 export function makeInputRef(key: string): string {
 	return `${INPUT_REF_PREFIX}${key}`;
 }
@@ -474,21 +479,22 @@ export function parseInputRef(value: string | undefined): string | null {
 }
 
 /**
- * イベントトリガーの対象レコードで、テーブルのフィールド定義に関わらず常に参照できるシステムフィールド。
- * キーは RecordRow（table-service.getRecord）が実際に返すキー名（createdBy等のキャメルケース）に合わせる。
+ * System fields on an event trigger's target record that are always referenceable regardless of the table's
+ * field definitions. Keys match what RecordRow (table-service.getRecord) actually returns (camelCase keys
+ * like createdBy).
  */
 export const TRIGGER_SYSTEM_FIELDS: WorkflowListResultField[] = [
-	{ key: 'id', label: 'レコードID' },
-	{ key: 'event', label: 'イベント種別（create/update/delete）' },
-	{ key: 'createdBy', label: '作成者のアカウントID' },
-	{ key: 'updatedBy', label: '更新者のアカウントID' },
-	{ key: 'createdAt', label: '作成日時' },
-	{ key: 'updatedAt', label: '更新日時' }
+	{ key: 'id', label: 'Record ID' },
+	{ key: 'event', label: 'Event type (create/update/delete)' },
+	{ key: 'createdBy', label: 'Creator account ID' },
+	{ key: 'updatedBy', label: 'Last updater account ID' },
+	{ key: 'createdAt', label: 'Created at' },
+	{ key: 'updatedAt', label: 'Updated at' }
 ];
 
 /**
- * イベントトリガーのstep1条件等で選択できる「トリガーレコードのフィールド」一覧を組み立てる。
- * システムフィールド（id/event/createdBy等）に、選択中のトリガー対象テーブルのカスタムフィールドを加える。
+ * Builds the list of "trigger record fields" selectable in an event trigger's step1 condition, etc.
+ * Adds the selected trigger table's custom fields to the system fields (id/event/createdBy, etc.).
  */
 export function triggerFieldsFor(
 	entityTypes: { id: string; fields: WorkflowListResultField[] }[],
@@ -498,5 +504,5 @@ export function triggerFieldsFor(
 	return [...TRIGGER_SYSTEM_FIELDS, ...(match?.fields ?? [])];
 }
 
-/** ワークフロー登録者自身のアカウントIDを参照する記法。createdBy等と比較して「自分が行った操作か」を判定するのに使う。 */
+/** Notation referencing the workflow owner's own account ID. Used to compare against createdBy etc. to check "did I perform this operation". */
 export const SELF_ACCOUNT_ID_REF = '@self:account_id';

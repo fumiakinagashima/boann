@@ -8,7 +8,7 @@
 		columns?: 1 | 2 | 3 | 4;
 	};
 
-	let { items, card, empty = 'データがありません', columns = 3 }: Props = $props();
+	let { items, card, empty = 'No data available', columns = 3 }: Props = $props();
 </script>
 
 {#if items.length === 0}

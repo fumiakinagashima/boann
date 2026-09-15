@@ -20,7 +20,8 @@ export const POST: RequestHandler = async ({ request, platform, locals }) => {
 		formTitle: string;
 		formFields: { key: string; label: string }[];
 		history: { role: 'user' | 'assistant'; text: string }[];
-		// ダイアログに表示中のレコード（詳細表示時）。指示語「この顧客」等の解決に使う
+		// The record currently displayed in the dialog (when viewing details). Used to resolve
+		// referring expressions like "this customer".
 		recordContext?: {
 			type: string;
 			typeLabel: string;
@@ -35,7 +36,7 @@ export const POST: RequestHandler = async ({ request, platform, locals }) => {
 			async start(controller) {
 				const enqueue = (e: StreamEvent) => controller.enqueue(new TextEncoder().encode(sse(e)));
 				await new Promise((r) => setTimeout(r, 300));
-				for (const char of 'ご質問ありがとうございます。') {
+				for (const char of 'Thank you for your question.') {
 					enqueue({ type: 'delta', text: char });
 					await new Promise((r) => setTimeout(r, 20));
 				}
@@ -63,7 +64,7 @@ export const POST: RequestHandler = async ({ request, platform, locals }) => {
 	};
 
 	const sections: string[] = [
-		'あなたは画面に開いているダイアログの内容についてユーザーをサポートするAIアシスタントです。'
+		'You are an AI assistant that helps the user with the content of the dialog currently open on the screen.'
 	];
 
 	const rc = body.recordContext;
@@ -75,29 +76,29 @@ export const POST: RequestHandler = async ({ request, platform, locals }) => {
 					.join('\n')
 			: '';
 		sections.push(
-			`現在ダイアログに表示中のレコード:
-- 種別: ${rc.typeLabel}（${rc.type}）
+			`Record currently displayed in the dialog:
+- Type: ${rc.typeLabel} (${rc.type})
 - ID: ${rc.id}
-- 名称: ${rc.label}${dataLines ? `\n- 表示中の内容:\n${dataLines}` : ''}
+- Name: ${rc.label}${dataLines ? `\n- Displayed content:\n${dataLines}` : ''}
 
-ユーザーが「このレコード」「これ」などと指示語で言及した場合は、上記の表示中レコードを指します（どのレコードか聞き返す必要はありません）。
-関連するデータの取得が必要な場合は、上記のIDを使ってツールで取得してください。`
+When the user refers to "this record" or "this" with a referring expression, it refers to the record shown above (no need to ask which record they mean).
+If you need to retrieve related data, use the ID above to fetch it with a tool.`
 		);
 	}
 
 	if (body.formFields.length > 0) {
-		const fieldList = body.formFields.map((f) => `- ${f.label}（${f.key}）`).join('\n');
+		const fieldList = body.formFields.map((f) => `- ${f.label} (${f.key})`).join('\n');
 		sections.push(
-			`このダイアログは「${body.formTitle}」フォームです。ユーザーが各フィールドを正しく入力できるよう、具体的なアドバイスや情報を提供してください。
-フォームのフィールド一覧:
+			`This dialog is the "${body.formTitle}" form. Provide concrete advice and information to help the user fill in each field correctly.
+List of form fields:
 ${fieldList}`
 		);
 	}
 
 	sections.push(
-		`利用可能なツール: カスタムテーブルのデータを検索・取得・集計できます。
-制約: データの登録・更新・削除・メール送信はできません。情報の取得のみ行えます。
-日付・数値などは日本語で分かりやすく示し、回答は簡潔にしてください。`
+		`Available tools: you can search, retrieve, and aggregate data from custom tables.
+Constraints: you cannot register, update, or delete data, or send email. You can only retrieve information.
+Present dates, numbers, and similar values clearly, and keep your answers concise.`
 	);
 
 	const systemPrompt = sections.join('\n\n');
@@ -149,7 +150,7 @@ ${fieldList}`
 					const finalMsg = await claudeStream.finalMessage();
 					if (finalMsg.stop_reason !== 'tool_use') break;
 
-					// ツール呼び出しターン中のテキストはストリーム済みなのでそのまま継続
+					// Text from the tool-call turn has already been streamed, so just continue
 					const toolResults = await Promise.all(
 						toolBlocks.map(async (b) => {
 							try {
@@ -164,7 +165,7 @@ ${fieldList}`
 								return {
 									type: 'tool_result' as const,
 									tool_use_id: b.id,
-									content: `エラー: ${e instanceof Error ? e.message : String(e)}`,
+									content: `Error: ${e instanceof Error ? e.message : String(e)}`,
 									is_error: true
 								};
 							}

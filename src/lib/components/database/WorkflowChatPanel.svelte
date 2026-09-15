@@ -55,7 +55,7 @@
 			if (!res.ok || !res.body) {
 				chatMessages = [
 					...chatMessages.slice(0, -1),
-					{ role: 'assistant', text: 'エラーが発生しました。' }
+					{ role: 'assistant', text: 'An error occurred.' }
 				];
 				return;
 			}
@@ -117,7 +117,7 @@
 <div class="chat-panel">
 	<div class="chat-messages" bind:this={chatListEl}>
 		{#if chatMessages.length === 0}
-			<p class="chat-empty">どんな自動化フローにしたいか、話しかけてみてください。提案内容は右側に反映されます。</p>
+			<p class="chat-empty">Tell me what kind of automation you'd like. Suggestions will be reflected on the right.</p>
 		{/if}
 		{#each chatMessages as msg}
 			<div class="chat-msg {msg.role}">
@@ -137,11 +137,11 @@
 		<textarea
 			bind:value={chatInput}
 			onkeydown={handleChatKey}
-			placeholder="例: 顧客数が10件を超えたら通知して"
+			placeholder="e.g. Notify me when the number of customers exceeds 10"
 			rows="2"
 			disabled={chatLoading}
 		></textarea>
-		<button class="chat-send" onclick={sendChat} disabled={chatLoading || !chatInput.trim()} aria-label="送信">
+		<button class="chat-send" onclick={sendChat} disabled={chatLoading || !chatInput.trim()} aria-label="Send">
 			<ArrowUp size={14} />
 		</button>
 	</div>

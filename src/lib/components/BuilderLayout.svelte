@@ -1,12 +1,12 @@
 <script lang="ts">
 	import type { Snippet } from 'svelte';
 
-	// テーブル／ページ／ワークフロー／アプリ設定で共通のビルダーレイアウト。
-	// 左に編集領域（main）、右にリサイズ可能なAIアシスタント列（chat）を配置する。
+	// Shared builder layout for tables/pages/workflows/app settings.
+	// Places the editing area (main) on the left and a resizable AI assistant column (chat) on the right.
 	let {
 		main,
 		chat,
-		chatTitle = 'AIアシスタント'
+		chatTitle = 'AI Assistant'
 	}: {
 		main: Snippet;
 		chat: Snippet;
@@ -45,7 +45,7 @@
 		class="resizer"
 		onmousedown={onResizerMouseDown}
 		role="separator"
-		aria-label="パネル幅を調整"
+		aria-label="Adjust panel width"
 		aria-orientation="vertical"
 	></div>
 

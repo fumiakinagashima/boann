@@ -12,7 +12,7 @@
 
 	let { label, href, description, newTab, download }: Props = $props();
 
-	// アプリ内パス（"/" 始まり、"//" のプロトコル相対URLは除外）のみ許可し、javascript: 等の危険なスキームを防ぐ
+	// Only allow in-app paths (starting with "/", excluding "//" protocol-relative URLs) to prevent dangerous schemes like javascript:
 	const safeHref = $derived(/^\/(?!\/)/.test(href) ? href : undefined);
 </script>
 

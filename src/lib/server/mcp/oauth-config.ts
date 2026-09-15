@@ -1,38 +1,43 @@
-// OAuth 2.1認可サーバー(@cloudflare/workers-oauth-provider)側の設定。
-// worker.ts(OAuthProviderの構築)とSvelteKitの/oauth/authorizeルートの両方から参照する、
-// フレームワーク非依存の純粋な設定・ヘルパー置き場。
+// Configuration for the OAuth 2.1 authorization server (@cloudflare/workers-oauth-provider) side.
+// A framework-agnostic home for pure config/helpers, referenced from both worker.ts
+// (where OAuthProvider is constructed) and the SvelteKit /oauth/authorize route.
 //
-// 参照元:
+// References:
 // - OAuth 2.1: https://datatracker.ietf.org/doc/html/draft-ietf-oauth-v2-1-13
 // - RFC 8707 (Resource Indicators for OAuth 2.0): https://www.rfc-editor.org/rfc/rfc8707
 // - MCP Authorization: https://modelcontextprotocol.io/specification/2025-06-18/basic/authorization
 // - @cloudflare/workers-oauth-provider: https://github.com/cloudflare/workers-oauth-provider
-//   (README/oauth-provider.d.tsがoptions・OAuthHelpersの一次情報。node_modulesに実物あり)
+//   (the README and oauth-provider.d.ts are the primary sources for options/OAuthHelpers;
+//   the actual file lives in node_modules)
 //
-// authorize/token/registerというパス名自体は仕様が強制する固定値ではない(OAuthProviderの
-// authorizeEndpoint/tokenEndpoint/clientRegistrationEndpointに渡す値はBoannが自由に決められる)。
-// 固定なのは各エンドポイントが実装しなければいけない"振る舞い"の方(RFC 6749/7591/8414)。
+// The path names authorize/token/register themselves are not fixed by the spec (Boann is
+// free to choose the values passed to OAuthProvider's authorizeEndpoint/tokenEndpoint/
+// clientRegistrationEndpoint). What IS fixed is the "behavior" each endpoint must implement
+// (RFC 6749/7591/8414).
 
-// 静的Bearerトークン(mcp/auth.ts)と共存させる。トークンの見た目で振り分けるのではなく、
-// OAuthProviderが「有効なOAuthトークンではない」と判断したリクエストは自動的にdefaultHandler
-// (=既存のSvelteKitワーカー)に流れるため、旧来のBearer検証(+server.ts)は無改修のまま生き続ける。
-// (この「無効なら黙ってdefaultHandlerに落ちる」という挙動はworkers-oauth-providerライブラリの
-// 仕様であり、OAuth自体の仕様ではない。ライブラリのd.tsコメント「Handler for all non-API
-// requests or API requests without a valid token」が根拠。)
+// Made to coexist with the static Bearer token (mcp/auth.ts). Rather than branching on what
+// the token looks like, any request OAuthProvider judges to not be a valid OAuth token
+// automatically flows through to defaultHandler (= the existing SvelteKit worker), so the
+// legacy Bearer validation (+server.ts) keeps working unmodified.
+// (This "silently fall through to defaultHandler when invalid" behavior is a property of the
+// workers-oauth-provider library, not of the OAuth spec itself. Grounded in the library's
+// d.ts comment: "Handler for all non-API requests or API requests without a valid token".)
 export const OAUTH_ROUTES = {
 	authorize: '/oauth/authorize',
 	token: '/oauth/token',
 	register: '/oauth/register'
 } as const;
 
-// apiRouteはプレフィックス一致のみ(アプリIDが途中に挟まるパスの完全一致は表現できない)ため、
-// あえて広めに取り、apiHandler側で「/api/apps/<id>/mcp」以外は既存のSvelteKitワーカーに委譲する。
-// これはworkers-oauth-providerのapiRouteオプションの制約(プレフィックスのみ対応)への対処で、
-// OAuthやMCPの仕様とは無関係なBoann側の設計判断。
+// apiRoute only supports prefix matching (it can't express an exact match for a path with an
+// app ID in the middle), so we deliberately set it broadly and have the apiHandler side
+// delegate anything other than "/api/apps/<id>/mcp" to the existing SvelteKit worker.
+// This works around a constraint of workers-oauth-provider's apiRoute option (prefix-only
+// support) and is a Boann-side design decision unrelated to the OAuth or MCP specs.
 export const MCP_API_ROUTE_PREFIX = '/api/apps/';
 
-// scope文字列の値自体はBoannが決める(OAuth仕様はscopeが空白区切り文字列であることだけ規定し、
-// 値の語彙はサーバー実装者が決める領域)。ACL未実装の現状は全ツール一括のこの1つだけ。
+// The value of the scope string itself is up to Boann (the OAuth spec only mandates that
+// scope be a space-delimited string; the vocabulary of values is left to the server
+// implementer). Since ACL isn't implemented yet, this single scope covers all tools at once.
 export const MCP_TOOL_SCOPE = 'mcp';
 
 const MCP_ENDPOINT_PATH_RE = /^\/api\/apps\/([^/]+)\/mcp$/;
@@ -41,15 +46,16 @@ export function matchMcpEndpointPath(pathname: string): string | null {
 	return MCP_ENDPOINT_PATH_RE.exec(pathname)?.[1] ?? null;
 }
 
-/** OAuthの認可コード発行済みグラントに紐付けて保存するアプリ固有の情報。 */
+/** App-specific info stored attached to an OAuth grant once the authorization code is issued. */
 export type McpGrantProps = {
 	accountId: string;
 	appId: string;
 };
 
 /**
- * MCPクライアントが送るresourceパラメータ(RFC 8707、通常は正規のMCPエンドポイントURL)から
- * どのアプリへのアクセス要求かを取り出す。resourceが無い/複数ある/パス形式が合わない場合はnull。
+ * Extracts which app is being requested from the resource parameter sent by the MCP client
+ * (RFC 8707, normally the canonical MCP endpoint URL). Returns null if resource is missing,
+ * has multiple values, or doesn't match the expected path shape.
  */
 export function parseMcpResourceAppId(resource: string | string[] | undefined): string | null {
 	if (!resource || Array.isArray(resource)) return null;

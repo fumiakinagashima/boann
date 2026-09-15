@@ -4,7 +4,7 @@ import type { Db } from '../db';
 
 export type SlackIntegration = { id: string; name: string; baseUrl: string };
 
-// Slack Incoming Webhook の base_url（hooks.slack.com）を持つ連携をSlack通知先として扱う
+// Treat integrations whose base_url is a Slack Incoming Webhook (hooks.slack.com) as Slack notification targets
 export async function listSlackIntegrations(db: Db): Promise<SlackIntegration[]> {
 	return db
 		.select({ id: integrations.id, name: integrations.name, baseUrl: integrations.baseUrl })
@@ -19,16 +19,16 @@ export async function getSlackIntegration(db: Db, id: string): Promise<SlackInte
 
 export type SlackIntegrationOption = { id: string; name: string };
 
-/** ワークフローの「Slack」対象選択用に、webhook URL（baseUrl）を含まない一覧を取得する。 */
+/** Gets a list without the webhook URL (baseUrl) included, for the workflow's "Slack" target selector. */
 export async function listSlackIntegrationsForWorkflow(db: Db): Promise<SlackIntegrationOption[]> {
 	return (await listSlackIntegrations(db)).map((s) => ({ id: s.id, name: s.name }));
 }
 
 /**
- * Slackのmrkdwnでは `&` `<` `>` が特殊文字（リンク・メンション記法）として解釈されるため、
- * 送信前にエスケープする（参考: https://api.slack.com/reference/surfaces/formatting#escaping）。
- * ワークフローの @item:<field> 等、ユーザー入力由来の文字列をそのまま送る経路があるため、
- * 偽装リンク（例: `<https://evil.example|本物に見えるテキスト>`）の埋め込みを防ぐ。
+ * In Slack's mrkdwn, `&`, `<`, and `>` are interpreted as special characters (link/mention syntax),
+ * so escape them before sending (reference: https://api.slack.com/reference/surfaces/formatting#escaping).
+ * Since there is a path where user-input-derived strings — such as a workflow's @item:<field> — are
+ * sent as-is, this prevents embedding a spoofed link (e.g. `<https://evil.example|text that looks legitimate>`).
  */
 function escapeSlackMrkdwn(text: string): string {
 	return text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
@@ -41,6 +41,6 @@ export async function sendSlackMessage(integration: SlackIntegration, text: stri
 		body: JSON.stringify({ text: escapeSlackMrkdwn(text) })
 	});
 	if (!res.ok) {
-		throw new Error(`Slack通知の送信に失敗しました（${integration.name}）: ${res.status}`);
+		throw new Error(`Failed to send Slack notification (${integration.name}): ${res.status}`);
 	}
 }

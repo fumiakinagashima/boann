@@ -12,18 +12,20 @@ function forbidden(message: string): Response {
 }
 
 /**
- * workers-oauth-provider の apiHandler。`apiRoute`(`/api/apps/`)はプレフィックス一致のみで
- * アプリIDを含む完全一致は表現できないため、ここで`/api/apps/<id>/mcp`かどうかを判定し、
- * 一致しない場合は素通しで既存のSvelteKitワーカー(defaultHandler)に委譲する。
- * これによりOAuthトークンを持つリクエストが誤って他の`/api/apps/**`エンドポイントに
- * ルーティングされても、今まで通りセッションCookie認証で処理される。
+ * The apiHandler for workers-oauth-provider. `apiRoute` (`/api/apps/`) only supports prefix
+ * matching and cannot express an exact match that includes an app ID, so here we determine
+ * whether the path is exactly `/api/apps/<id>/mcp`, and if it doesn't match, pass the request
+ * through unchanged to the existing SvelteKit worker (defaultHandler).
+ * This means that even if a request carrying an OAuth token is mistakenly routed to another
+ * `/api/apps/**` endpoint, it's still handled by the usual session-cookie authentication.
  *
- * この関数のシグネチャ(request, env, ctx)とctx.propsの意味は@cloudflare/workers-oauth-provider
- * が規定する契約(apiHandlerオプション)であり、MCPやOAuth自体の仕様ではない。
- * https://github.com/cloudflare/workers-oauth-provider （README「apiHandler」節、
- * `dist/oauth-provider.d.ts`の`OAuthProviderOptions.apiHandler`のJSDoc参照）。
- * props(accountId/appId)の中身はBoann独自(`/oauth/authorize`のcompleteAuthorization呼び出し側
- * =`src/routes/oauth/authorize/+page.server.ts`で詰めている)。
+ * This function's signature (request, env, ctx) and the meaning of ctx.props are the contract
+ * defined by @cloudflare/workers-oauth-provider (the apiHandler option), not part of the MCP
+ * or OAuth specs themselves.
+ * https://github.com/cloudflare/workers-oauth-provider (see the README's "apiHandler" section
+ * and the JSDoc on `OAuthProviderOptions.apiHandler` in `dist/oauth-provider.d.ts`).
+ * The contents of props (accountId/appId) are Boann-specific (populated by the caller of
+ * completeAuthorization in `/oauth/authorize` = `src/routes/oauth/authorize/+page.server.ts`).
  */
 export async function handleMcpOAuthApiRequest(
 	request: Request,
@@ -35,9 +37,9 @@ export async function handleMcpOAuthApiRequest(
 	const appId = request.method === 'POST' ? matchMcpEndpointPath(url.pathname) : null;
 	if (!appId) return fallback(request, env, ctx);
 
-	// OAuthProviderが既にトークンの有効性(署名・失効・resource/audience)を検証済みだが、
-	// アプリ単位のテナント分離はこちらでも明示的に再チェックする(既存のassertOwnedByTable等と
-	// 同じdefense-in-depthの方針)。
+	// OAuthProvider has already validated the token's validity (signature, revocation,
+	// resource/audience), but we still explicitly re-check per-app tenant isolation here
+	// too (the same defense-in-depth policy as the existing assertOwnedByTable, etc).
 	if (!ctx.props || ctx.props.appId !== appId) return forbidden('Unknown tool: this token is not authorized for this app');
 
 	const db = createDb(env.DB);

@@ -26,7 +26,7 @@ describe('buildResultPreview', () => {
 
 	it('skips result steps with no key yet', () => {
 		const steps: WorkflowStep[] = [
-			{ id: 'r1', kind: 'result', label: '新しいレスポンス設定', key: '', valueType: 'scalar', value: '' }
+			{ id: 'r1', kind: 'result', label: 'New response setting', key: '', valueType: 'scalar', value: '' }
 		];
 		expect(buildResultPreview(steps)).toEqual({});
 	});
@@ -40,7 +40,7 @@ describe('buildResultPreview', () => {
 				left: '@step:x',
 				operator: '==',
 				right: '1',
-				then: [{ id: 'r1', kind: 'result', label: 'name', key: 'name', valueType: 'scalar', value: '田中' }]
+				then: [{ id: 'r1', kind: 'result', label: 'name', key: 'name', valueType: 'scalar', value: 'Tanaka' }]
 			},
 			{
 				id: 'f1',
@@ -50,7 +50,7 @@ describe('buildResultPreview', () => {
 				body: [{ id: 'r2', kind: 'result', label: 'age', key: 'age', valueType: 'scalar', value: '@item:f1:age' }]
 			}
 		];
-		expect(buildResultPreview(steps)).toEqual({ name: '田中', age: '@item:f1:age' });
+		expect(buildResultPreview(steps)).toEqual({ name: 'Tanaka', age: '@item:f1:age' });
 	});
 
 	it('lets a later result step overwrite an earlier one with the same key', () => {
@@ -107,7 +107,7 @@ describe('isReferenceOperand', () => {
 	});
 
 	it('rejects plain literals and non-strings', () => {
-		expect(isReferenceOperand('田中')).toBe(false);
+		expect(isReferenceOperand('Tanaka')).toBe(false);
 		expect(isReferenceOperand('')).toBe(false);
 		expect(isReferenceOperand(42)).toBe(false);
 	});
@@ -119,8 +119,8 @@ describe('formatResultPreview', () => {
 	});
 
 	it('leaves reference tokens unquoted but quotes plain string literals', () => {
-		const out = formatResultPreview({ name: '@step:345', city: '東京' });
-		expect(out).toBe('{\n  "name": @step:345,\n  "city": "東京"\n}');
+		const out = formatResultPreview({ name: '@step:345', city: 'Tokyo' });
+		expect(out).toBe('{\n  "name": @step:345,\n  "city": "Tokyo"\n}');
 	});
 
 	it('quotes each string element of an array, but leaves reference elements unquoted', () => {
@@ -133,7 +133,7 @@ describe('formatResultPreview', () => {
 	});
 
 	it('renders a nested object with indentation, unquoting reference tokens at any depth', () => {
-		const out = formatResultPreview({ user: { id: '@step:sef', name: '田中' } });
-		expect(out).toBe('{\n  "user": {\n    "id": @step:sef,\n    "name": "田中"\n  }\n}');
+		const out = formatResultPreview({ user: { id: '@step:sef', name: 'Tanaka' } });
+		expect(out).toBe('{\n  "user": {\n    "id": @step:sef,\n    "name": "Tanaka"\n  }\n}');
 	});
 });

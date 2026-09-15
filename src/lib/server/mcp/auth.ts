@@ -1,8 +1,9 @@
-// このファイルはBoann独自のBearer認証で、MCPやOAuthの仕様が規定しているものではない
-// （`Authorization: Bearer <token>`というヘッダー形式自体はHTTP認証の一般的な慣習だが、
-// トークンの発行・ハッシュ保存・検証方式はBoannが独自に設計したもの）。OAuth 2.1側の実装は
-// `oauth-config.ts`/`oauth-api-handler.ts`/`worker.ts`側にあり、こちらとは別の認証経路として
-// 共存させている（詳細は`oauth-config.ts`のコメント参照）。
+// This file implements Boann's own Bearer authentication, not something dictated by the MCP
+// or OAuth specs (the `Authorization: Bearer <token>` header format itself is a common HTTP
+// authentication convention, but the token issuance, hashed storage, and verification scheme
+// are Boann's own design). The OAuth 2.1 implementation lives on the `oauth-config.ts` /
+// `oauth-api-handler.ts` / `worker.ts` side, coexisting as a separate auth path from this one
+// (see the comments in `oauth-config.ts` for details).
 import { eq } from 'drizzle-orm';
 import type { Db } from '../db';
 import { appMcpTokens } from '../db/schema';
@@ -24,7 +25,7 @@ function shortPrefix(token: string): string {
 	return `${token.slice(0, TOKEN_PREFIX.length + 6)}…`;
 }
 
-/** タイミング攻撃を避けるため、長さが同じでも常に全文字を比較してから結果を返す。 */
+/** To avoid timing attacks, always compares every character before returning a result, even when the lengths already match. */
 function timingSafeEqual(a: string, b: string): boolean {
 	if (a.length !== b.length) return false;
 	let diff = 0;
@@ -50,7 +51,7 @@ export async function getMcpTokenStatus(db: Db, appId: string): Promise<McpToken
 	};
 }
 
-/** 新しいBearerトークンを発行（既存があれば再発行=旧トークンは即座に失効）し、平文を1回だけ返す。 */
+/** Issues a new Bearer token (re-issuing if one already exists = the old token is invalidated immediately) and returns the plaintext exactly once. */
 export async function issueMcpToken(db: Db, appId: string, accountId?: string | null): Promise<string> {
 	const token = TOKEN_PREFIX + toBase64Url(crypto.getRandomValues(new Uint8Array(32)));
 	const tokenHash = await sha256Hex(token);
@@ -82,7 +83,7 @@ export async function verifyAppMcpToken(db: Db, appId: string, authHeader: strin
 	const hash = await sha256Hex(token);
 	if (!timingSafeEqual(hash, row.tokenHash)) return { ok: false, reason: 'invalid' };
 
-	// 最終利用日時の更新はベストエフォート（失敗しても認証結果には影響させない）。
+	// Updating the last-used timestamp is best-effort (a failure here doesn't affect the auth result).
 	db.update(appMcpTokens).set({ lastUsedAt: new Date() }).where(eq(appMcpTokens.appId, appId)).catch(() => {});
 	return { ok: true };
 }

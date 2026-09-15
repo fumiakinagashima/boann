@@ -21,7 +21,7 @@
 		triggerMessage?: string | null;
 		onTriggerConsumed?: () => void;
 	};
-	let { placeholder = 'AIに相談する…', onAction, context, triggerMessage = null, onTriggerConsumed }: Props = $props();
+	let { placeholder = 'Ask the AI…', onAction, context, triggerMessage = null, onTriggerConsumed }: Props = $props();
 
 	let messages = $state<Message[]>([]);
 	let input = $state('');
@@ -132,8 +132,8 @@
 	<div class="chat-messages" bind:this={listEl}>
 		{#if messages.length === 0}
 			<div class="chat-empty">
-				<p>AIに質問・指示できます</p>
-				<p class="hint">例: 「フィールドを追加して」「名前と日付のフィールドが必要」</p>
+				<p>Ask the AI a question or give it instructions</p>
+				<p class="hint">e.g. "Add a field" or "I need name and date fields"</p>
 			</div>
 		{/if}
 		{#each messages as msg (msg.id)}
@@ -173,7 +173,7 @@
 			rows="2"
 			disabled={loading}
 		></textarea>
-		<button class="send-btn" onclick={sendMessage} disabled={loading || !input.trim()} aria-label="送信">
+		<button class="send-btn" onclick={sendMessage} disabled={loading || !input.trim()} aria-label="Send">
 			<ArrowUp size={15} />
 		</button>
 	</div>

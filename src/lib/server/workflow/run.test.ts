@@ -38,11 +38,11 @@ describe('resolveOperand @input:', () => {
 	});
 
 	it('throws when the referenced key was not supplied', () => {
-		expect(() => resolveOperand('@input:missing', new Map(), [], undefined, undefined, { other: '1' })).toThrow('入力パラメータが指定されていません: missing');
+		expect(() => resolveOperand('@input:missing', new Map(), [], undefined, undefined, { other: '1' })).toThrow('Input parameter not supplied: missing');
 	});
 
 	it('throws when no inputArgs were passed at all', () => {
-		expect(() => resolveOperand('@input:customer_name', new Map(), [], undefined, undefined, undefined)).toThrow('入力パラメータが指定されていません: customer_name');
+		expect(() => resolveOperand('@input:customer_name', new Map(), [], undefined, undefined, undefined)).toThrow('Input parameter not supplied: customer_name');
 	});
 });
 
@@ -74,13 +74,13 @@ describe('computeSetResultValue', () => {
 
 	it('throws when the array value is not valid JSON', () => {
 		expect(() => computeSetResultValue('array', 'not json', 'set', new Map(), [])).toThrow(
-			'「set」の値が配列形式ではありません'
+			'The value of "set" is not in array format'
 		);
 	});
 
 	it('throws when the array value parses but is not an array', () => {
 		expect(() => computeSetResultValue('array', '{"a":1}', 'set', new Map(), [])).toThrow(
-			'「set」の値は配列で指定してください'
+			'The value of "set" must be specified as an array'
 		);
 	});
 

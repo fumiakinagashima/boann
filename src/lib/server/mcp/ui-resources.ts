@@ -1,15 +1,17 @@
 /**
- * MCP Apps（SEP-1865）用の ui:// リソース本体。list_<table>/get_<table> の結果を
- * チャット内にインラインでテーブル/詳細表示するための、テーブルに依存しない共通テンプレート。
- * 自己完結（インラインCSS/JS、外部リソースへの通信なし）。
+ * The ui:// resource body for MCP Apps (SEP-1865). A table-agnostic shared template for
+ * rendering list_<table>/get_<table> results inline in the chat as a table/detail view.
+ * Self-contained (inline CSS/JS, no communication with external resources).
  *
- * 仕様: https://modelcontextprotocol.io/seps/1865-mcp-apps-interactive-user-interfaces-for-mcp
- * (Boannが実装対象にしている版: https://github.com/modelcontextprotocol/ext-apps/blob/main/specification/2026-01-26/apps.mdx)
+ * Spec: https://modelcontextprotocol.io/seps/1865-mcp-apps-interactive-user-interfaces-for-mcp
+ * (Version Boann targets: https://github.com/modelcontextprotocol/ext-apps/blob/main/specification/2026-01-26/apps.mdx)
  *
- * 仕様が決めている部分: ui://スキームのリソースURI、`window.parent`とのpostMessageによる
- * JSON-RPC通信（`ui/initialize`ハンドシェイク、`ui/notifications/tool-result`通知）。
- * Boann独自の部分: render()以下の描画ロジック（テーブル/詳細のどちらで出すかの判定、
- * DOM構築、XSS対策でtextContentのみ使う方針）——ここは仕様が規定しない自由な実装領域。
+ * What the spec dictates: the ui:// scheme resource URI, JSON-RPC communication via
+ * postMessage with `window.parent` (the `ui/initialize` handshake, the
+ * `ui/notifications/tool-result` notification).
+ * Boann's own part: the rendering logic under render() (deciding whether to show a table or
+ * detail view, DOM construction, the policy of using only textContent for XSS protection) —
+ * this is free implementation territory the spec doesn't dictate.
  */
 
 export const RECORD_VIEW_URI = 'ui://boann/record-view';
@@ -64,7 +66,7 @@ export const RECORD_VIEW_HTML = `<!DOCTYPE html>
 </style>
 </head>
 <body>
-<div id="root"><p class="loading">読み込み中…</p></div>
+<div id="root"><p class="loading">Loading…</p></div>
 <script>
 (function () {
   var root = document.getElementById('root');
@@ -113,7 +115,7 @@ export const RECORD_VIEW_HTML = `<!DOCTYPE html>
   function renderTable(rows) {
     if (rows.length === 0) {
       root.innerHTML = '';
-      root.appendChild(Object.assign(document.createElement('p'), { className: 'empty', textContent: '該当するレコードがありません。' }));
+      root.appendChild(Object.assign(document.createElement('p'), { className: 'empty', textContent: 'No matching records.' }));
       return;
     }
     var keys = orderedKeys(rows[0]);
@@ -176,7 +178,7 @@ export const RECORD_VIEW_HTML = `<!DOCTYPE html>
     clientInfo: { name: 'boann-record-view', version: '0.1.0' },
     capabilities: {},
     appCapabilities: { availableDisplayModes: ['inline'] }
-  }).catch(function () { /* ホスト情報取得はベストエフォート。失敗しても描画は続行する */ });
+  }).catch(function () { /* Fetching host info is best-effort; rendering continues even on failure */ });
 })();
 </script>
 </body>

@@ -17,9 +17,10 @@ import { runWorkflowNow } from '../workflow/run';
 import type { ToolEnv } from '../tools/shared';
 import { RECORD_VIEW_URI } from './ui-resources';
 
-// フィールド名(readOnlyHint等4つ)自体はMCP仕様が定義するTool Annotationsの語彙で、Boannが
-// 名付けたものではない。「どのツールにどの値を割り当てるか」の判断はBoann側の設計。
-// 仕様: https://modelcontextprotocol.io/specification/2025-06-18/server/tools#annotations
+// The field names themselves (readOnlyHint and the other 3) are vocabulary defined by the
+// MCP spec's Tool Annotations — Boann did not name them. Deciding which value goes on which
+// tool is Boann's own design.
+// Spec: https://modelcontextprotocol.io/specification/2025-06-18/server/tools#annotations
 export type McpToolAnnotations = {
 	readOnlyHint?: boolean;
 	destructiveHint?: boolean;
@@ -27,8 +28,9 @@ export type McpToolAnnotations = {
 	openWorldHint?: boolean;
 };
 
-// McpTool型自体もMCPのtools/list結果(Toolオブジェクト)の形をなぞったもの。_metaのuiキーだけは
-// MCP Apps(SEP-1865)の拡張(ui-resources.tsのコメント参照)で、素のMCP仕様には無いフィールド。
+// The McpTool type itself mirrors the shape of an MCP tools/list result (a Tool object).
+// Only the _meta.ui key is an extension from MCP Apps (SEP-1865, see the comment in
+// ui-resources.ts) — a field that doesn't exist in the plain MCP spec.
 export type McpTool = {
 	name: string;
 	description: string;
@@ -38,16 +40,19 @@ export type McpTool = {
 	_meta?: { ui: { resourceUri: string; visibility?: ('model' | 'app')[] } };
 };
 
-// 各値そのものはBoannの判断(仕様は語彙を定義するだけで値の割り当ては規定しない)。
-// テーブルCRUDツールの注釈。closed worldなアプリ内データのみを操作するためopenWorldHint:falseで統一。
+// The values themselves are Boann's own judgment call (the spec only defines the
+// vocabulary, not how values get assigned).
+// Annotations for the table CRUD tools. Uniformly openWorldHint:false since these only
+// operate on closed-world data within the app.
 const READ_ANNOTATIONS: McpToolAnnotations = { readOnlyHint: true, openWorldHint: false };
 const CREATE_ANNOTATIONS: McpToolAnnotations = { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false };
 const UPDATE_ANNOTATIONS: McpToolAnnotations = { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false };
 const DELETE_ANNOTATIONS: McpToolAnnotations = { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false };
-// ワークフローはステップ内で外部API呼び出し・削除等の任意の操作を行いうるため保守的な既定値にする。
+// Workflows can perform arbitrary operations within their steps (external API calls,
+// deletes, etc.), so default to conservative annotations.
 const WORKFLOW_ANNOTATIONS: McpToolAnnotations = { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: true };
 
-/** list_<table>/get_<table> の結果をチャット内にテーブル/詳細表示するための共通MCP Appsテンプレート。 */
+/** Shared MCP Apps template for rendering list_<table>/get_<table> results as a table/detail view in the chat. */
 const RECORD_VIEW_META = { ui: { resourceUri: RECORD_VIEW_URI } };
 export type McpToolResult = {
 	content: { type: 'text'; text: string }[];
@@ -65,9 +70,10 @@ async function getAppTablesWithFields(db: Db, appId: string): Promise<TableInfo[
 }
 
 /**
- * MCPツールとして呼び出し可能なワークフロー（triggerType: 'mcp_tool' かつ enabled）を返す。
- * workflow.name はアプリ内一意でも英数字制限もないため、ツール名にはそのまま使えない
- * （entity_types.name のようなスラッグが存在しない）。代わりに id 先頭8文字（hex、衝突確率は無視できる）を使う。
+ * Returns the workflows callable as MCP tools (triggerType: 'mcp_tool' and enabled).
+ * workflow.name is unique within the app but has no alphanumeric restriction, so it can't
+ * be used directly as a tool name (there's no slug like entity_types.name has). Instead we
+ * use the first 8 hex characters of the id (the collision probability is negligible).
  */
 async function getAppWorkflowTools(db: Db, appId: string): Promise<WorkflowRow[]> {
 	const rows = await listWorkflowsByAppId(db, appId);
@@ -81,27 +87,29 @@ export async function listAppMcpTools(db: Db, appId: string): Promise<McpTool[]>
 	const workflows = await getAppWorkflowTools(db, appId);
 	const workflowTools: McpTool[] = workflows.map((w) => ({
 		name: `run_workflow_${w.id.slice(0, 8)}`,
-		description: w.description?.trim() || `ワークフロー「${w.name}」を実行する。`,
+		description: w.description?.trim() || `Runs the workflow "${w.name}".`,
 		inputSchema: toJsonSchema(buildEntityDataSchema(w.inputSchema, 'create')),
-		// resultはset_resultアクションで組み立てられる任意のキー・値（未使用のワークフローは空オブジェクト）。
+		// result is an arbitrary set of key/value pairs assembled by the set_result action
+		// (an empty object for workflows that don't use it).
 		outputSchema: toJsonSchema(z.object({ ok: z.boolean(), name: z.string(), result: z.record(z.string(), z.unknown()) })),
 		annotations: WORKFLOW_ANNOTATIONS
 	}));
 	const tableTools = tables.flatMap((t) => [
 		...(t.mcpRead ? [{
 			name: `list_${t.id}`,
-			description: `${t.label}のレコード一覧を取得する。`,
+			description: `Fetches a list of records from ${t.label}.`,
 			inputSchema: toJsonSchema(LIST_ARGS_SCHEMA),
-			// structuredContentはMCP仕様上オブジェクトである必要がある（配列は一部クライアントのバリデーションで拒否される。
-			// 実機確認: Pydantic系クライアントで"structuredContent Input should be a valid dictionary"エラーになった）。
-			// 仕様: https://modelcontextprotocol.io/specification/2025-06-18/server/tools
-			// (structuredContent: `{ [key: string]: unknown }`。配列は型として許容されない)
+			// structuredContent must be an object per the MCP spec (an array is rejected by
+			// some clients' validation — confirmed in practice: a Pydantic-based client raised
+			// a "structuredContent Input should be a valid dictionary" error).
+			// Spec: https://modelcontextprotocol.io/specification/2025-06-18/server/tools
+			// (structuredContent: `{ [key: string]: unknown }`. Arrays are not an allowed type.)
 			outputSchema: toJsonSchema(z.object({ records: z.array(buildRecordOutputSchema(t.fields)) })),
 			annotations: READ_ANNOTATIONS,
 			_meta: RECORD_VIEW_META
 		}, {
 			name: `get_${t.id}`,
-			description: `${t.label}のレコードを1件取得する。`,
+			description: `Fetches a single record from ${t.label}.`,
 			inputSchema: toJsonSchema(ID_ARGS_SCHEMA),
 			outputSchema: toJsonSchema(buildRecordOutputSchema(t.fields)),
 			annotations: READ_ANNOTATIONS,
@@ -109,21 +117,21 @@ export async function listAppMcpTools(db: Db, appId: string): Promise<McpTool[]>
 		}] : []),
 		...(t.mcpCreate ? [{
 			name: `create_${t.id}`,
-			description: `${t.label}にレコードを登録する。`,
+			description: `Creates a record in ${t.label}.`,
 			inputSchema: toJsonSchema(buildEntityDataSchema(t.fields, 'create')),
 			outputSchema: toJsonSchema(buildRecordOutputSchema(t.fields)),
 			annotations: CREATE_ANNOTATIONS
 		}] : []),
 		...(t.mcpUpdate ? [{
 			name: `update_${t.id}`,
-			description: `${t.label}のレコードを更新する（指定したフィールドのみ既存データにマージ）。`,
+			description: `Updates a record in ${t.label} (only the given fields are merged into the existing data).`,
 			inputSchema: toJsonSchema(z.object({ id: z.string().min(1) }).extend(buildEntityDataSchema(t.fields, 'update').shape)),
 			outputSchema: toJsonSchema(buildRecordOutputSchema(t.fields)),
 			annotations: UPDATE_ANNOTATIONS
 		}] : []),
 		...(t.mcpDelete ? [{
 			name: `delete_${t.id}`,
-			description: `${t.label}のレコードを削除する。`,
+			description: `Deletes a record from ${t.label}.`,
 			inputSchema: toJsonSchema(ID_ARGS_SCHEMA),
 			outputSchema: toJsonSchema(z.object({ deleted: z.boolean(), id: z.string() })),
 			annotations: DELETE_ANNOTATIONS
@@ -147,10 +155,12 @@ function formatZodError(e: z.ZodError): string {
 const TOOL_NAME_RE = /^(list|get|create|update|delete)_(.+)$/;
 
 /**
- * レコードが本当にこのテーブルに属するかを確認する。get/update/deleteはid単独で操作できてしまう
- * table-service.ts の既存実装をそのまま使うため、外部トークンという新しい信頼境界をまたぐこの層で
- * 必ずテーブル所有権を検証してから実処理に入る（他アプリ・他テーブルのレコードIDを渡された場合に
- * 誤って読み書き・削除してしまうのを防ぐ）。
+ * Verifies that a record actually belongs to this table. Since get/update/delete can
+ * operate on a record by id alone using the existing table-service.ts implementation as-is,
+ * this layer — which crosses the new trust boundary introduced by external tokens — must
+ * always verify table ownership before proceeding to the actual operation (this prevents
+ * accidentally reading, writing, or deleting a record when handed a record id belonging to
+ * a different app or table).
  */
 async function assertOwnedByTable(db: Db, table: TableInfo, id: string): Promise<boolean> {
 	return (await getRecordOwnerEntityTypeId(db, id)) === table.entityTypeId;
@@ -175,12 +185,13 @@ async function callWorkflowMcpTool(
 	if (!parsed.success) return toolError(formatZodError(parsed.error));
 
 	const result = await runWorkflowNow(db, workflow.id, env, undefined, parsed.data);
-	if (!result.ok) return toolError(result.error ?? '実行に失敗しました');
+	if (!result.ok) return toolError(result.error ?? 'Execution failed');
 	return toolOk({ ok: true, name: result.name, result: result.result });
 }
 
-// TODO: 全ツール呼び出し（テーブルCRUD含む）のコールログを永続化したい（2026-07-21、ユーザー要望）。
-// 現状はworkflow_runsがrun_workflow_*のみを記録。ここにログ記録フックを足すのが実装候補地。
+// TODO: persist a call log for all tool invocations, including table CRUD (2026-07-21,
+// requested by the user). Currently workflow_runs only records run_workflow_* calls. This
+// is the likely place to add a logging hook.
 export async function callAppMcpTool(
 	db: Db,
 	appId: string,
@@ -199,7 +210,7 @@ export async function callAppMcpTool(
 	const table = tables.find((t) => t.id === tableId);
 	if (!table) return toolError(`Unknown table: ${tableId}`);
 
-	const NOT_FOUND = 'レコードが見つかりません';
+	const NOT_FOUND = 'Record not found';
 
 	switch (action) {
 		case 'list': {
@@ -229,8 +240,9 @@ export async function callAppMcpTool(
 			const dataParsed = buildEntityDataSchema(table.fields, 'update').safeParse(rest);
 			if (!dataParsed.success) return toolError(formatZodError(dataParsed.error));
 			if (!(await assertOwnedByTable(db, table, idParsed.data.id))) return toolError(NOT_FOUND);
-			// updateRecordByEntityTypeId は既存データとマージせず渡したフィールドで data 列を丸ごと
-			// 上書きするため（内部AIツールの handleUpdateEntity とは異なる挙動）、ここで明示的にマージする。
+			// updateRecordByEntityTypeId overwrites the entire data column with the fields
+			// passed in, rather than merging with existing data (this differs from the
+			// internal AI tool's handleUpdateEntity), so we merge explicitly here.
 			const existing = await getRecord(db, table.id, idParsed.data.id);
 			return toolOk(
 				await updateRecordByEntityTypeId(db, table.entityTypeId, idParsed.data.id, { ...existing, ...dataParsed.data })

@@ -54,7 +54,7 @@ export type EmailSetup = {
 	signature?: string;
 };
 
-// DBに保存する設定。プロバイダーごとの設定をすべて保持し、`provider` で現在の選択を切り替える
+// Configuration stored in the DB. Holds settings for every provider, with `provider` switching which one is currently selected
 export type EmailProviderConfigMap = {
 	resend?: Record<string, string>;
 	ses?: Record<string, string>;
@@ -133,7 +133,7 @@ export async function getEmailSetupFromDb(db: Db): Promise<EmailSetup | null> {
 	};
 }
 
-// DB設定（/settings/email）を優先し、未設定の場合は環境変数にフォールバックする
+// Prioritizes the DB configuration (/settings/email), falling back to environment variables if not set
 export async function getEmailSetup(db: Db, env?: EmailEnv): Promise<EmailSetup | null> {
 	return (await getEmailSetupFromDb(db)) ?? getEmailSetupFromEnv(env ?? {});
 }

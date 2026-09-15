@@ -15,17 +15,17 @@
 	let editorRef = $state<EditorRef | null>(null);
 
 	function confirmDeleteWorkflow(e: SubmitEvent) {
-		if (!confirm(`ワークフロー「${data.workflow.name}」を削除しますか？`)) e.preventDefault();
+		if (!confirm(`Delete the workflow "${data.workflow.name}"?`)) e.preventDefault();
 	}
 
-	// 保存処理（WorkflowEditor から移管）。このページは既存ワークフローの編集なので常に PATCH。
+	// Save logic (migrated from WorkflowEditor). This page always edits an existing workflow, so it's always a PATCH.
 	let saving = $state(false);
 	async function handleSave() {
 		if (saving || !editorRef) return;
 		const state = editorRef.getState();
 		const name = state.name.trim();
 		if (!name) {
-			toast.error('ワークフロー名を入力してください');
+			toast.error('Enter a workflow name');
 			return;
 		}
 		const validation = validateWorkflow(state.triggerType ?? 'schedule', state.triggerHour, state.triggerMinute, state.triggerEntityTypeId, state.steps, data.entityTypes, data.slackIntegrations, state.inputSchema ?? [], data.integrations);
@@ -41,12 +41,12 @@
 				body: JSON.stringify({ ...state, name, enabled: editorRef.getEnabled() })
 			});
 			if (!res.ok) {
-				throw new Error(((await res.json()) as { error?: string }).error ?? '更新に失敗しました');
+				throw new Error(((await res.json()) as { error?: string }).error ?? 'Failed to update');
 			}
-			toast.success(`「${name}」を更新しました`);
+			toast.success(`Updated "${name}"`);
 			await invalidateAll();
 		} catch (e) {
-			toast.error(e instanceof Error ? e.message : '更新に失敗しました');
+			toast.error(e instanceof Error ? e.message : 'Failed to update');
 		} finally {
 			saving = false;
 		}
@@ -75,10 +75,10 @@
 			<a href="/apps/{data.app.id}" class="back-link"><ChevronLeft size={15} />{data.app.label}</a>
 			<div class="header-actions">
 				<form method="POST" action="?/delete" onsubmit={confirmDeleteWorkflow} class="delete-form">
-					<button type="submit" class="btn-danger-ghost">削除</button>
+					<button type="submit" class="btn-danger-ghost">Delete</button>
 				</form>
 				<button class="btn-save" onclick={handleSave} disabled={saving}>
-					{saving ? '保存中…' : '保存'}
+					{saving ? 'Saving…' : 'Save'}
 				</button>
 			</div>
 		</div>

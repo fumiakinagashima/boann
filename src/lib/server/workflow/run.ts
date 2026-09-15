@@ -21,35 +21,37 @@ export type TriggerContext = {
 	event: TriggerEvent;
 	recordId: string;
 	entityTypeId: string;
-	/** トリガーとなったレコードのフィールド値スナップショット（@trigger:<field> で参照する）。 */
+	/** Snapshot of the triggering record's field values (referenced via @trigger:<field>). */
 	data?: Record<string, unknown>;
 };
 
-/** ワークフロー登録者自身の情報。selfEmail は send_email の宛先、accountId は @self:account_id の解決に使う。 */
+/** Info about the workflow's own registrant. selfEmail is used as the recipient for send_email, accountId to resolve @self:account_id. */
 type SelfContext = { email: string | null; accountId: string | null };
 
 /**
- * raw は「抽出前の生の値」（オブジェクト/配列等）で、`@step:<id>.<path>` によるプロパティアクセス用。
- * 現状call_external_apiだけが設定する（他アクションの結果はもともとスカラーで分解する意味が無い）。
+ * raw holds the "raw value before extraction" (object/array/etc.) for property access via
+ * `@step:<id>.<path>`. Currently only call_external_api sets this (other actions' results are
+ * already scalar, so there's no point decomposing them).
  */
 type StepResult = { type: WorkflowResultType; value: boolean | number | string; raw?: unknown };
 type ListResults = Map<string, Record<string, unknown>[]>;
-/** ネストしたforeachの「現在の項目」をforeachのidごとに積んだスタック。配列の末尾が最も内側のforeach。 */
+/** Stack of the "current item" for nested foreach, keyed per foreach id. The end of the array is the innermost foreach. */
 type ItemStack = { foreachStepId: string; item: Record<string, unknown> }[];
 
-/** ワークフロー実行を即時中断させるためのエラー（未定義の変数参照・未対応ツール等）。 */
+/** Error used to immediately abort workflow execution (e.g. referencing an undefined variable, an unsupported tool, etc.). */
 class WorkflowAbortError extends Error {}
 
 /**
- * ネストしたforeachの組み合わせ爆発（例: 50件×50件×50件の3段ネスト）を防ぐための、
- * 1回の実行全体で許容するアクション実行回数の残量。runSteps/runForeachの再帰全体で1つを共有する。
+ * The remaining budget of action executions allowed across a single run, used to prevent a
+ * combinatorial explosion from nested foreach (e.g. a 3-level nest of 50 x 50 x 50 items).
+ * A single instance is shared across the whole runSteps/runForeach recursion.
  */
 type Budget = { remaining: number };
 
 function consumeBudget(budget: Budget): void {
 	if (budget.remaining <= 0) {
 		throw new WorkflowAbortError(
-			`1回の実行で許容するアクション数の上限（${WORKFLOW_MAX_ACTIONS_PER_RUN}）を超えました。foreachのネストやリトライ回数を減らしてください`
+			`The limit on the number of actions allowed in a single run (${WORKFLOW_MAX_ACTIONS_PER_RUN}) was exceeded. Please reduce foreach nesting or retry counts`
 		);
 	}
 	budget.remaining--;
@@ -59,14 +61,15 @@ function sleep(ms: number): Promise<void> {
 	return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-/** set_resultが組み立てる、ワークフロー実行全体の結果オブジェクト（run_workflow_*のMCPレスポンス・「今すぐ実行」の結果表示に使う）。 */
+/** The result object assembled by set_result for the whole workflow run (used in the run_workflow_* MCP response and the "run now" result display). */
 type ResultObject = Record<string, unknown>;
 
 /**
- * set_resultの value フィールドを解決する。scalarは単一のoperand（@step:等の参照も可）、
- * arrayはJSON配列（文字列要素のみ@refとして解決、それ以外はそのまま）。
- * エディタが書き込むvalue（配列時はJSON.stringifyされた文字列配列）を前提にしており、
- * preQuoteReferences相当のクォート補完は不要（エディタが常に正しくクォートされたJSONを書く）。
+ * Resolves the value field of set_result. scalar is a single operand (references such as @step:
+ * are also allowed); array is a JSON array (only string elements are resolved as @refs, everything
+ * else is passed through as-is). Assumes the value written by the editor (a JSON.stringify'd string
+ * array in the array case), so preQuoteReferences-style quote completion is not needed (the editor
+ * always writes correctly quoted JSON).
  */
 export function computeSetResultValue(
 	valueType: 'scalar' | 'array',
@@ -83,9 +86,9 @@ export function computeSetResultValue(
 		try {
 			items = JSON.parse(rawValue || '[]');
 		} catch {
-			throw new WorkflowAbortError(`「${label}」の値が配列形式ではありません`);
+			throw new WorkflowAbortError(`The value of "${label}" is not in array format`);
 		}
-		if (!Array.isArray(items)) throw new WorkflowAbortError(`「${label}」の値は配列で指定してください`);
+		if (!Array.isArray(items)) throw new WorkflowAbortError(`The value of "${label}" must be specified as an array`);
 		return items.map((v) =>
 			typeof v === 'string' ? resolveOperand(v, results, itemStack, triggerContext, self, inputArgs).value : v
 		);
@@ -94,9 +97,10 @@ export function computeSetResultValue(
 }
 
 /**
- * call_external_apiのレスポンスボディ(結果を格納する時)や`@step:<id>.<path>`参照でresolveJsonPathが
- * 取り出した値(型不明)をStepResultへ変換する。boolean/number/string以外(オブジェクト・配列・
- * null・undefined)はJSON文字列表現に落とす(値が確認できないより文字列化されている方が実用的なため)。
+ * Converts a value (of unknown type) extracted by resolveJsonPath — whether from the response body
+ * of call_external_api (when storing the result) or via a `@step:<id>.<path>` reference — into a
+ * StepResult. Anything other than boolean/number/string (object, array, null, undefined) is dropped
+ * to its JSON string representation (a stringified value is more useful than one you can't inspect).
  */
 function coerceScalarResult(value: unknown): StepResult {
 	if (typeof value === 'boolean') return { type: 'boolean', value };
@@ -106,11 +110,11 @@ function coerceScalarResult(value: unknown): StepResult {
 	return { type: 'string', value: JSON.stringify(value) };
 }
 
-// preQuoteReferences は $lib/workflow-tools（サーバー専用依存を持たない共有カタログ）に定義されている。
-// run.test.ts が従来 './run' からimportしているため、後方互換のためここで再エクスポートする。
+// preQuoteReferences is defined in $lib/workflow-tools (a shared catalog with no server-only dependencies).
+// run.test.ts historically imports it from './run', so it is re-exported here for backward compatibility.
 export { preQuoteReferences };
 
-/** JSON.parse 済みの data オブジェクト内の文字列値に含まれる @参照を解決する。 */
+/** Resolves @references contained in string values within an already-JSON.parse'd data object. */
 function resolveDataValues(
 	data: Record<string, unknown>,
 	results: Map<string, StepResult>,
@@ -139,27 +143,27 @@ export function resolveOperand(
 	inputArgs?: Record<string, unknown>
 ): StepResult {
 	if (operand.startsWith('@trigger:')) {
-		if (!triggerContext) throw new WorkflowAbortError('@trigger参照はイベントトリガーでのみ使用できます');
+		if (!triggerContext) throw new WorkflowAbortError('@trigger references can only be used with an event trigger');
 		const field = operand.slice('@trigger:'.length);
 		if (field === 'id') return { type: 'string', value: triggerContext.recordId };
 		if (field === 'event') return { type: 'string', value: triggerContext.event };
 		const v = triggerContext.data?.[field];
-		if (v === undefined) throw new WorkflowAbortError(`トリガーレコードに存在しないフィールドです: ${field}`);
+		if (v === undefined) throw new WorkflowAbortError(`This field does not exist on the trigger record: ${field}`);
 		const type: WorkflowResultType = typeof v === 'number' ? 'number' : typeof v === 'boolean' ? 'boolean' : 'string';
 		return { type, value: (v as boolean | number | string) ?? '' };
 	}
 	if (operand.startsWith('@self:')) {
 		const field = operand.slice('@self:'.length);
 		if (field === 'account_id') {
-			if (!self?.accountId) throw new WorkflowAbortError('@self:account_id はワークフローの登録者が特定できないため使用できません');
+			if (!self?.accountId) throw new WorkflowAbortError('@self:account_id cannot be used because the workflow\'s registrant could not be identified');
 			return { type: 'string', value: self.accountId };
 		}
-		throw new WorkflowAbortError(`未知の@self参照です: ${field}`);
+		throw new WorkflowAbortError(`Unknown @self reference: ${field}`);
 	}
 	if (operand.startsWith('@input:')) {
 		const key = operand.slice('@input:'.length);
 		const v = inputArgs?.[key];
-		if (v === undefined) throw new WorkflowAbortError(`入力パラメータが指定されていません: ${key}`);
+		if (v === undefined) throw new WorkflowAbortError(`Input parameter not supplied: ${key}`);
 		const type: WorkflowResultType = typeof v === 'number' ? 'number' : typeof v === 'boolean' ? 'boolean' : 'string';
 		return { type, value: (v as boolean | number | string) ?? '' };
 	}
@@ -168,24 +172,25 @@ export function resolveOperand(
 		const scope = itemRef.foreachStepId
 			? itemStack.find((s) => s.foreachStepId === itemRef.foreachStepId)
 			: itemStack[itemStack.length - 1];
-		if (!scope) throw new WorkflowAbortError(`@item参照はforeachの中でのみ使用できます: ${operand}`);
+		if (!scope) throw new WorkflowAbortError(`@item reference can only be used inside a foreach: ${operand}`);
 		const v = scope.item[itemRef.field];
-		if (v === undefined) throw new WorkflowAbortError(`現在の項目に存在しないフィールドです: ${itemRef.field}`);
+		if (v === undefined) throw new WorkflowAbortError(`This field does not exist on the current item: ${itemRef.field}`);
 		const type: WorkflowResultType = typeof v === 'number' ? 'number' : typeof v === 'boolean' ? 'boolean' : 'string';
 		return { type, value: (v as boolean | number | string) ?? '' };
 	}
 	const stepRef = parseStepRef(operand);
 	if (stepRef === null) return { type: 'string', value: operand };
 	const found = results.get(stepRef.id);
-	if (!found) throw new WorkflowAbortError(`参照先のステップ結果が見つかりません: ${stepRef.id}`);
+	if (!found) throw new WorkflowAbortError(`Could not find the result of the referenced step: ${stepRef.id}`);
 	if (stepRef.path === null) return found;
-	// `@step:<id>.<path>` — rawが無いアクション（大半のツール、もともと分解不要なスカラーのみ返す）に
-	// パスを指定した場合はエラーにする（@item参照が存在しないフィールドでエラーになるのと同じ扱い）。
+	// `@step:<id>.<path>` — for an action with no raw (most tools return only an already-scalar
+	// value that doesn't need decomposing), specifying a path is an error (the same treatment as
+	// an @item reference to a field that doesn't exist).
 	if (found.raw === undefined) {
-		throw new WorkflowAbortError(`「${stepRef.id}」の結果はフィールドを指定して参照できません（call_external_api以外は非対応）: ${operand}`);
+		throw new WorkflowAbortError(`The result of "${stepRef.id}" cannot be referenced by field (only call_external_api supports this): ${operand}`);
 	}
 	const resolved = resolveJsonPath(found.raw, stepRef.path);
-	if (resolved === undefined) throw new WorkflowAbortError(`指定したフィールドが見つかりません: ${operand}`);
+	if (resolved === undefined) throw new WorkflowAbortError(`The specified field was not found: ${operand}`);
 	return coerceScalarResult(resolved);
 }
 
@@ -199,11 +204,12 @@ export function compare(left: StepResult, operator: string, right: StepResult): 
 	if (operator === '==') return lv === rv;
 	if (operator === '!=') return lv !== rv;
 	if (operator !== '>' && operator !== '<' && operator !== '>=' && operator !== '<=') {
-		throw new WorkflowAbortError(`未対応の演算子です: ${operator}`);
+		throw new WorkflowAbortError(`Unsupported operator: ${operator}`);
 	}
-	// 順序比較: left.type が 'string' でも、両辺が数値として解釈できれば数値比較する。
-	// CSV取り込みや create_entity の JSON data 等で数値が文字列化されているケースを
-	// 素のJS文字列比較（辞書順、例: "10" > "9" が false になる）で誤判定しないため。
+	// Order comparison: even when left.type is 'string', compare numerically if both sides can be
+	// interpreted as numbers. This avoids misjudging cases where numbers have been stringified (e.g.
+	// via CSV import or create_entity's JSON data) using plain JS string comparison (lexicographic,
+	// where e.g. "10" > "9" would be false).
 	const ln = typeof lv === 'number' ? lv : Number(lv);
 	const rn = typeof rv === 'number' ? rv : Number(rv);
 	const numeric = !Number.isNaN(ln) && !Number.isNaN(rn);
@@ -222,9 +228,10 @@ export function compare(left: StepResult, operator: string, right: StepResult): 
 }
 
 /**
- * ステップを1回だけ実行する（リトライの単位）。設定不備（対象未選択・JSON不正等）は
- * WorkflowAbortErrorを投げてリトライさせない。それ以外の例外（外部API呼び出し失敗等）は
- * 呼び出し元（runAction）のリトライループが一時的な障害とみなして再試行しうる。
+ * Runs a step exactly once (the unit of retry). A configuration problem (no target selected,
+ * malformed JSON, etc.) throws WorkflowAbortError so it is not retried. Any other exception (e.g. an
+ * external API call failure) is treated by the caller's (runAction's) retry loop as a possibly
+ * transient failure that may be retried.
  */
 async function performAction(
 	db: Db,
@@ -239,66 +246,68 @@ async function performAction(
 	triggerContext?: TriggerContext,
 	inputArgs?: Record<string, unknown>
 ): Promise<{ result?: string }> {
-	// 検証用（一時的）: 解決済みの値をdevサーバーのターミナルにconsole.logするだけのデバッグアクション。
-	// 本番運用には意味が無い(出力先はローカルdevのターミナルのみ)ため、不要になったら削除して良い。
+	// For verification only (temporary): a debug action that just console.logs the resolved value to
+	// the dev server's terminal. Meaningless in production (its output only goes to the local dev
+	// terminal), so it's fine to remove once no longer needed.
 	if (step.tool === 'console_log') {
 		const value = resolvedParams['value'];
-		console.log(`[workflow debug] 「${step.label}」:`, value);
+		console.log(`[workflow debug] "${step.label}":`, value);
 		return { result: String(value) };
 	}
 
-	// エンティティ書き込み操作はMCPツールを介さずDBサービスを直接呼ぶ
+	// Entity write operations call the DB service directly, bypassing the MCP tools
 	if (step.tool === 'create_entity') {
 		const entityTypeId = step.params?.entity_type_id;
-		if (!entityTypeId) throw new WorkflowAbortError(`「${step.label}」の対象テーブルが選択されていません`);
+		if (!entityTypeId) throw new WorkflowAbortError(`No target table is selected for "${step.label}"`);
 		const rawDataStr = step.params?.['data'] ?? '';
-		if (!rawDataStr) throw new WorkflowAbortError(`「${step.label}」のデータが指定されていません`);
+		if (!rawDataStr) throw new WorkflowAbortError(`No data is specified for "${step.label}"`);
 		let data: Record<string, unknown>;
-		try { data = JSON.parse(preQuoteReferences(rawDataStr)); } catch { throw new WorkflowAbortError(`「${step.label}」のデータがJSON形式ではありません`); }
+		try { data = JSON.parse(preQuoteReferences(rawDataStr)); } catch { throw new WorkflowAbortError(`The data for "${step.label}" is not in JSON format`); }
 		data = resolveDataValues(data, results, itemStack, triggerContext, self, inputArgs);
 		const record = await createRecordByEntityTypeId(db, entityTypeId, data, env?.accountId);
-		return { result: `レコード作成完了（id: ${record.id}）` };
+		return { result: `Record created (id: ${record.id})` };
 	}
 
 	if (step.tool === 'update_entity') {
 		const entityTypeId = step.params?.entity_type_id;
-		if (!entityTypeId) throw new WorkflowAbortError(`「${step.label}」の対象テーブルが選択されていません`);
+		if (!entityTypeId) throw new WorkflowAbortError(`No target table is selected for "${step.label}"`);
 		const recordId = resolvedParams['id'] as string | undefined;
-		if (!recordId) throw new WorkflowAbortError(`「${step.label}」のレコードIDが指定されていません`);
+		if (!recordId) throw new WorkflowAbortError(`No record ID is specified for "${step.label}"`);
 		const rawDataStr = step.params?.['data'] ?? '';
-		if (!rawDataStr) throw new WorkflowAbortError(`「${step.label}」のデータが指定されていません`);
+		if (!rawDataStr) throw new WorkflowAbortError(`No data is specified for "${step.label}"`);
 		let data: Record<string, unknown>;
-		try { data = JSON.parse(preQuoteReferences(rawDataStr)); } catch { throw new WorkflowAbortError(`「${step.label}」のデータがJSON形式ではありません`); }
+		try { data = JSON.parse(preQuoteReferences(rawDataStr)); } catch { throw new WorkflowAbortError(`The data for "${step.label}" is not in JSON format`); }
 		data = resolveDataValues(data, results, itemStack, triggerContext, self, inputArgs);
 		await updateRecordByEntityTypeId(db, entityTypeId, recordId, data, env?.accountId);
-		return { result: `レコード更新完了（id: ${recordId}）` };
+		return { result: `Record updated (id: ${recordId})` };
 	}
 
 	if (step.tool === 'delete_entity') {
 		const entityTypeId = step.params?.entity_type_id;
-		if (!entityTypeId) throw new WorkflowAbortError(`「${step.label}」の対象テーブルが選択されていません`);
+		if (!entityTypeId) throw new WorkflowAbortError(`No target table is selected for "${step.label}"`);
 		const recordId = resolvedParams['id'] as string | undefined;
-		if (!recordId) throw new WorkflowAbortError(`「${step.label}」のレコードIDが指定されていません`);
+		if (!recordId) throw new WorkflowAbortError(`No record ID is specified for "${step.label}"`);
 		await deleteRecord(db, '', recordId);
-		return { result: `レコード削除完了（id: ${recordId}）` };
+		return { result: `Record deleted (id: ${recordId})` };
 	}
 
-	// call_external_apiは`integrations`(Slack通知等、通知目的の連携)テーブルではなく、
-	// 専用のexternal_api_connectionsテーブル(2026-07-22追加)を参照する。dispatchTool経由の
-	// 内部AIツール(tools/integrations.tsのcall_external_api、authType別の認証設定を持つ別システム)
-	// とは実装を完全に分離し、ここで直接HTTP呼び出しを行う。
+	// call_external_api references the dedicated external_api_connections table (added 2026-07-22),
+	// not the `integrations` table (used for notification-oriented integrations like Slack). This is
+	// implemented completely separately from the internal AI tool reached via dispatchTool
+	// (call_external_api in tools/integrations.ts, a distinct system with per-authType auth config);
+	// it makes the HTTP call directly here.
 	if (step.tool === 'call_external_api') {
-		// connection_id相当。カタログのparamsには含めず、エディタの「対象」選択で直接 step.params に設定される
+		// Equivalent to connection_id. Not included in the catalog's params; set directly on step.params via the editor's "target" selector
 		const connectionId = step.params?.integration_id;
-		if (!connectionId) throw new WorkflowAbortError(`「${step.label}」の連携先が選択されていません`);
+		if (!connectionId) throw new WorkflowAbortError(`No integration target is selected for "${step.label}"`);
 		const connection = await getExternalApiConnection(db, connectionId);
-		if (!connection) throw new WorkflowAbortError(`「${step.label}」の連携先が見つかりません（削除された可能性があります）`);
+		if (!connection) throw new WorkflowAbortError(`The integration target for "${step.label}" was not found (it may have been deleted)`);
 
 		const rawBodyStr = step.params?.['body'] ?? '';
 		let body: Record<string, unknown> | undefined;
 		if (rawBodyStr) {
 			let parsedBody: Record<string, unknown>;
-			try { parsedBody = JSON.parse(preQuoteReferences(rawBodyStr)); } catch { throw new WorkflowAbortError(`「${step.label}」のリクエストボディがJSON形式ではありません`); }
+			try { parsedBody = JSON.parse(preQuoteReferences(rawBodyStr)); } catch { throw new WorkflowAbortError(`The request body for "${step.label}" is not in JSON format`); }
 			body = resolveDataValues(parsedBody, results, itemStack, triggerContext, self, inputArgs);
 		}
 
@@ -308,28 +317,29 @@ async function performAction(
 			body
 		});
 
-		// スカラー結果は常にレスポンスボディ全体(coerceScalarResultがオブジェクトはJSON文字列化する)。
-		// rawには分解前の値（オブジェクト/配列等）を保持し、参照側で`@step:<id>.<path>`によりフィールド・
-		// 配列要素を辿る（result_path/list_pathのようなステップ定義時のフィールド抽出設定は廃止した。
-		// 参照側でパス指定できるので、ステップ側で事前に決め打つ必要が無いため — 2026-07-22）。
+		// The scalar result is always the entire response body (coerceScalarResult JSON-stringifies an
+		// object). raw retains the pre-decomposition value (object/array/etc.); the reference side
+		// walks fields/array elements via `@step:<id>.<path>` (the step-definition-time field
+		// extraction settings like result_path/list_path have been removed, since the reference side
+		// can specify the path, there's no need to hard-code it on the step side — 2026-07-22).
 		results.set(step.id, { ...coerceScalarResult(raw.body), raw: raw.body });
 
-		return { result: `外部API呼び出し完了（ステータス: ${raw.status}）` };
+		return { result: `External API call complete (status: ${raw.status})` };
 	}
 
 	let input: Record<string, unknown> = resolvedParams;
 	if (step.tool === 'send_email') {
-		if (!self.email) throw new WorkflowAbortError('送信先（自分のメールアドレス）が特定できません');
+		if (!self.email) throw new WorkflowAbortError('Could not identify the recipient (your own email address)');
 		input = { ...resolvedParams, to: self.email };
 	} else if (step.tool === 'get_entities') {
-		// entity_type_id はカタログのparamsに含めず、エディタの「対象」選択で直接 step.params に設定される
+		// entity_type_id is not included in the catalog's params; it's set directly on step.params via the editor's "target" selector
 		const entityTypeId = step.params?.entity_type_id;
-		if (!entityTypeId) throw new WorkflowAbortError(`「${step.label}」の対象テーブルが選択されていません`);
+		if (!entityTypeId) throw new WorkflowAbortError(`No target table is selected for "${step.label}"`);
 		input = { ...resolvedParams, entity_type_id: entityTypeId };
 	} else if (step.tool === 'send_slack_notification') {
-		// integration_id はカタログのparamsに含めず、エディタの「対象」選択で直接 step.params に設定される
+		// integration_id is not included in the catalog's params; it's set directly on step.params via the editor's "target" selector
 		const integrationId = step.params?.integration_id;
-		if (!integrationId) throw new WorkflowAbortError(`「${step.label}」のSlack連携先が選択されていません`);
+		if (!integrationId) throw new WorkflowAbortError(`No Slack integration target is selected for "${step.label}"`);
 		input = { ...resolvedParams, integration_id: integrationId };
 	}
 
@@ -357,7 +367,7 @@ async function runAction(
 	inputArgs?: Record<string, unknown>
 ): Promise<{ result?: string; attempts: number }> {
 	const toolDef = getWorkflowActionTool(step.tool);
-	if (!toolDef) throw new WorkflowAbortError(`未対応のツールです: ${step.tool}`);
+	if (!toolDef) throw new WorkflowAbortError(`Unsupported tool: ${step.tool}`);
 
 	const resolvedParams: Record<string, string | number> = {};
 	for (const field of toolDef.params) {
@@ -367,16 +377,18 @@ async function runAction(
 		if (field.type === 'number') {
 			resolvedParams[field.key] = Number(value);
 		} else if (field.type === 'date' && typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value)) {
-			// <input type="date"> の "YYYY-MM-DD" は new Date() でUTC深夜と解釈されJSTと9時間ズレるため、
-			// JSTのウォールクロックとして明示的にオフセットを付与する（until は当日いっぱいを含めるため終端時刻にする）
+			// The "YYYY-MM-DD" from <input type="date"> gets interpreted by new Date() as UTC midnight,
+			// which is 9 hours off from JST, so explicitly attach an offset to treat it as JST wall-clock
+			// time (for "until", use the end-of-day time so the whole day is included).
 			resolvedParams[field.key] = `${value}T${field.key === 'until' ? '23:59:59' : '00:00:00'}+09:00`;
 		} else {
 			resolvedParams[field.key] = String(value);
 		}
 	}
 
-	// maxRetriesはユーザー入力なのでWORKFLOW_MAX_RETRIESで上限をクランプする（validateWorkflowで
-	// 弾いているはずだが、AI生成データ等バリデーションを経由しない経路への防御として二重にチェックする）。
+	// maxRetries comes from user input, so clamp it to the ceiling with WORKFLOW_MAX_RETRIES
+	// (validateWorkflow should already reject values exceeding it, but this is a second check as a
+	// defense for paths that bypass validation, such as AI-generated data).
 	const maxAttempts = 1 + Math.min(Math.max(step.maxRetries ?? 0, 0), WORKFLOW_MAX_RETRIES);
 	let lastError: unknown;
 	for (let attempt = 1; attempt <= maxAttempts; attempt++) {
@@ -386,7 +398,8 @@ async function runAction(
 			return { result, attempts: attempt };
 		} catch (e) {
 			lastError = e;
-			// 設定不備（対象未選択・JSON不正等）はリトライしても同じ結果になるだけなので即座に諦める。
+			// A configuration problem (no target selected, malformed JSON, etc.) will just produce the
+			// same result on retry, so give up immediately.
 			if (e instanceof WorkflowAbortError) break;
 			if (attempt < maxAttempts) await sleep(WORKFLOW_RETRY_DELAY_MS);
 		}
@@ -395,10 +408,11 @@ async function runAction(
 }
 
 /**
- * foreachのsourceを解決する。`@step:<id>`（パス無し）はget_entities等、静的にlistResultを持つ
- * アクションの一覧をそのまま使う。`@step:<id>.<path>`はcall_external_api等、rawを保持するステップの
- * 生の値からresolveJsonPathで配列を取り出す（result_path/list_pathの代わり。参照側でパスを指定できる
- * ので、ステップ側で事前に「一覧として取り出すフィールド」を決め打つ必要が無い — 2026-07-22）。
+ * Resolves a foreach's source. `@step:<id>` (no path) uses the list of a step that statically holds
+ * a listResult as-is, such as get_entities. `@step:<id>.<path>` uses resolveJsonPath to pull an array
+ * out of the raw value of a step that retains raw, such as call_external_api (in place of
+ * result_path/list_path — since the reference side can specify the path, there's no need to
+ * pre-decide the "field to extract as a list" on the step side — 2026-07-22).
  */
 function resolveForeachSource(
 	stepRef: { id: string; path: string | null },
@@ -408,15 +422,15 @@ function resolveForeachSource(
 ): Record<string, unknown>[] {
 	if (stepRef.path === null) {
 		const items = listResults.get(stepRef.id);
-		if (!items) throw new WorkflowAbortError(`「${label}」の参照先のリスト結果が見つかりません: ${stepRef.id}`);
+		if (!items) throw new WorkflowAbortError(`Could not find the list result referenced by "${label}": ${stepRef.id}`);
 		return items;
 	}
 	const found = results.get(stepRef.id);
 	if (!found || found.raw === undefined) {
-		throw new WorkflowAbortError(`「${label}」の参照先はフィールドを指定して参照できません（call_external_api以外は非対応）: ${stepRef.id}`);
+		throw new WorkflowAbortError(`The reference target of "${label}" cannot be referenced by field (only call_external_api supports this): ${stepRef.id}`);
 	}
 	const resolved = resolveJsonPath(found.raw, stepRef.path);
-	if (!Array.isArray(resolved)) throw new WorkflowAbortError(`「${label}」の参照先は配列ではありません: ${stepRef.id}.${stepRef.path}`);
+	if (!Array.isArray(resolved)) throw new WorkflowAbortError(`The reference target of "${label}" is not an array: ${stepRef.id}.${stepRef.path}`);
 	return resolved.map((item) =>
 		item && typeof item === 'object' && !Array.isArray(item) ? (item as Record<string, unknown>) : { value: item }
 	);
@@ -437,7 +451,7 @@ async function runForeach(
 	inputArgs?: Record<string, unknown>
 ): Promise<void> {
 	const stepRef = parseStepRef(step.source);
-	if (!stepRef) throw new WorkflowAbortError(`「${step.label}」の対象が選択されていません`);
+	if (!stepRef) throw new WorkflowAbortError(`No target is selected for "${step.label}"`);
 	const items = resolveForeachSource(stepRef, step.label, results, listResults);
 	for (const item of items.slice(0, WORKFLOW_FOREACH_MAX_ITEMS)) {
 		await runSteps(db, step.body, results, listResults, env, self, [...itemStack, { foreachStepId: step.id, item }], budget, logs, resultObj, triggerContext, inputArgs);
@@ -489,9 +503,9 @@ async function runSteps(
 			const start = Date.now();
 			try {
 				consumeBudget(budget);
-				if (!step.key) throw new WorkflowAbortError(`「${step.label}」のキー名が指定されていません`);
+				if (!step.key) throw new WorkflowAbortError(`No key name is specified for "${step.label}"`);
 				setResultPath(resultObj, step.key, computeSetResultValue(step.valueType, step.value, step.label, results, itemStack, triggerContext, self, inputArgs));
-				logs.push({ id: step.id, label: step.label, ok: true, result: `「${step.key}」をセットしました`, ms: Date.now() - start });
+				logs.push({ id: step.id, label: step.label, ok: true, result: `Set "${step.key}"`, ms: Date.now() - start });
 			} catch (e) {
 				const error = e instanceof Error ? e.message : String(e);
 				logs.push({ id: step.id, label: step.label, ok: false, error, ms: Date.now() - start });
@@ -507,16 +521,19 @@ export type WorkflowRunResult = { id: string; name: string; ok: boolean; error?:
 
 const WORKFLOW_RUN_LOCK_PREFIX = 'workflow-run-lock:';
 /**
- * ロックの取り忘れ（異常終了等）に備えたフェイルセーフのTTL。通常は実行完了時にreleaseRunLockで即時解放する。
- * WORKFLOW_MAX_ACTIONS_PER_RUN（外部API呼び出し等を含みうる）を余裕を持ってカバーできる値にする
- * （短すぎると、正常実行中でもTTL満了により別プロセスがロックを取得できてしまう）。
+ * A fail-safe TTL in case a lock is never released (e.g. an abnormal termination). Normally the lock
+ * is released immediately via releaseRunLock when the run finishes. Set this generously enough to
+ * cover WORKFLOW_MAX_ACTIONS_PER_RUN (which can include external API calls, etc.) — too short and
+ * another process could acquire the lock via TTL expiry even while a run is still in progress normally.
  */
 const WORKFLOW_RUN_LOCK_TTL_SECONDS = 600;
 
 /**
- * 「今すぐ実行」とCron tickが同じワークフローを同時に実行してしまう（通知の重複送信等）のを防ぐ、
- * KVを使ったベストエフォートのロック。KVはアトミックなcompare-and-swapを提供しないため完全な排他制御ではないが、
- * 実用上の同時実行（同じ分の重複発火・連打）はこれで十分防げる。KV未設定（ローカル開発等）の場合は実行を許可する。
+ * A best-effort lock using KV to prevent "run now" and a Cron tick from running the same workflow
+ * simultaneously (e.g. duplicate notification sends). KV does not provide an atomic
+ * compare-and-swap, so this is not fully exclusive, but it's enough in practice to prevent the
+ * realistic case of concurrent execution (duplicate firing within the same minute, double-clicking).
+ * If KV is not configured (e.g. local development), execution is allowed.
  */
 async function acquireRunLock(kv: KVNamespace | undefined, workflowId: string): Promise<boolean> {
 	if (!kv) return true;
@@ -537,7 +554,7 @@ async function executeWorkflow(db: Db, workflow: WorkflowRow, env?: ToolEnv, tri
 			id: workflow.id,
 			name: workflow.name,
 			ok: false,
-			error: '他の処理がこのワークフローを実行中のため今回はスキップしました。しばらく待ってから再度お試しください',
+			error: 'Skipped this time because another process is already running this workflow. Please wait a moment and try again',
 			result: {}
 		};
 	}
@@ -546,8 +563,8 @@ async function executeWorkflow(db: Db, workflow: WorkflowRow, env?: ToolEnv, tri
 	const resultObj: ResultObject = {};
 	try {
 		const account = workflow.accountId ? await getAccount(db, workflow.accountId) : null;
-		// send_notification 等、env.accountId を「通知・登録の宛先」として参照するツールのために、
-		// ワークフローの登録者をこの実行スコープのアカウントとして引き渡す
+		// For tools like send_notification that reference env.accountId as "the notification/registration
+		// recipient", pass the workflow's registrant through as the account for this run's scope
 		const toolEnv: ToolEnv | undefined = workflow.accountId
 			? { ...(env ?? {}), accountId: workflow.accountId }
 			: env;
@@ -564,7 +581,7 @@ async function executeWorkflow(db: Db, workflow: WorkflowRow, env?: ToolEnv, tri
 	}
 }
 
-/** 毎分のCronから呼ばれる。現在のJST時刻に一致する有効なスケジュールワークフローを実行する。 */
+/** Called from the per-minute Cron. Runs enabled scheduled workflows matching the current JST time. */
 export async function processDueWorkflows(
 	db: Db,
 	env?: ToolEnv,
@@ -578,11 +595,12 @@ export async function processDueWorkflows(
 }
 
 /**
- * 「今すぐ実行」用。トリガー時刻・有効化フラグを無視し、DBに保存されている内容をそのまま即時実行する
- * （編集中の画面上の未保存の内容ではない）。テスト目的の手動実行またはイベントトリガーによる自動実行。
+ * For "run now". Ignores the trigger time and enabled flag, and immediately runs the content as
+ * saved in the DB as-is (not any unsaved content currently being edited on screen). Used for manual
+ * runs for testing purposes, or automatic runs via an event trigger.
  */
 export async function runWorkflowNow(db: Db, workflowId: string, env?: ToolEnv, triggerContext?: TriggerContext, inputArgs?: Record<string, unknown>): Promise<WorkflowRunResult> {
 	const workflow = await getWorkflow(db, workflowId);
-	if (!workflow) throw new Error('ワークフローが見つかりません');
+	if (!workflow) throw new Error('Workflow not found');
 	return executeWorkflow(db, workflow, env, triggerContext, inputArgs);
 }

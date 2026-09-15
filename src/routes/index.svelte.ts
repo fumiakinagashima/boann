@@ -16,7 +16,7 @@ export function createAppListState(getData: () => PageData) {
 		const res = await fetch('/api/apps', {
 			method: 'POST',
 			headers: { 'Content-Type': 'application/json' },
-			body: JSON.stringify({ name, label: '新しいアプリ', icon: 'layout-grid' })
+			body: JSON.stringify({ name, label: 'New app', icon: 'layout-grid' })
 		});
 		if (!res.ok) { creating = false; return; }
 		await invalidateAll();

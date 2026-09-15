@@ -6,7 +6,7 @@ export const CHAT_TITLE_MAX_LENGTH = 24;
 export const CHAT_TEXTAREA_MAX_HEIGHT_PX = 192;
 
 // ── Lists ──────────────────────────────────────────────────────────────────
-// 一覧表示の1ページあたり件数（チャットの Table・レコード一覧で共通）
+// Number of items per page in list views (shared by chat Table and record lists)
 export const LIST_PAGE_SIZE = 20;
 
 // ── Deal statuses ─────────────────────────────────────────────────────────
@@ -42,12 +42,12 @@ export const DEFAULT_ACTIVITY_LIST_LIMIT = 20;
 export const CUSTOMER_DETAIL_ACTIVITY_LIMIT = 10;
 export const HEALTH_RANKING_DEFAULT_LIMIT = 5;
 
-// ── ワークフロー ───────────────────────────────────────────────────────────
-/** foreachステップが1回の実行で処理する最大件数（暴走防止のセーフティキャップ） */
+// ── Workflow ──────────────────────────────────────────────────────────────
+/** Max number of items a foreach step processes in a single run (safety cap against runaway execution) */
 export const WORKFLOW_FOREACH_MAX_ITEMS = 50;
-/** ネストしたforeachの組み合わせ爆発を防ぐため、1回の実行（cron/今すぐ実行）で許容するアクション実行回数の総量上限 */
+/** Total cap on the number of action executions allowed in a single run (cron/run-now), to prevent combinatorial explosion from nested foreach */
 export const WORKFLOW_MAX_ACTIONS_PER_RUN = 500;
-/** actionステップに設定できる最大リトライ回数（一時的な障害からの自動回復用。設定不備等の即時中断エラーはリトライしない） */
+/** Max retry count that can be set on an action step (for automatic recovery from transient failures; immediate-abort errors such as misconfiguration are not retried) */
 export const WORKFLOW_MAX_RETRIES = 5;
-/** リトライ間の待機時間（ミリ秒、固定・バックオフ無し） */
+/** Wait time between retries (ms, fixed, no backoff) */
 export const WORKFLOW_RETRY_DELAY_MS = 1000;

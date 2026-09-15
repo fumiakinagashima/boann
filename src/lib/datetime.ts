@@ -17,34 +17,34 @@ function getJstParts(d: Date): { year: string; month: string; day: string; hour:
 }
 
 /**
- * `<input type="datetime-local">` の値（"YYYY-MM-DDTHH:mm"、JSTのウォールクロック）を、
- * 対応する Date（UTC instant）に変換する。
- * 実行環境のローカルタイムゾーン（Cloudflare Workers は常にUTC）に依存しないようにするため、
- * `new Date(value)` ではなく明示的に +09:00 オフセットを付与する。
+ * Converts a `<input type="datetime-local">` value ("YYYY-MM-DDTHH:mm", JST wall-clock time)
+ * into the corresponding Date (UTC instant).
+ * Explicitly attaches a +09:00 offset instead of using `new Date(value)`, so the result doesn't
+ * depend on the runtime's local timezone (Cloudflare Workers is always UTC).
  */
 export function parseJstDatetime(value: string): Date {
 	return new Date(`${value}+09:00`);
 }
 
-/** Date を JST の "YYYY/MM/DD HH:mm" 表示用文字列に変換する。 */
+/** Converts a Date into a JST "YYYY/MM/DD HH:mm" display string. */
 export function formatJstDateTime(d: string | Date): string {
 	const dt = typeof d === 'string' ? new Date(d) : d;
 	const { year, month, day, hour, minute } = getJstParts(dt);
 	return `${year}/${month}/${day} ${hour}:${minute}`;
 }
 
-/** Date を `<input type="datetime-local">` 用の JST の "YYYY-MM-DDTHH:mm" 文字列に変換する。 */
+/** Converts a Date into a JST "YYYY-MM-DDTHH:mm" string for `<input type="datetime-local">`. */
 export function toJstDatetimeLocal(d: Date): string {
 	const { year, month, day, hour, minute } = getJstParts(d);
 	return `${year}-${month}-${day}T${hour}:${minute}`;
 }
 
-/** 現在時刻を `<input type="datetime-local">` 用の JST の "YYYY-MM-DDTHH:mm" 文字列に変換する。 */
+/** Converts the current time into a JST "YYYY-MM-DDTHH:mm" string for `<input type="datetime-local">`. */
 export function nowJstDatetimeLocal(): string {
 	return toJstDatetimeLocal(new Date());
 }
 
-/** Date を JST の時・分（0-23 / 0-59）に変換する。ワークフローのトリガー時刻判定に使う。 */
+/** Converts a Date into JST hour/minute (0-23 / 0-59). Used for workflow trigger time checks. */
 export function getJstHourMinute(d: Date): { hour: number; minute: number } {
 	const { hour, minute } = getJstParts(d);
 	return { hour: Number(hour), minute: Number(minute) };

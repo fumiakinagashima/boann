@@ -5,10 +5,10 @@ import { errors } from '$lib/server/errors';
 import { createDb } from '$lib/server/db';
 
 export const POST: RequestHandler = async ({ request, platform }) => {
-	if (!platform?.env?.DB) return errors.serviceUnavailable('DBが利用できません');
+	if (!platform?.env?.DB) return errors.serviceUnavailable('DB is not available');
 	const db = createDb(platform.env.DB);
 	const setup = await getEmailSetup(db, platform?.env ?? {});
-	if (!setup) return errors.serviceUnavailable('メール設定が構成されていません（/settings/email、または EMAIL_PROVIDER / EMAIL_FROM を設定してください）');
+	if (!setup) return errors.serviceUnavailable('Email settings are not configured (please configure /settings/email, or EMAIL_PROVIDER / EMAIL_FROM)');
 
 	try {
 		const body = await request.json() as {
@@ -19,10 +19,10 @@ export const POST: RequestHandler = async ({ request, platform }) => {
 		};
 
 		if (!body.to || (Array.isArray(body.to) && body.to.length === 0)) {
-			return errors.badRequest('送信先アドレスは必須です');
+			return errors.badRequest('Recipient address is required');
 		}
-		if (!body.subject?.trim()) return errors.badRequest('件名は必須です');
-		if (!body.html && !body.text) return errors.badRequest('html または text の本文が必要です');
+		if (!body.subject?.trim()) return errors.badRequest('Subject is required');
+		if (!body.html && !body.text) return errors.badRequest('html or text body is required');
 
 		await sendEmail(setup.providerConfig, {
 			from: setup.from,
@@ -34,7 +34,7 @@ export const POST: RequestHandler = async ({ request, platform }) => {
 		});
 
 		const toList = Array.isArray(body.to) ? body.to : [body.to];
-		return json({ success: true, message: `${toList.join(', ')} にメールを送信しました` });
+		return json({ success: true, message: `Email sent to ${toList.join(', ')}` });
 	} catch (e) {
 		return errors.internal(e);
 	}

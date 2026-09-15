@@ -21,8 +21,8 @@
 	import InfoCircle from '$lib/components/icon/InfoCircle.svelte';
 	import WorkflowStepList from './WorkflowStepList.svelte';
 
-	/** ネストしたforeachのうち、いずれか1段の「現在の項目」スコープ。bodyの内側ではこのスタック（祖先のforeach全て）を全て参照できる。
-	 *  itemFields===null はフィールド構成が事前にわからない場合(call_external_apiをsourceに@step:<id>.<path>で指定した場合等)。 */
+	/** The "current item" scope for one level of a nested foreach. Inside the body, this whole stack (all ancestor foreachs) can be referenced.
+	 *  itemFields===null means the field structure isn't known in advance (e.g. when call_external_api is specified as the source via @step:<id>.<path>). */
 	type ItemScope = { foreachStepId: string; label: string; itemFields: WorkflowListResultField[] | null };
 
 	type Props = {
@@ -35,9 +35,9 @@
 		entityTypes?: EntityTypeForWorkflow[];
 		slackIntegrations?: SlackIntegrationOption[];
 		integrations?: ExternalApiConnectionOption[];
-		/** イベントトリガー時、@trigger:<field> として参照できるフィールド一覧（トリガーがscheduleの場合は空） */
+		/** List of fields referenceable as @trigger:<field> on an event trigger (empty if the trigger is schedule) */
 		triggerFields?: WorkflowListResultField[];
-		/** 宣言された入力パラメータ一覧。@input:<key> として参照できる */
+		/** List of declared input parameters, referenceable as @input:<key> */
 		inputFields?: WorkflowListResultField[];
 	};
 
@@ -55,8 +55,8 @@
 		inputFields = []
 	}: Props = $props();
 
-	// ステップidは@step:<id>やmakeItemRef等で手入力することが多いため、UUIDではなく短い英数字にする
-	// （parseStepRefが最初の"."をid/pathの区切りに使うため、idそのものにドットは含めない）。
+	// Step ids are often entered manually via @step:<id>, makeItemRef, etc., so use short alphanumerics
+	// instead of UUIDs (the id itself must not contain a dot, since parseStepRef uses the first "." as the id/path separator).
 	const ID_CHARS = 'abcdefghijklmnopqrstuvwxyz0123456789';
 
 	function randomShortId(length = 4): string {
@@ -79,10 +79,11 @@
 	}
 
 	function makeId(): string {
-		// このコンポーネントインスタンスが持つのは現在のスコープ（steps）のみだが、ワークフロー全体で
-		// idが一意である必要があるため、呼び出し元のルートまで遡って全ステップidを集める必要がある。
-		// ただしvisibleBefore等から全体を辿る手段が無いため、実用上はこのスコープ内での重複回避に留める
-		// （4文字・36^4通りなので、他スコープとの衝突確率は無視できるレベル）。
+		// This component instance only holds the current scope (steps), but ids must be unique across
+		// the whole workflow, which would require walking back up to the caller's root to collect every
+		// step id. Since there's no way to traverse the whole tree from visibleBefore etc., in practice
+		// we only avoid collisions within this scope (4 chars, 36^4 combinations, so the chance of
+		// colliding with another scope is negligible).
 		const existing = collectAllStepIds(steps);
 		let id = randomShortId();
 		while (existing.has(id)) id = randomShortId();
@@ -91,27 +92,27 @@
 
 	function addStep(kind: 'action' | 'condition' | 'foreach' | 'result') {
 		if (kind === 'action') {
-			steps.push({ id: makeId(), kind: 'action', label: '新しいアクション', tool: '', params: {} });
+			steps.push({ id: makeId(), kind: 'action', label: 'New action', tool: '', params: {} });
 		} else if (kind === 'condition') {
 			steps.push({
 				id: makeId(),
 				kind: 'condition',
-				label: '新しい条件',
+				label: 'New condition',
 				left: '',
 				operator: '==',
 				right: '',
 				then: []
 			});
 		} else if (kind === 'result') {
-			steps.push({ id: makeId(), kind: 'result', label: '新しいレスポンス設定', key: '', valueType: 'scalar', value: '' });
+			steps.push({ id: makeId(), kind: 'result', label: 'New response setting', key: '', valueType: 'scalar', value: '' });
 		} else {
-			steps.push({ id: makeId(), kind: 'foreach', label: '新しい繰り返し', source: '', body: [] });
+			steps.push({ id: makeId(), kind: 'foreach', label: 'New loop', source: '', body: [] });
 		}
 	}
 
 	function removeStep(index: number) {
 		const step = steps[index];
-		if (!confirm(`「${step.label}」を削除します。よろしいですか？`)) return;
+		if (!confirm(`Delete "${step.label}"? Are you sure?`)) return;
 		steps.splice(index, 1);
 	}
 
@@ -136,21 +137,22 @@
 			if (s.kind === 'action') {
 				const tool = getWorkflowActionTool(s.tool);
 				if (tool?.listResult) {
-					// get_entitiesはテーブルごとにフィールドが異なるため、選択中のentity_type_idから動的に解決する
+					// get_entities' fields differ per table, so resolve them dynamically from the selected entity_type_id
 					const itemFields =
 						s.tool === 'get_entities' ? entityListItemFields(entityTypes, s.params?.entity_type_id) : tool.listResult.itemFields;
 					visible.push({ id: s.id, label: s.label, itemFields });
 				}
-				// call_external_apiはここに載せない: `@step:<id>`(パス無し)では一覧化されず、
-				// `@step:<id>.<path>`（パス指定）で参照する場合はforeachのsource側で別途許可している。
+				// call_external_api is not listed here: it's not shown in the list via `@step:<id>` (no path);
+				// when referenced with a path as `@step:<id>.<path>`, it's separately allowed on the foreach's source side.
 			}
 		}
 		return visible;
 	}
 
 	/**
-	 * このステップの位置で参照できる「現在の項目」フィールドを、祖先のforeach全て（itemScopes）から
-	 * フラットなリストにする（「ここで使える変数」ヘルプパネルへの表示専用。値の入力は直接入力のみ）。
+	 * Flattens the "current item" fields referenceable at this step's position, from all ancestor
+	 * foreachs (itemScopes), into a single list (for display in the "Available variables here" help
+	 * panel only — values must still be entered directly).
 	 */
 	type ItemOption = { foreachStepId: string; field: WorkflowListResultField; scopeLabel: string };
 
@@ -172,11 +174,12 @@
 		return makeInputRef(field.key);
 	}
 
-	// カテゴリ選択中（対象未選択でtoolが空の）ステップのカテゴリを覚えておくための一時状態。
-	// tool が決まれば常にそこからカテゴリを逆引きできるため、これは未確定の間だけ使う。
+	// Temporary state for remembering the category of a step that is mid-category-selection
+	// (target not yet selected and tool still empty). Once tool is set, the category can always be
+	// looked up from it, so this is only used while it's undetermined.
 	let pendingCategory = $state<Record<string, string>>({});
 
-	// 任意パラメーターをユーザーが明示的に開いたもの（ステップID → パラメーターキーのSet）
+	// Optional parameters the user has explicitly opened (step id -> Set of parameter keys)
 	let openedParams = $state<Record<string, Set<string>>>({});
 
 	function isParamShown(
@@ -196,8 +199,8 @@
 		openedParams[stepId] = new Set([...openedParams[stepId], key]);
 	}
 
-	// resultステップ専用: 「値」欄。valueTypeが'array'の場合、step.valueはJSON文字列化された
-	// 文字列配列として保持する（エディタが常に正しくクォートするため、run.ts側でJSON.parseするだけで良い）。
+	// result step only: the "value" field. When valueType is 'array', step.value is kept as a
+	// JSON-stringified array of strings (the editor always quotes correctly, so run.ts just needs to JSON.parse it).
 	function parseResultArrayValue(raw: string | undefined): string[] {
 		if (!raw) return [''];
 		try {
@@ -239,15 +242,15 @@
 		}
 	}
 
-	// 同じtoolが複数カテゴリから参照される場合に、
-	// 再読込後どちらのカテゴリで表示するかをstep.categoryで覚えておく。未設定（AI生成・旧データ）はtoolからの逆引きにフォールバックする。
+	// When the same tool is referenced from multiple categories, step.category remembers which
+	// category to display it under after reload. Unset (AI-generated or legacy data) falls back to looking it up from tool.
 	function currentCategoryKey(step: { id: string; tool: string; category?: string }): string {
 		if (step.tool) return step.category ?? findWorkflowActionCategory(step.tool)?.key ?? '';
 		return pendingCategory[step.id] ?? '';
 	}
 
-	/** カテゴリの対象一覧。includeEntityTargets/includeSlackTargets/includeIntegrationTargetsの場合、
-	 *  テーブル・Slack連携・外部API連携を顧客・案件等と同じ並びに追加する。 */
+	/** The category's list of targets. When includeEntityTargets/includeSlackTargets/includeIntegrationTargets
+	 *  are set, adds tables, Slack integrations, and external API integrations alongside the fixed targets. */
 	function effectiveTargets(category: {
 		targets: { value: string; label: string; tool: string }[];
 		includeEntityTargets?: boolean;
@@ -270,7 +273,7 @@
 
 	const ENTITY_WRITE_TOOLS = new Set(['get_entities', 'create_entity', 'update_entity', 'delete_entity']);
 
-	/** 対象selectの現在値。エンティティ操作ツールはparamsから`entity:<id>`形式に変換する。 */
+	/** The target select's current value. For entity-operation tools, converts from params to `entity:<id>` form. */
 	function currentTargetValue(step: { tool: string; params?: Record<string, string> }): string {
 		if (ENTITY_WRITE_TOOLS.has(step.tool)) return `entity:${step.params?.entity_type_id ?? ''}`;
 		if (step.tool === 'send_slack_notification') return `slack:${step.params?.integration_id ?? ''}`;
@@ -300,14 +303,14 @@
 		step.category = categoryKey;
 	}
 
-	// 「ここで使える変数」ヘルプパネルの開閉状態（ステップごと）
+	// Open/closed state of the "Available variables here" help panel (per step)
 	let helpOpenFor = $state<Record<string, boolean>>({});
 
 	function toggleHelp(stepId: string) {
 		helpOpenFor[stepId] = !helpOpenFor[stepId];
 	}
 
-	// ドラッグ&ドロップによる並び替え（同じ steps 配列内、つまり同じスコープ内のみ）
+	// Drag-and-drop reordering (within the same steps array, i.e. the same scope only)
 	let draggedIndex = $state<number | null>(null);
 	let dragOverIndex = $state<number | null>(null);
 
@@ -359,7 +362,7 @@
 						draggable="true"
 						ondragstart={(e) => handleDragStart(e, i)}
 						ondragend={handleDragEnd}
-						title="ドラッグして並び替え"
+						title="Drag to reorder"
 						role="button"
 						tabindex="0"
 					>
@@ -388,7 +391,7 @@
 							step.category = undefined;
 						}}
 					>
-						<option value="">カテゴリを選択</option>
+						<option value="">Select category</option>
 						{#each WORKFLOW_ACTION_CATEGORIES as c (c.key)}
 							<option value={c.key}>{c.label}</option>
 						{/each}
@@ -399,7 +402,7 @@
 							disabled={!editable}
 							onchange={(e) => applyTargetSelection(step, e.currentTarget.value, categoryKey)}
 						>
-							<option value="">対象を選択</option>
+							<option value="">Select target</option>
 							{#each effectiveTargets(category) as t (t.value)}
 								<option value={t.value}>{t.label}</option>
 							{/each}
@@ -412,7 +415,7 @@
 					class="wf-help-btn"
 					class:active={helpOpenFor[step.id]}
 					onclick={() => toggleHelp(step.id)}
-					title="ここで使える変数を見る"
+					title="View variables available here"
 				>
 					<InfoCircle size={14} />
 				</button>
@@ -424,7 +427,7 @@
 
 			{#if helpOpenFor[step.id]}
 				<div class="wf-help-panel">
-					<div class="wf-help-title">ここで使える変数</div>
+					<div class="wf-help-title">Variables available here</div>
 					<ul class="wf-help-list">
 						{#each visible as v (v.id)}
 							<li>
@@ -440,24 +443,24 @@
 						{/each}
 						{#each itemScopes.filter((s) => s.itemFields === null) as scope (scope.foreachStepId)}
 							<li>
-								<span class="wf-help-name">{scope.label}の項目（フィールド構成不明、下の形式で「直接入力」欄に手入力）</span>
-								<code class="wf-help-token">@item:{scope.foreachStepId}:&lt;フィールド名&gt;</code>
+								<span class="wf-help-name">{scope.label} item (field structure unknown; type it manually into the "direct input" field below in this format)</span>
+								<code class="wf-help-token">@item:{scope.foreachStepId}:&lt;field name&gt;</code>
 							</li>
 						{/each}
 						{#each triggerFields as f, tfi (tfi)}
 							<li>
-								<span class="wf-help-name">{f.label}（トリガーレコード）</span>
+								<span class="wf-help-name">{f.label} (trigger record)</span>
 								<code class="wf-help-token">{triggerToken(f)}</code>
 							</li>
 						{/each}
 						{#each inputFields as f, ifi (ifi)}
 							<li>
-								<span class="wf-help-name">{f.label}（入力パラメータ）</span>
+								<span class="wf-help-name">{f.label} (input parameter)</span>
 								<code class="wf-help-token">{inputToken(f)}</code>
 							</li>
 						{/each}
 						<li>
-							<span class="wf-help-name">自分（ワークフロー登録者）のアカウントID</span>
+							<span class="wf-help-name">Your own (the workflow owner's) account ID</span>
 							<code class="wf-help-token">{SELF_ACCOUNT_ID_REF}</code>
 						</li>
 					</ul>
@@ -536,7 +539,7 @@
 									<button
 										class="wf-param-del"
 										onclick={() => closeParam(step, field.key)}
-										title="このパラメーターを削除"
+										title="Remove this parameter"
 									>×</button>
 								{/if}
 							</div>
@@ -558,7 +561,7 @@
 										}
 									}}
 								>
-									<option value="">＋ オプションを追加...</option>
+									<option value="">+ Add option...</option>
 									{#each hiddenOptional as f (f.key)}
 										<option value={f.key}>{f.label}</option>
 									{/each}
@@ -568,7 +571,7 @@
 					{/if}
 
 					<div class="wf-line wf-error-handling">
-						<label for="wf-retry-{step.id}">失敗時リトライ回数</label>
+						<label for="wf-retry-{step.id}">Retry count on failure</label>
 						<input
 							id="wf-retry-{step.id}"
 							type="number"
@@ -588,16 +591,16 @@
 								disabled={!editable}
 								onchange={(e) => (step.continueOnError = e.currentTarget.checked)}
 							/>
-							失敗しても後続処理を続行する
+							Continue with subsequent steps even on failure
 						</label>
 					</div>
 				{/if}
 			{:else if step.kind === 'condition'}
 				<div class="wf-line wf-cond-line">
-					<span class="wf-cond-label">判定:</span>
+					<span class="wf-cond-label">Condition:</span>
 					<input
 						type="text"
-						placeholder="@step:xxx / @item:xxx:yyy 等"
+						placeholder="e.g. @step:xxx / @item:xxx:yyy"
 						value={step.left}
 						disabled={!editable}
 						oninput={(e) => (step.left = e.currentTarget.value)}
@@ -613,7 +616,7 @@
 					</select>
 					<input
 						type="text"
-						placeholder="直接入力 または @step:xxx 等"
+						placeholder="Direct input or e.g. @step:xxx"
 						value={step.right}
 						disabled={!editable}
 						oninput={(e) => (step.right = e.currentTarget.value)}
@@ -621,10 +624,10 @@
 				</div>
 			{:else if step.kind === 'result'}
 				<div class="wf-line wf-result-line">
-					<span class="wf-cond-label">キー:</span>
+					<span class="wf-cond-label">Key:</span>
 					<input
 						type="text"
-						placeholder="レスポンスのキー名（例: user.name でネスト）"
+						placeholder="Response key name (e.g. user.name for nesting)"
 						value={step.key}
 						disabled={!editable}
 						oninput={(e) => (step.key = e.currentTarget.value)}
@@ -637,12 +640,12 @@
 							step.value = '';
 						}}
 					>
-						<option value="scalar">スカラー</option>
-						<option value="array">配列</option>
+						<option value="scalar">Scalar</option>
+						<option value="array">Array</option>
 					</select>
 				</div>
 				<div class="wf-line wf-result-value">
-					<span class="wf-cond-label">値:</span>
+					<span class="wf-cond-label">Value:</span>
 					{#if step.valueType === 'array'}
 						<div class="wf-result-array">
 							{#each parseResultArrayValue(step.value) as itemVal, idx (idx)}
@@ -651,7 +654,7 @@
 										type="text"
 										value={itemVal}
 										disabled={!editable}
-										placeholder="直接入力 または @step:xxx 等"
+										placeholder="Direct input or e.g. @step:xxx"
 										oninput={(e) => updateResultArrayItem(step, idx, e.currentTarget.value)}
 									/>
 									{#if editable}
@@ -659,14 +662,14 @@
 											type="button"
 											class="wf-param-del"
 											onclick={() => removeResultArrayItem(step, idx)}
-											title="この項目を削除"
+											title="Remove this item"
 										>×</button>
 									{/if}
 								</div>
 							{/each}
 							{#if editable}
 								<button type="button" class="wf-result-array-add" onclick={() => addResultArrayItem(step)}>
-									+ 項目を追加
+									+ Add item
 								</button>
 							{/if}
 						</div>
@@ -676,17 +679,17 @@
 							class="wf-result-scalar-input"
 							value={step.value}
 							disabled={!editable}
-							placeholder="直接入力 または @step:xxx 等"
+							placeholder="Direct input or e.g. @step:xxx"
 							oninput={(e) => (step.value = e.currentTarget.value)}
 						/>
 					{/if}
 				</div>
 			{:else}
 				<div class="wf-line wf-foreach-line">
-					<span class="wf-cond-label">対象:</span>
+					<span class="wf-cond-label">Target:</span>
 					<input
 						type="text"
-						placeholder="@step:xxx（一覧を返すステップ） または @step:xxx.data.items（call_external_apiの配列を指定）"
+						placeholder="@step:xxx (a step that returns a list), or @step:xxx.data.items (specifying a call_external_api array)"
 						value={step.source}
 						disabled={!editable}
 						oninput={(e) => (step.source = e.currentTarget.value)}
@@ -750,10 +753,10 @@
 
 	{#if editable}
 		<div class="wf-add-row">
-			<button class="btn-add t-action" onclick={() => addStep('action')}>+ アクション</button>
-			<button class="btn-add t-condition" onclick={() => addStep('condition')}>+ 条件</button>
-			<button class="btn-add t-foreach" onclick={() => addStep('foreach')}>+ 繰り返し</button>
-			<button class="btn-add t-result" onclick={() => addStep('result')}>+ レスポンス</button>
+			<button class="btn-add t-action" onclick={() => addStep('action')}>+ Action</button>
+			<button class="btn-add t-condition" onclick={() => addStep('condition')}>+ Condition</button>
+			<button class="btn-add t-foreach" onclick={() => addStep('foreach')}>+ Loop</button>
+			<button class="btn-add t-result" onclick={() => addStep('result')}>+ Response</button>
 		</div>
 	{/if}
 </div>

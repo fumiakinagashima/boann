@@ -11,7 +11,7 @@
 		pageSize?: number;
 	};
 
-	let { columns, rows, empty = 'データがありません', pageSize }: Props = $props();
+	let { columns, rows, empty = 'No data available', pageSize }: Props = $props();
 
 	let sortKey = $state<string | null>(null);
 	let sortAsc = $state(true);
@@ -32,7 +32,7 @@
 		if (!sortKey) return rows;
 		const key = sortKey;
 		return [...rows].sort((a, b) => {
-			const cmp = String(a[key] ?? '').localeCompare(String(b[key] ?? ''), 'ja');
+			const cmp = String(a[key] ?? '').localeCompare(String(b[key] ?? ''), 'en');
 			return sortAsc ? cmp : -cmp;
 		});
 	});
@@ -49,7 +49,7 @@
 		if (!pageSize) return null;
 		const start = (page - 1) * pageSize + 1;
 		const end = Math.min(page * pageSize, sorted.length);
-		return `${start}–${end} / ${sorted.length}件`;
+		return `${start}–${end} / ${sorted.length}`;
 	});
 </script>
 

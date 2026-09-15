@@ -8,7 +8,7 @@ import type { ImportJobMessage } from './types';
 
 type ConsumerEnv = { ANTHROPIC_API_KEY?: string; MOCK_AI?: string };
 
-// Queue consumer のジョブ処理本体。worker.ts の queue ハンドラから呼ぶ。
+// The core job-processing logic for the Queue consumer. Called from the queue handler in worker.ts.
 export async function processImportJob(
 	db: Db,
 	env: ConsumerEnv,
@@ -21,13 +21,13 @@ export async function processImportJob(
 	}
 }
 
-// 設計: アップロード本文を AI に渡してプランを生成し、ready にする。
+// Design: passes the uploaded content to the AI to generate a plan, then marks the job ready.
 async function processDesign(db: Db, env: ConsumerEnv, jobId: string): Promise<void> {
 	const job = await getImportJob(db, jobId);
 	if (!job) return;
-	if (job.status === 'ready' && job.plan) return; // 重複配信はスキップ
+	if (job.status === 'ready' && job.plan) return; // skip duplicate delivery
 	if (!job.content) {
-		await updateImportJob(db, jobId, { status: 'error', error: 'ファイル本文がありません' });
+		await updateImportJob(db, jobId, { status: 'error', error: 'No file content was found' });
 		return;
 	}
 
@@ -46,14 +46,14 @@ async function processDesign(db: Db, env: ConsumerEnv, jobId: string): Promise<v
 		await updateImportJob(db, jobId, { status: 'ready', plan, error: null });
 		await createNotification(db, {
 			type: 'import',
-			title: 'アプリの設計が完了しました',
-			body: `「${plan.app.label}」のプランを確認してください。`,
+			title: 'App design complete',
+			body: `Please review the plan for "${plan.app.label}".`,
 			seedContent: [
 				{
 					type: 'link',
-					label: `${plan.app.label} のプランを確認`,
+					label: `Review the plan for ${plan.app.label}`,
 					href: `/imports/${jobId}`,
-					description: 'ファイルから設計したアプリのプラン'
+					description: 'The app plan designed from the file'
 				}
 			],
 			accountId: job.accountId
@@ -63,23 +63,23 @@ async function processDesign(db: Db, env: ConsumerEnv, jobId: string): Promise<v
 		await updateImportJob(db, jobId, { status: 'error', error });
 		await createNotification(db, {
 			type: 'import',
-			title: 'アプリの設計に失敗しました',
-			body: `ファイルの設計中にエラーが発生しました: ${error}`,
+			title: 'App design failed',
+			body: `An error occurred while designing the file: ${error}`,
 			seedContent: [],
 			accountId: job.accountId
 		});
 	}
 }
 
-// apply: ドラフトのプランを決定的に反映してアプリを作成する。冪等。
+// apply: deterministically applies the drafted plan to create the app. Idempotent.
 async function processApply(db: Db, jobId: string): Promise<void> {
 	const job = await getImportJob(db, jobId);
 	if (!job) return;
-	if (job.status === 'done') return; // 重複配信はスキップ
+	if (job.status === 'done') return; // skip duplicate delivery
 
 	const parsed = importPlanSchema.safeParse(job.plan);
 	if (!parsed.success) {
-		await updateImportJob(db, jobId, { status: 'error', error: 'プランの形式が不正です' });
+		await updateImportJob(db, jobId, { status: 'error', error: 'The plan format is invalid' });
 		return;
 	}
 
@@ -88,14 +88,14 @@ async function processApply(db: Db, jobId: string): Promise<void> {
 		await updateImportJob(db, jobId, { status: 'done', appId, error: null });
 		await createNotification(db, {
 			type: 'import',
-			title: 'アプリを作成しました',
-			body: `「${parsed.data.app.label}」を作成しました。`,
+			title: 'App created',
+			body: `Created "${parsed.data.app.label}".`,
 			seedContent: [
 				{
 					type: 'link',
-					label: `${parsed.data.app.label} を開く`,
+					label: `Open ${parsed.data.app.label}`,
 					href: `/apps/${appId}`,
-					description: 'ファイルから作成したアプリ'
+					description: 'The app created from the file'
 				}
 			],
 			accountId: job.accountId
@@ -105,8 +105,8 @@ async function processApply(db: Db, jobId: string): Promise<void> {
 		await updateImportJob(db, jobId, { status: 'error', error });
 		await createNotification(db, {
 			type: 'import',
-			title: 'アプリの作成に失敗しました',
-			body: `「${parsed.data.app.label}」の作成中にエラーが発生しました: ${error}`,
+			title: 'App creation failed',
+			body: `An error occurred while creating "${parsed.data.app.label}": ${error}`,
 			seedContent: [],
 			accountId: job.accountId
 		});

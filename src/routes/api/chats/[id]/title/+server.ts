@@ -23,7 +23,7 @@ export const POST: RequestHandler = async ({ params, request, platform, locals }
 
 	const body = (await request.json()) as { message?: string };
 	const message = body.message?.trim() ?? '';
-	if (!message) return errors.badRequest('message が空です。');
+	if (!message) return errors.badRequest('message is empty.');
 
 	const db = createDb(platform.env.DB);
 
@@ -37,7 +37,7 @@ export const POST: RequestHandler = async ({ params, request, platform, locals }
 	}
 
 	const apiKey = platform?.env?.ANTHROPIC_API_KEY ?? env.ANTHROPIC_API_KEY ?? '';
-	if (!apiKey) return json({ error: 'ANTHROPIC_API_KEY が設定されていません。' }, { status: 500 });
+	if (!apiKey) return json({ error: 'ANTHROPIC_API_KEY is not set.' }, { status: 500 });
 
 	try {
 		const title = await generateChatTitle(apiKey, message);

@@ -9,10 +9,10 @@ type DocumentJobStatus =
 	| { status: 'error'; error: string };
 
 export const GET: RequestHandler = async ({ params, platform }) => {
-	if (!platform?.env?.KV) return errors.serviceUnavailable('KVが設定されていません');
+	if (!platform?.env?.KV) return errors.serviceUnavailable('KV is not configured');
 
 	const raw = await platform.env.KV.get(`docjob:${params.id}`);
-	if (!raw) return errors.notFound('ジョブが見つかりません');
+	if (!raw) return errors.notFound('Job not found');
 
 	const job = JSON.parse(raw) as DocumentJobStatus;
 	return json(job);

@@ -16,14 +16,14 @@ const createSchema = z.object({
 });
 
 export const GET: RequestHandler = async ({ platform }) => {
-	if (!platform?.env?.DB) return errors.serviceUnavailable('利用できません');
+	if (!platform?.env?.DB) return errors.serviceUnavailable('Not available');
 	const db = createDb(platform.env.DB);
 	const rows = await listExternalApiConnections(db);
 	return json(rows.map((r) => ({ ...r, headers: maskHeaders(r.headers) })));
 };
 
 export const POST: RequestHandler = async ({ request, platform, locals }) => {
-	if (!platform?.env?.DB) return errors.serviceUnavailable('利用できません');
+	if (!platform?.env?.DB) return errors.serviceUnavailable('Not available');
 	const db = createDb(platform.env.DB);
 	const data = createSchema.parse(await request.json());
 	const row = await createExternalApiConnection(db, { ...data, createdBy: locals.account?.id });

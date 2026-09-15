@@ -20,7 +20,7 @@ export const PATCH: RequestHandler = async ({ request, platform, locals }) => {
 	if (data.email) {
 		const existingAccounts = await listAccounts(db);
 		if (existingAccounts.some((a) => a.id !== locals.account!.id && a.email === data.email)) {
-			return errors.badRequest('このメールアドレスは既に使用されています');
+			return errors.badRequest('This email address is already in use');
 		}
 	}
 

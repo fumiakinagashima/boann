@@ -67,7 +67,7 @@ export function createTableRecordsState(getData: () => PageData) {
 			});
 			if (!res.ok) {
 				const body = (await res.json()) as { error?: string };
-				saveError = body.error ?? '保存に失敗しました';
+				saveError = body.error ?? 'Failed to save';
 				return;
 			}
 			closeForm();
@@ -78,7 +78,7 @@ export function createTableRecordsState(getData: () => PageData) {
 	}
 
 	async function deleteRecord() {
-		if (!confirm('このレコードを削除しますか？')) return;
+		if (!confirm('Delete this record?')) return;
 		deleting = true;
 		try {
 			const appName = getData().app.name;
@@ -106,7 +106,7 @@ export function createTableRecordsState(getData: () => PageData) {
 			return opt ? opt.label : String(val);
 		}
 		if (field.type === 'date' && typeof val === 'number') {
-			return new Date(val * 1000).toLocaleDateString('ja-JP');
+			return new Date(val * 1000).toLocaleDateString('en-US');
 		}
 		return String(val);
 	}

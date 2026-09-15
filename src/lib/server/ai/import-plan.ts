@@ -2,9 +2,9 @@ import Anthropic from '@anthropic-ai/sdk';
 import type { Tool } from '@anthropic-ai/sdk/resources/messages';
 import { z } from 'zod';
 
-// ファイル（txt/md 等の仕様メモ）から、アプリ構造（テーブル・フィールド）を
-// 推論してプラン化する。確定（DBへの反映）は import-apply.ts が決定的に行う。
-// LLM はあくまで「設計案」を出すだけで、レコードの一括投入などは決定的コードに任せる。
+// Infers and plans an app structure (tables/fields) from a file (a spec memo such as txt/md, etc.).
+// Finalizing (applying it to the DB) is done deterministically by import-apply.ts.
+// The LLM only ever produces a "design proposal" — deterministic code handles things like bulk record insertion.
 
 const FIELD_TYPES = ['text', 'number', 'select', 'date', 'email', 'tel', 'textarea', 'recordSelect', 'account'] as const;
 
@@ -31,7 +31,7 @@ export const importPlanSchema = z.object({
 		icon: z.string().optional()
 	}),
 	tables: z.array(tableSchema).min(1),
-	// ワークフローは現状プランに含めても自動作成しない（情報提示のみ）。
+	// Workflows are not auto-created even if included in the plan right now (informational display only).
 	workflows: z.array(z.object({ name: z.string(), description: z.string().optional() })).default([])
 });
 
@@ -39,48 +39,48 @@ export type ImportPlan = z.infer<typeof importPlanSchema>;
 
 const PLAN_TOOL: Tool = {
 	name: 'emit_app_plan',
-	description: 'ファイルの内容から設計したアプリ構造（テーブル・フィールド）を出力する。',
+	description: 'Outputs the app structure (tables/fields) designed from the file contents.',
 	input_schema: {
 		type: 'object',
 		properties: {
 			app: {
 				type: 'object',
 				properties: {
-					name: { type: 'string', description: 'アプリの識別名（英小文字・数字・アンダースコアのみ、例: customer_management）' },
-					label: { type: 'string', description: 'アプリの表示名（例: 顧客管理）' },
-					icon: { type: 'string', description: 'アイコン（絵文字推奨 例: 📇）' }
+					name: { type: 'string', description: 'The app\'s identifier name (lowercase letters, digits, and underscores only, e.g. customer_management)' },
+					label: { type: 'string', description: 'The app\'s display name (e.g. Customer Management)' },
+					icon: { type: 'string', description: 'Icon (an emoji is recommended, e.g. 📇)' }
 				},
 				required: ['name', 'label']
 			},
 			tables: {
 				type: 'array',
-				description: 'アプリに含めるテーブル一覧',
+				description: 'The list of tables to include in the app',
 				items: {
 					type: 'object',
 					properties: {
-						name: { type: 'string', description: 'テーブルの識別名（英小文字・数字・アンダースコアのみ、例: customers）' },
-						label: { type: 'string', description: 'テーブルの表示名（例: 顧客マスタ）' },
-						icon: { type: 'string', description: 'アイコン（絵文字推奨）' },
+						name: { type: 'string', description: 'The table\'s identifier name (lowercase letters, digits, and underscores only, e.g. customers)' },
+						label: { type: 'string', description: 'The table\'s display name (e.g. Customer Master)' },
+						icon: { type: 'string', description: 'Icon (an emoji is recommended)' },
 						fields: {
 							type: 'array',
-							description: 'フィールド定義（表示順）',
+							description: 'Field definitions (in display order)',
 							items: {
 								type: 'object',
 								properties: {
-									key: { type: 'string', description: 'フィールドキー（英小文字・数字・アンダースコアのみ）' },
-									label: { type: 'string', description: 'フィールドの表示名' },
+									key: { type: 'string', description: 'Field key (lowercase letters, digits, and underscores only)' },
+									label: { type: 'string', description: 'The field\'s display name' },
 									type: {
 										type: 'string',
 										enum: [...FIELD_TYPES],
-										description: 'フィールドの型。recordSelect は他テーブルのレコードを参照する関係フィールド。account はアカウント（ユーザー）を参照する関係フィールドで ref_table は不要（自動で accounts を参照し、表示・選択肢ではアカウント名を表示）'
+										description: 'The field\'s type. recordSelect is a relationship field referencing a record in another table. account is a relationship field referencing an account (user); ref_table isn\'t needed for it (it automatically references accounts, and displays the account name in views and choices)'
 									},
 									required: { type: 'boolean' },
 									options: {
 										type: 'array',
 										items: { type: 'object', properties: { value: { type: 'string' }, label: { type: 'string' } } },
-										description: 'type が select のときの選択肢'
+										description: 'The choices when type is select'
 									},
-									ref_table: { type: 'string', description: 'type が recordSelect のときの参照先テーブルの name（このプラン内の tables の name を指定）' }
+									ref_table: { type: 'string', description: 'The name of the referenced table when type is recordSelect (specify the name of one of the tables in this plan)' }
 								},
 								required: ['key', 'label', 'type']
 							}
@@ -91,7 +91,7 @@ const PLAN_TOOL: Tool = {
 			},
 			workflows: {
 				type: 'array',
-				description: 'ファイルに記載があれば、ワークフロー（自動処理）の名称と概要を列挙する（このプランでは作成されず、後で手動追加する）。',
+				description: 'If the file mentions any, list the name and summary of workflows (automated processes) (these are not created by this plan, and are added manually later).',
 				items: {
 					type: 'object',
 					properties: { name: { type: 'string' }, description: { type: 'string' } },
@@ -103,17 +103,17 @@ const PLAN_TOOL: Tool = {
 	}
 };
 
-const SYSTEM_PROMPT = `あなたはノーコードアプリ基盤 Boann の設計アシスタントです。
-ユーザーがアップロードした仕様メモ（テキスト/Markdown）またはExcelファイル（シート名・見出し行・サンプル行を抽出したもの）を読み、業務アプリの構造を設計してください。
-Excel由来の内容は「--- シート: <名前> ---」「見出し: ...」「例: ...」の形式で渡される。原則シート1つにつきテーブル1つとし、見出しをフィールドとして設計する（サンプル行の値からフィールド型を推測してよい）。
+const SYSTEM_PROMPT = `You are the design assistant for Boann, a no-code app platform.
+Read the spec memo (text/Markdown) or Excel file (with sheet names, header rows, and sample rows extracted) the user uploaded, and design the structure of a business app.
+Content derived from Excel is passed in the form "--- Sheet: <name> ---" "Headers: ..." "Example: ...". As a rule, treat one sheet as one table, and design the headers as fields (you may infer the field type from the sample row values).
 
-設計ルール:
-- ファイルの内容から必要なテーブル・フィールドを過不足なく設計する。
-- 表示名（label）は日本語、識別名（name/key）は英小文字・数字・アンダースコアのみ。
-- テーブル間の関係は recordSelect 型フィールドで表現し、ref_table に参照先テーブルの name を指定する。
-- 一般的な業務に必要な基本フィールド（名称・日付・担当者・ステータス等）は文面に明示がなくても適宜補う。
-- ファイルにワークフロー（自動処理）の記載があれば workflows に列挙する（作成はしない）。
-- 必ず emit_app_plan ツールを呼び出して結果を返す。`;
+Design rules:
+- Design exactly the tables and fields needed from the file's contents, no more and no less.
+- Display names (label) are in English; identifier names (name/key) are lowercase letters, digits, and underscores only.
+- Express relationships between tables with a recordSelect-type field, specifying the referenced table's name in ref_table.
+- Supplement common fields a typical business app needs (e.g. name, date, assignee, status) as appropriate, even if not explicitly stated in the text.
+- If the file mentions workflows (automated processes), list them in workflows (don't create them).
+- Always call the emit_app_plan tool to return the result.`;
 
 export async function generateImportPlan(opts: {
 	apiKey: string;
@@ -129,25 +129,25 @@ export async function generateImportPlan(opts: {
 		tools: [PLAN_TOOL],
 		tool_choice: { type: 'tool', name: 'emit_app_plan' },
 		messages: [
-			{ role: 'user', content: `ファイル名: ${opts.filename}\n\n--- ファイル内容 ---\n${opts.content}` }
+			{ role: 'user', content: `File name: ${opts.filename}\n\n--- File content ---\n${opts.content}` }
 		]
 	});
 
 	const block = response.content.find((b) => b.type === 'tool_use');
 	if (!block || block.type !== 'tool_use') {
-		throw new Error('プランを生成できませんでした');
+		throw new Error('Failed to generate a plan');
 	}
 	return importPlanSchema.parse(block.input);
 }
 
-const REFINE_SYSTEM_PROMPT = `あなたはノーコードアプリ基盤 Boann の設計アシスタントです。
-既に設計済みのアプリのプラン（JSON）に対し、ユーザーの修正依頼を反映した**新しいプラン全体**を出力します。
+const REFINE_SYSTEM_PROMPT = `You are the design assistant for Boann, a no-code app platform.
+Given an already-designed app plan (JSON), output the **entire new plan** reflecting the user's requested changes.
 
-ルール:
-- 依頼された変更のみを反映し、それ以外の構成・命名は極力維持する。
-- 表示名（label）は日本語、識別名（name/key）は英小文字・数字・アンダースコアのみ。
-- テーブル間の関係は recordSelect 型フィールド（ref_table に参照先テーブルの name）で表現する。
-- 必ず emit_app_plan ツールでプラン全体を返す（差分ではなく完全な新プラン）。`;
+Rules:
+- Reflect only the requested change, and keep the rest of the structure and naming as unchanged as possible.
+- Display names (label) are in English; identifier names (name/key) are lowercase letters, digits, and underscores only.
+- Express relationships between tables with a recordSelect-type field (ref_table holding the referenced table's name).
+- Always return the entire plan via the emit_app_plan tool (a full new plan, not a diff).`;
 
 export async function refineImportPlan(opts: {
 	apiKey: string;
@@ -164,14 +164,14 @@ export async function refineImportPlan(opts: {
 		.join('\n');
 
 	const userText = [
-		'現在のプラン(JSON):',
+		'Current plan (JSON):',
 		'```json',
 		JSON.stringify(opts.currentPlan, null, 2),
 		'```',
-		opts.content ? `\n元のファイル内容:\n---\n${opts.content}\n---` : '',
-		pastRequests ? `\nこれまでの修正依頼:\n${pastRequests}` : '',
-		`\n今回の修正依頼:\n${opts.message}`,
-		'\n上記を反映した新しいプラン全体を emit_app_plan で返してください。'
+		opts.content ? `\nOriginal file content:\n---\n${opts.content}\n---` : '',
+		pastRequests ? `\nPrevious change requests:\n${pastRequests}` : '',
+		`\nThis change request:\n${opts.message}`,
+		'\nReturn the entire new plan reflecting the above via emit_app_plan.'
 	].join('\n');
 
 	const response = await anthropic.messages.create({
@@ -185,44 +185,44 @@ export async function refineImportPlan(opts: {
 
 	const block = response.content.find((b) => b.type === 'tool_use');
 	if (!block || block.type !== 'tool_use') {
-		throw new Error('プランを更新できませんでした');
+		throw new Error('Failed to update the plan');
 	}
 	return importPlanSchema.parse(block.input);
 }
 
-// MOCK_AI 用の決定的プラン（顧客管理の例）。
+// A deterministic plan for MOCK_AI (a customer-management example).
 export function mockImportPlan(_content: string): ImportPlan {
 	return importPlanSchema.parse({
-		app: { name: 'customer_management', label: '顧客管理', icon: '📇' },
+		app: { name: 'customer_management', label: 'Customer Management', icon: '📇' },
 		tables: [
 			{
 				name: 'customers',
-				label: '顧客マスタ',
+				label: 'Customer Master',
 				icon: '🏢',
 				fields: [
-					{ key: 'name', label: '顧客名', type: 'text', required: true },
-					{ key: 'email', label: 'メール', type: 'email' },
-					{ key: 'phone', label: '電話番号', type: 'tel' },
-					{ key: 'status', label: 'ステータス', type: 'select', options: [
-						{ value: 'active', label: '取引中' },
-						{ value: 'prospect', label: '見込み' }
+					{ key: 'name', label: 'Customer name', type: 'text', required: true },
+					{ key: 'email', label: 'Email', type: 'email' },
+					{ key: 'phone', label: 'Phone number', type: 'tel' },
+					{ key: 'status', label: 'Status', type: 'select', options: [
+						{ value: 'active', label: 'Active' },
+						{ value: 'prospect', label: 'Prospect' }
 					] }
 				]
 			},
 			{
 				name: 'activities',
-				label: '活動履歴',
+				label: 'Activity History',
 				icon: '📝',
 				fields: [
-					{ key: 'customer', label: '顧客', type: 'recordSelect', ref_table: 'customers', required: true },
-					{ key: 'occurred_on', label: '実施日', type: 'date' },
-					{ key: 'memo', label: '内容', type: 'textarea' },
-					{ key: 'shared_with', label: '共有者', type: 'text' }
+					{ key: 'customer', label: 'Customer', type: 'recordSelect', ref_table: 'customers', required: true },
+					{ key: 'occurred_on', label: 'Date', type: 'date' },
+					{ key: 'memo', label: 'Notes', type: 'textarea' },
+					{ key: 'shared_with', label: 'Shared with', type: 'text' }
 				]
 			}
 		],
 		workflows: [
-			{ name: '活動履歴の共有通知', description: '活動履歴登録時、共有者に通知を送信する' }
+			{ name: 'Activity history share notification', description: 'Sends a notification to the shared-with party when an activity history entry is registered' }
 		]
 	});
 }

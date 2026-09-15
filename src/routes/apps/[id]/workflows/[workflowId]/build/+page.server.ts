@@ -18,8 +18,8 @@ export const load: PageServerLoad = async ({ params, platform }) => {
 		listSlackIntegrationsForWorkflow(db),
 		listExternalApiConnectionsForWorkflow(db)
 	]);
-	if (!workflow) error(404, 'ワークフローが見つかりません');
-	if (!app) error(404, 'アプリが見つかりません');
+	if (!workflow) error(404, 'Workflow not found');
+	if (!app) error(404, 'App not found');
 	const runs = await listWorkflowRuns(db, params.workflowId, 20);
 	return { workflow, app, entityTypes, slackIntegrations, integrations, runs };
 };
@@ -29,9 +29,9 @@ export const actions: Actions = {
 		if (!platform?.env?.DB) error(500);
 		const db = createDb(platform.env.DB);
 		const workflow = await getWorkflow(db, params.workflowId);
-		if (!workflow) error(404, 'ワークフローが見つかりません');
+		if (!workflow) error(404, 'Workflow not found');
 		if (workflow.accountId && workflow.accountId !== locals.account?.id) {
-			return fail(403, { message: '権限がありません' });
+			return fail(403, { message: 'You do not have permission' });
 		}
 		await deleteWorkflow(db, params.workflowId);
 		redirect(303, `/apps/${params.id}`);

@@ -6,20 +6,22 @@ import { getAppById } from '$lib/server/db/table-service';
 import { canManageApp } from '$lib/server/authz';
 import { parseMcpResourceAppId, MCP_TOOL_SCOPE, type McpGrantProps } from '$lib/server/mcp/oauth-config';
 
-// このページ自体はhooks.server.tsの通常のセッションガード対象(PUBLIC_PATHSに含めていない)。
-// ログインしていなければ自動的に/signinへリダイレクトされるので、ここではlocals.accountが
-// 必ず入っている前提でよい。
+// This page itself is subject to hooks.server.ts's normal session guard (not included in PUBLIC_PATHS).
+// If the user isn't logged in they're automatically redirected to /signin, so we can assume
+// locals.account is always populated here.
 //
-// このファイル全体はworkers-oauth-providerが要求する「認可UIをアプリ側で実装する」契約への
-// 対応(ライブラリはparseAuthRequest/lookupClient/completeAuthorizationというヘルパーだけ提供し、
-// 画面自体は作らない。README「Usage」節参照)。この画面の「見た目・文言・権限判定(canManageApp)」
-// はBoannの設計だが、hidden fieldでAuthRequestの各値を素通りさせる構造や、承認/拒否の結果として
-// 何を呼ぶか(completeAuthorization / リダイレクト)はOAuth 2.1の認可コードフロー
-// (https://datatracker.ietf.org/doc/html/draft-ietf-oauth-v2-1-13#section-1.3.1)が要求する手順。
+// This entire file addresses the contract workers-oauth-provider requires — "the app implements
+// the authorization UI itself" (the library only provides helpers: parseAuthRequest/lookupClient/
+// completeAuthorization; it doesn't build the screen itself. See the README's "Usage" section).
+// The "look, copy, and permission check (canManageApp)" of this screen is Boann's own design, but
+// the structure of passing each AuthRequest value through via hidden fields, and what to call as a
+// result of approve/deny (completeAuthorization / redirect), are the steps required by OAuth 2.1's
+// authorization code flow
+// (https://datatracker.ietf.org/doc/html/draft-ietf-oauth-v2-1-13#section-1.3.1).
 
-// AuthRequestの各フィールド名(response_type/client_id/redirect_uri/scope/state)はRFC 6749
-// §4.1.1が規定する認可リクエストパラメータそのもの。code_challenge/code_challenge_methodは
-// PKCE(RFC 7636)、resourceはRFC 8707(oauth-config.tsのコメント参照)。
+// AuthRequest's field names (response_type/client_id/redirect_uri/scope/state) are exactly the
+// authorization request parameters defined by RFC 6749 §4.1.1. code_challenge/code_challenge_method
+// are PKCE (RFC 7636), and resource is RFC 8707 (see the comment in oauth-config.ts).
 function authRequestFromForm(form: FormData): AuthRequest {
 	return {
 		responseType: String(form.get('response_type') ?? ''),
@@ -34,30 +36,30 @@ function authRequestFromForm(form: FormData): AuthRequest {
 }
 
 async function resolveApp(platform: App.Platform | undefined, resource: string | string[] | undefined) {
-	if (!platform?.env?.DB) throw error(503, '利用できません');
+	if (!platform?.env?.DB) throw error(503, 'Unavailable');
 	const appId = parseMcpResourceAppId(resource);
-	if (!appId) throw error(400, 'resourceパラメータが不正です(対象アプリを特定できません)');
+	if (!appId) throw error(400, 'The resource parameter is invalid (cannot identify the target app)');
 	const db = createDb(platform.env.DB);
 	const app = await getAppById(db, appId);
-	if (!app) throw error(404, 'アプリが見つかりません');
+	if (!app) throw error(404, 'App not found');
 	return { db, app };
 }
 
 export const load: PageServerLoad = async ({ request, platform, locals }) => {
-	if (!platform?.env?.OAUTH_PROVIDER) throw error(503, '利用できません');
+	if (!platform?.env?.OAUTH_PROVIDER) throw error(503, 'Unavailable');
 
 	let authReq: AuthRequest;
 	try {
 		authReq = await platform.env.OAUTH_PROVIDER.parseAuthRequest(request);
 	} catch {
-		throw error(400, '不正な認可リクエストです');
+		throw error(400, 'Invalid authorization request');
 	}
 
 	const clientInfo = await platform.env.OAUTH_PROVIDER.lookupClient(authReq.clientId);
-	if (!clientInfo) throw error(400, '未登録のクライアントです');
+	if (!clientInfo) throw error(400, 'Unregistered client');
 
 	const { app } = await resolveApp(platform, authReq.resource);
-	if (!canManageApp(app, locals.account)) throw error(403, 'このアプリを管理する権限がありません');
+	if (!canManageApp(app, locals.account)) throw error(403, 'You do not have permission to manage this app');
 
 	return {
 		authReq,
@@ -68,13 +70,13 @@ export const load: PageServerLoad = async ({ request, platform, locals }) => {
 
 export const actions: Actions = {
 	approve: async ({ request, platform, locals }) => {
-		if (!platform?.env?.OAUTH_PROVIDER || !locals.account) throw error(401, '認証が必要です');
+		if (!platform?.env?.OAUTH_PROVIDER || !locals.account) throw error(401, 'Authentication required');
 
 		const authReq = authRequestFromForm(await request.formData());
 		const { app } = await resolveApp(platform, authReq.resource);
-		if (!canManageApp(app, locals.account)) return fail(403, { message: '権限がありません' });
+		if (!canManageApp(app, locals.account)) return fail(403, { message: 'You do not have permission' });
 
-		const appId = parseMcpResourceAppId(authReq.resource) as string; // resolveAppで検証済み
+		const appId = parseMcpResourceAppId(authReq.resource) as string; // Already validated by resolveApp
 		const scope = authReq.scope.length ? authReq.scope : [MCP_TOOL_SCOPE];
 		const props: McpGrantProps = { accountId: locals.account.id, appId };
 
@@ -89,20 +91,21 @@ export const actions: Actions = {
 	},
 
 	deny: async ({ request, platform }) => {
-		if (!platform?.env?.OAUTH_PROVIDER) throw error(503, '利用できません');
+		if (!platform?.env?.OAUTH_PROVIDER) throw error(503, 'Unavailable');
 		const form = await request.formData();
 		const clientId = String(form.get('client_id') ?? '');
 		const redirectUri = String(form.get('redirect_uri') ?? '');
 		const state = String(form.get('state') ?? '');
 
-		// リダイレクト先はhidden fieldの値をそのまま信用せず、登録済みクライアントの
-		// redirect_urisに含まれるものだけを許可する(オープンリダイレクト対策。Boann独自の防御で、
-		// completeAuthorization()側は同種の検証をライブラリ内部でやっているはずだが、拒否パスは
-		// ライブラリを経由しないコードなのでここで明示的に検証している)。
+		// Don't trust the hidden field's redirect target as-is; only allow one that's included in
+		// the registered client's redirect_uris (open-redirect defense. This is Boann's own
+		// defense — completeAuthorization() presumably does the same kind of validation internally
+		// in the library, but the deny path doesn't go through the library, so we validate it
+		// explicitly here).
 		const clientInfo = await platform.env.OAUTH_PROVIDER.lookupClient(clientId);
-		if (!clientInfo || !clientInfo.redirectUris.includes(redirectUri)) throw error(400, '不正なリクエストです');
+		if (!clientInfo || !clientInfo.redirectUris.includes(redirectUri)) throw error(400, 'Invalid request');
 
-		// error=access_denied のリダイレクトはRFC 6749 §4.1.2.1が規定する認可エラーレスポンスの形。
+		// The error=access_denied redirect is the authorization error response shape defined by RFC 6749 §4.1.2.1.
 		// https://www.rfc-editor.org/rfc/rfc6749#section-4.1.2.1
 		const url = new URL(redirectUri);
 		url.searchParams.set('error', 'access_denied');

@@ -34,7 +34,7 @@ export async function getAccount(db: Db, id: string): Promise<AccountRow | null>
 	return r ? toRow(r) : null;
 }
 
-/** ログインAPI専用。`AccountRow` に `passwordHash` を加えて返す。 */
+/** For the login API only. Returns `AccountRow` with `passwordHash` added. */
 export async function getAccountByEmailWithPassword(
 	db: Db,
 	email: string
@@ -43,7 +43,7 @@ export async function getAccountByEmailWithPassword(
 	return r ? { ...toRow(r), passwordHash: r.passwordHash } : null;
 }
 
-/** パスワード変更API専用。`AccountRow` に `passwordHash` を加えて返す。 */
+/** For the password-change API only. Returns `AccountRow` with `passwordHash` added. */
 export async function getAccountWithPasswordById(
 	db: Db,
 	id: string

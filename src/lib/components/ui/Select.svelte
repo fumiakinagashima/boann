@@ -17,7 +17,7 @@
 		label,
 		value = $bindable(''),
 		options,
-		placeholder = '選択してください',
+		placeholder = 'Please select',
 		required = false,
 		disabled = false,
 		error

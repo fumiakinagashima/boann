@@ -1,4 +1,4 @@
--- apps テーブル（複数テーブル・複数ページを束ねるコンテナ）
+-- apps table (a container bundling multiple tables and multiple pages)
 CREATE TABLE `apps` (
   `id` text PRIMARY KEY NOT NULL,
   `name` text NOT NULL,
@@ -10,21 +10,21 @@ CREATE TABLE `apps` (
 );
 --> statement-breakpoint
 
--- 既存 entity_types から apps をバックフィル（1:1 移行）
+-- Backfill apps from existing entity_types (1:1 migration)
 INSERT INTO `apps` (`id`, `name`, `label`, `icon`, `created_at`, `updated_at`)
 SELECT `id`, `name`, `label`, `icon`, coalesce(`created_at`, unixepoch()), unixepoch()
 FROM `entity_types`;
 --> statement-breakpoint
 
--- entity_types に app_id カラム追加
+-- Add an app_id column to entity_types
 ALTER TABLE `entity_types` ADD COLUMN `app_id` text REFERENCES `apps`(`id`);
 --> statement-breakpoint
 
--- 既存レコードは app_id = id（1:1）
+-- For existing records, app_id = id (1:1)
 UPDATE `entity_types` SET `app_id` = `id`;
 --> statement-breakpoint
 
--- app_pages テーブル（アプリ内のページ定義）
+-- app_pages table (page definitions within an app)
 CREATE TABLE `app_pages` (
   `id` text PRIMARY KEY NOT NULL,
   `app_id` text NOT NULL REFERENCES `apps`(`id`),
@@ -36,7 +36,7 @@ CREATE TABLE `app_pages` (
 );
 --> statement-breakpoint
 
--- 既存 entity_types から app_pages をバックフィル（1ページずつ）
+-- Backfill app_pages from existing entity_types (one page each)
 INSERT INTO `app_pages` (`id`, `app_id`, `label`, `table_id`, `view_type`, `sort_order`, `created_at`)
 SELECT `id` || '_p', `id`, `label`, `id`, 'list', 0, coalesce(`created_at`, unixepoch())
 FROM `entity_types`;

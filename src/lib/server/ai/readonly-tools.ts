@@ -1,7 +1,7 @@
 import { tools } from '$lib/server/tools';
 
-// 情報取得のみ許可するツール名のセット。フォーム入力サポート・ワークフロー構築サポートなど、
-// データの登録・更新・削除を行わせたくない補助チャットで共有する。
+// The set of tool names that only allow retrieving information. Shared by auxiliary chats —
+// such as form-input support and workflow-building support — where we don't want data to be created, updated, or deleted.
 export const READONLY_TOOL_NAMES = new Set([
 	'list_integrations',
 	'list_entity_types',

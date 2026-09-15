@@ -23,7 +23,7 @@
 		try {
 			const res = await fetch(`/api/documents/jobs/${jobId}`);
 			if (!res.ok) {
-				job = { status: 'error', error: '資料の生成状況を取得できませんでした' };
+				job = { status: 'error', error: 'Could not retrieve the document generation status' };
 				stop();
 				return;
 			}
@@ -32,7 +32,7 @@
 			if (data.status !== 'pending') stop();
 			if (data.status === 'done') onResolved?.(data.result);
 		} catch {
-			job = { status: 'error', error: '資料の生成状況を取得できませんでした' };
+			job = { status: 'error', error: 'Could not retrieve the document generation status' };
 			stop();
 		}
 	}
@@ -55,12 +55,12 @@
 {#if job.status === 'pending'}
 	<div class="job-pending">
 		<span class="spinner"></span>
-		<span class="job-label">生成中: {label}</span>
+		<span class="job-label">Generating: {label}</span>
 	</div>
 {:else if job.status === 'done'}
 	<Link label={job.result.label} href={job.result.href} description={job.result.description} newTab={job.result.newTab} download={true} />
 {:else}
-	<p class="job-error">資料の生成に失敗しました: {job.error}</p>
+	<p class="job-error">Document generation failed: {job.error}</p>
 {/if}
 
 <style lang="scss">

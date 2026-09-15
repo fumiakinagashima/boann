@@ -43,8 +43,8 @@ function constantTimeEqual(a: Uint8Array, b: Uint8Array): boolean {
 }
 
 /**
- * パスワードをハッシュ化する。フォーマット: `pbkdf2:<iterations>:<saltBase64>:<hashBase64>`
- * 将来別方式へ移行する場合は、このファイル内（hashPassword/verifyPassword）のみを変更すればよい。
+ * Hashes a password. Format: `pbkdf2:<iterations>:<saltBase64>:<hashBase64>`
+ * If migrating to a different scheme in the future, only this file (hashPassword/verifyPassword) needs to change.
  */
 export async function hashPassword(password: string): Promise<string> {
 	const salt = crypto.getRandomValues(new Uint8Array(SALT_LENGTH_BYTES));
@@ -53,8 +53,9 @@ export async function hashPassword(password: string): Promise<string> {
 }
 
 /**
- * パスワードを検証する。`stored` が旧SHA-256形式（仮実装）の場合はそちらで検証し、
- * 一致すれば `rehash` にPBKDF2形式の新ハッシュを返す（呼び出し側でDB更新する）。
+ * Verifies a password. If `stored` is in the legacy SHA-256 format (a provisional implementation),
+ * verify against that instead, and if it matches, return a new PBKDF2-format hash in `rehash` (the
+ * caller updates the DB with it).
  */
 export async function verifyPassword(
 	password: string,

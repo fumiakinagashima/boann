@@ -2,8 +2,9 @@ import { describe, it, expect } from 'vitest';
 import { handleMcpMessage, LEGACY_PROTOCOL_VERSIONS, MODERN_PROTOCOL_VERSIONS } from './protocol';
 import type { Db } from '../db';
 
-// tools/list・tools/callはDBアクセスが必要なため対象外(このリポジトリのvitestにDBモック基盤が無い)。
-// ここではDBに触れないパス(initialize/server/discover/ping/resources/read/バリデーションエラー)のみ検証する。
+// tools/list and tools/call are out of scope since they require DB access (this repo's vitest
+// setup has no DB mocking infrastructure). Here we only verify the paths that don't touch the
+// DB (initialize/server/discover/ping/resources/read/validation errors).
 const db = {} as Db;
 const appId = 'app-1';
 

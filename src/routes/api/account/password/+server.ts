@@ -19,12 +19,12 @@ export const PATCH: RequestHandler = async ({ request, platform, locals }) => {
 
 	const account = await getAccountWithPasswordById(db, locals.account!.id);
 	if (!account?.passwordHash) {
-		return errors.badRequest('現在のパスワードが正しくありません');
+		return errors.badRequest('The current password is incorrect');
 	}
 
 	const result = await verifyPassword(data.currentPassword, account.passwordHash);
 	if (!result.valid) {
-		return errors.badRequest('現在のパスワードが正しくありません');
+		return errors.badRequest('The current password is incorrect');
 	}
 
 	await updateAccount(db, locals.account!.id, { passwordHash: await hashPassword(data.newPassword) });

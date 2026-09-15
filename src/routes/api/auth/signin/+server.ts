@@ -14,7 +14,7 @@ const signinSchema = z.object({
 });
 
 export const POST: RequestHandler = async ({ request, platform, cookies, url }) => {
-	if (!platform?.env?.DB || !platform.env.KV) return errors.serviceUnavailable('利用できません');
+	if (!platform?.env?.DB || !platform.env.KV) return errors.serviceUnavailable('Not available');
 
 	const ip = request.headers.get('CF-Connecting-IP') ?? request.headers.get('X-Forwarded-For') ?? 'unknown';
 	const rl = await checkRateLimit(platform.env.KV, 'signin', ip, { windowSeconds: 900, maxRequests: 10 });
@@ -25,12 +25,12 @@ export const POST: RequestHandler = async ({ request, platform, cookies, url }) 
 
 	const account = await getAccountByEmailWithPassword(db, data.email);
 	if (!account || !account.passwordHash) {
-		return errors.badRequest('メールアドレスまたはパスワードが正しくありません');
+		return errors.badRequest('Email address or password is incorrect');
 	}
 
 	const result = await verifyPassword(data.password, account.passwordHash);
 	if (!result.valid) {
-		return errors.badRequest('メールアドレスまたはパスワードが正しくありません');
+		return errors.badRequest('Email address or password is incorrect');
 	}
 
 	if (result.rehash) {

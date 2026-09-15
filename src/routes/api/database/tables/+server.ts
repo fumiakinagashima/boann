@@ -17,7 +17,7 @@ export const POST: RequestHandler = async ({ request, platform }) => {
 		const body = await request.json() as EntityTypeInput & { appId?: string };
 		let appId = body.appId;
 		if (!appId) {
-			// appId 未指定の場合は同名アプリを自動作成（後方互換）
+			// If appId is not specified, automatically create an app with the same name (backward compatibility)
 			const { createApp } = await import('$lib/server/db/table-service');
 			const app = await createApp(db, { name: body.name, label: body.label, icon: body.icon });
 			appId = app.id;

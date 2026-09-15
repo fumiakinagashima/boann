@@ -26,7 +26,7 @@ export const POST: RequestHandler = async ({ request, platform, locals }) => {
 			appId?: string;
 		};
 		const name = body.name?.trim();
-		if (!name) return json({ error: 'ワークフロー名を入力してください' }, { status: 422 });
+		if (!name) return json({ error: 'Please enter a workflow name' }, { status: 422 });
 		const triggerType = body.triggerType ?? 'mcp_tool';
 		const triggerHour = body.triggerHour ?? 9;
 		const triggerMinute = body.triggerMinute ?? 0;

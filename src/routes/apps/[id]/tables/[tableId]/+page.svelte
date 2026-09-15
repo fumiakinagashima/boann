@@ -26,23 +26,23 @@
 					<h1>{data.app.label}</h1>
 				</div>
 				<div class="header-actions">
-					<a href="/apps/{data.appId}/tables/{data.app.id}/build" class="btn-secondary">テーブル設定</a>
-					<button class="btn-primary" onclick={s.openNew}>+ レコード追加</button>
+					<a href="/apps/{data.appId}/tables/{data.app.id}/build" class="btn-secondary">Table settings</a>
+					<button class="btn-primary" onclick={s.openNew}>+ Add record</button>
 				</div>
 			</div>
 		</div>
 
 		{#if s.fields.length === 0}
 			<div class="empty">
-				<p class="empty-title">フィールドが設定されていません</p>
-				<p class="empty-desc">テーブル設定でフィールドを追加してください。</p>
-				<a href="/apps/{data.appId}/tables/{data.app.id}/build" class="btn-primary">テーブル設定を開く</a>
+				<p class="empty-title">No fields have been set up</p>
+				<p class="empty-desc">Add fields in the table settings.</p>
+				<a href="/apps/{data.appId}/tables/{data.app.id}/build" class="btn-primary">Open table settings</a>
 			</div>
 		{:else if s.records.length === 0}
 			<div class="empty">
-				<p class="empty-title">レコードがまだありません</p>
-				<p class="empty-desc">「レコード追加」からデータを登録してください。</p>
-				<button class="btn-primary" onclick={s.openNew}>+ レコード追加</button>
+				<p class="empty-title">No records yet</p>
+				<p class="empty-desc">Register data from "Add record".</p>
+				<button class="btn-primary" onclick={s.openNew}>+ Add record</button>
 			</div>
 		{:else}
 			<div class="table-wrap">
@@ -52,7 +52,7 @@
 							{#each s.listFields as field}
 								<th>{field.label}</th>
 							{/each}
-							<th>登録日時</th>
+							<th>Registered at</th>
 						</tr>
 					</thead>
 					<tbody>
@@ -89,8 +89,8 @@
 	{#if s.formOpen}
 		<div class="form-panel">
 			<div class="form-panel-header">
-				<h2>{s.formMode === 'new' ? '新規レコード' : 'レコードを編集'}</h2>
-				<button class="form-close-btn" onclick={s.closeForm} aria-label="閉じる">×</button>
+				<h2>{s.formMode === 'new' ? 'New record' : 'Edit record'}</h2>
+				<button class="form-close-btn" onclick={s.closeForm} aria-label="Close">×</button>
 			</div>
 
 			<div class="form-panel-body">
@@ -105,7 +105,7 @@
 							<SearchSelect
 								bind:value={s.formData[field.key]}
 								options={s.recordOptions[field.key] ?? []}
-								placeholder="選択または検索…"
+								placeholder="Select or search…"
 								required={field.required}
 							/>
 						{:else if field.type === 'select'}
@@ -114,7 +114,7 @@
 								class="form-select"
 								bind:value={s.formData[field.key]}
 							>
-								{#if !field.required}<option value="">— 選択してください —</option>{/if}
+								{#if !field.required}<option value="">— Select —</option>{/if}
 								{#each (field.options ?? []) as opt}
 									<option value={opt.value}>{opt.label}</option>
 								{/each}
@@ -147,14 +147,14 @@
 			<div class="form-panel-footer">
 				{#if s.formMode === 'edit'}
 					<button class="btn-delete" onclick={s.deleteRecord} disabled={s.deleting}>
-						{s.deleting ? '削除中…' : '削除'}
+						{s.deleting ? 'Deleting…' : 'Delete'}
 					</button>
 				{/if}
 				<div class="footer-right">
 					{#if s.saveError}<span class="save-error">{s.saveError}</span>{/if}
-					<button class="btn-cancel" onclick={s.closeForm}>キャンセル</button>
+					<button class="btn-cancel" onclick={s.closeForm}>Cancel</button>
 					<button class="btn-save" onclick={s.saveRecord} disabled={s.saving}>
-						{s.saving ? '保存中…' : '保存'}
+						{s.saving ? 'Saving…' : 'Save'}
 					</button>
 				</div>
 			</div>

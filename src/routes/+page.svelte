@@ -24,14 +24,14 @@
 {#snippet createMenu()}
 	<div class="create">
 		<button class="btn-primary" onclick={() => (menuOpen = !menuOpen)} disabled={s.creating}>
-			アプリを作成
+			Create app
 			<ChevronDown size={16} />
 		</button>
 		{#if menuOpen}
-			<button class="menu-backdrop" aria-label="閉じる" onclick={() => (menuOpen = false)}></button>
+			<button class="menu-backdrop" aria-label="Close" onclick={() => (menuOpen = false)}></button>
 			<div class="menu" role="menu">
-				<button class="menu-item" role="menuitem" onclick={createBlank}>空から作成</button>
-				<button class="menu-item" role="menuitem" onclick={openImport}>ファイルから作成</button>
+				<button class="menu-item" role="menuitem" onclick={createBlank}>Start from scratch</button>
+				<button class="menu-item" role="menuitem" onclick={openImport}>Create from file</button>
 			</div>
 		{/if}
 	</div>
@@ -40,15 +40,15 @@
 <div class="page">
 	<div class="page-header">
 		<div>
-			<h1>アプリ一覧</h1>
+			<h1>Apps</h1>
 		</div>
 		{@render createMenu()}
 	</div>
 
 	{#if s.apps.length === 0}
 		<div class="empty">
-			<p class="empty-title">アプリがまだありません</p>
-			<p class="empty-desc">「アプリを作成」からはじめて、AIに仕様を伝えましょう。</p>
+			<p class="empty-title">No apps yet</p>
+			<p class="empty-desc">Get started with "Create app" and tell the AI your requirements.</p>
 			{@render createMenu()}
 		</div>
 	{:else}

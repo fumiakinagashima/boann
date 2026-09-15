@@ -5,9 +5,9 @@ import { aiSettings } from '$lib/server/db/schema';
 export const DEFAULT_AI_MODEL = 'claude-haiku-4-5-20251001';
 
 export const AI_MODEL_OPTIONS = [
-	{ value: 'claude-haiku-4-5-20251001', label: 'Claude Haiku 4.5（高速・低コスト）' },
-	{ value: 'claude-sonnet-4-6', label: 'Claude Sonnet 4.6（バランス型）' },
-	{ value: 'claude-opus-4-8', label: 'Claude Opus 4.8（最高性能）' }
+	{ value: 'claude-haiku-4-5-20251001', label: 'Claude Haiku 4.5 (fast, low cost)' },
+	{ value: 'claude-sonnet-4-6', label: 'Claude Sonnet 4.6 (balanced)' },
+	{ value: 'claude-opus-4-8', label: 'Claude Opus 4.8 (highest performance)' }
 ];
 
 const SETTINGS_ID = 'default';

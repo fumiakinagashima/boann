@@ -9,30 +9,30 @@ export const tools: Tool[] = [
 	{
 		name: 'list_integrations',
 		description:
-			'登録済みの外部API連携の一覧を取得する。どの外部APIが使えるか確認するために使う。',
+			'Get the list of registered external API integrations. Use this to check which external APIs are available.',
 		input_schema: { type: 'object', properties: {}, required: [] }
 	},
 	{
 		name: 'call_external_api',
 		description:
-			'設定済みの外部APIを呼び出す。Slackへの通知送信・外部サービスのデータ取得など。まず list_integrations で使える連携を確認してから使う。',
+			'Call a configured external API. Used for things like sending a Slack notification or fetching data from an external service. Check the available integrations with list_integrations first before using this.',
 		input_schema: {
 			type: 'object',
 			properties: {
-				integration_id: { type: 'string', description: '連携のID（list_integrations で確認）' },
+				integration_id: { type: 'string', description: 'ID of the integration (check with list_integrations)' },
 				endpoint: {
 					type: 'string',
 					description:
-						'エンドポイントのパス（例: /chat.postMessage）またはフルURL。Webhook のようにベースURLだけで完結する場合は省略するか "/" を指定する'
+						'Endpoint path (e.g. /chat.postMessage) or a full URL. If the base URL alone is enough (as with a webhook), omit this or specify "/"'
 				},
 				method: {
 					type: 'string',
 					enum: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'],
-					description: 'HTTPメソッド'
+					description: 'HTTP method'
 				},
-				body: { type: 'object', description: 'リクエストボディ（JSON）' },
-				query: { type: 'object', description: 'クエリパラメータ' },
-				headers: { type: 'object', description: '追加リクエストヘッダー' }
+				body: { type: 'object', description: 'Request body (JSON)' },
+				query: { type: 'object', description: 'Query parameters' },
+				headers: { type: 'object', description: 'Additional request headers' }
 			},
 			required: ['integration_id', 'endpoint', 'method']
 		}
@@ -70,7 +70,7 @@ export async function handleCallExternalApi(db: Db, input: unknown) {
 		.select()
 		.from(integrations)
 		.where(eq(integrations.id, p.integration_id));
-	if (!integration) throw new Error(`連携が見つかりません: ${p.integration_id}`);
+	if (!integration) throw new Error(`Integration not found: ${p.integration_id}`);
 
 	const authConfig = parseJson(integration.authConfig);
 
@@ -80,7 +80,7 @@ export async function handleCallExternalApi(db: Db, input: unknown) {
 		path = base;
 	} else if (p.endpoint.startsWith('http')) {
 		if (new URL(p.endpoint).origin !== new URL(base).origin) {
-			throw new Error('endpoint は連携先（baseUrl）と同じホストのURLのみ指定できます');
+			throw new Error('endpoint may only be a URL on the same host as the integration target (baseUrl)');
 		}
 		path = p.endpoint;
 	} else {

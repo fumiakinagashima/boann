@@ -62,9 +62,9 @@
 		return fields.map(({ _id: _drop, ...f }) => f);
 	}
 
-	// チャットの $state からの値は深くリアクティブなProxyの場合があり、
-	// ブラウザ native の structuredClone がそれを認識できず DataCloneError になることがあるため、
-	// JSONシリアライズで複製する（WorkflowStep は常にプレーンなJSONデータのため安全）。
+	// Values from the chat's $state can be deeply reactive Proxies, which the browser's native
+	// structuredClone doesn't recognize, causing a DataCloneError — so we clone via JSON
+	// serialization instead (safe since WorkflowStep is always plain JSON data).
 	function cloneSteps(steps: WorkflowStep[]): WorkflowStep[] {
 		return JSON.parse(JSON.stringify(steps));
 	}
@@ -84,7 +84,7 @@
 		return { name, description: description || null, triggerType, triggerHour, triggerMinute, triggerEvent, triggerEntityTypeId, inputSchema: stripLocalId(inputSchema), steps };
 	}
 
-	/** 外部（AIアシスタントパネル等）から提案された状態を反映する。 */
+	/** Reflects state proposed from an external source (e.g. the AI assistant panel). */
 	export function setState(def: WorkflowState) {
 		name = def.name;
 		description = def.description ?? '';
@@ -101,16 +101,16 @@
 		inputSchemaDrawerOpen = true;
 	}
 
-	// イベントトリガー時、ステップ内で @trigger:<field> として参照できるフィールド一覧
-	// （id/event等のシステムフィールド＋選択中テーブルのカスタムフィールド）
+	// List of fields referenceable within steps as @trigger:<field> on an event trigger
+	// (system fields like id/event plus the custom fields of the selected table)
 	const triggerFields = $derived(
 		triggerType === 'event' ? triggerFieldsFor(entityTypes, triggerEntityTypeId) : []
 	);
 
-	// 宣言された入力パラメータ。ステップ内で @input:<key> として参照できる一覧（キー・ラベルのみ）。
+	// Declared input parameters. List referenceable within steps as @input:<key> (key and label only).
 	const inputFields = $derived(inputSchema.map((f) => ({ key: f.key, label: f.label })));
 
-	// resultステップの設定内容から組み立てる、実行前のプレビュー（@step:等の参照は解決せずトークンのまま）。
+	// Pre-execution preview assembled from the result step's configuration (references like @step: are left as tokens, not resolved).
 	const resultPreview = $derived(buildResultPreview(steps));
 	const hasResultPreview = $derived(Object.keys(resultPreview).length > 0);
 </script>
@@ -118,13 +118,13 @@
 <div class="wf-wrap">
 	<div class="wf-header">
 		{#if editable}
-			<input type="text" class="wf-name-input" bind:value={name} placeholder="ワークフロー名" />
+			<input type="text" class="wf-name-input" bind:value={name} placeholder="Workflow name" />
 		{:else}
 			<span class="wf-name">{name}</span>
 		{/if}
-		<!-- MCP専用フェーズのためトリガー設定UIは非表示（triggerType自体のデータ・ロジックはそのまま維持） -->
+		<!-- Trigger configuration UI is hidden during the MCP-only phase (triggerType's own data/logic is kept as-is) -->
 		{#if onsave}
-			<button class="btn-save" onclick={() => onsave?.(getState())}>保存</button>
+			<button class="btn-save" onclick={() => onsave?.(getState())}>Save</button>
 		{/if}
 	</div>
 
@@ -134,7 +134,7 @@
 				<textarea
 					class="wf-description-input"
 					bind:value={description}
-					placeholder="このワークフローが何をするか説明する（MCPツールとして呼び出す外部AIエージェントが判断材料に使う）"
+					placeholder="Describe what this workflow does (used by external AI agents to decide when to call it as an MCP tool)"
 					rows="4"
 				></textarea>
 			{:else}
@@ -161,7 +161,7 @@
 
 	{#if hasResultPreview}
 		<div class="wf-result-preview">
-			<div class="wf-result-preview-title">結果プレビュー</div>
+			<div class="wf-result-preview-title">Result preview</div>
 			<pre class="wf-result-preview-json">{formatResultPreview(resultPreview)}</pre>
 		</div>
 	{/if}

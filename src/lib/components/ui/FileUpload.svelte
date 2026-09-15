@@ -60,7 +60,7 @@
 		ondrop={handleDrop}
 	>
 		<Upload size={28} />
-		<p>クリックまたはドラッグ＆ドロップ</p>
+		<p>Click or drag and drop</p>
 		{#if accept}<span class="hint">{accept}</span>{/if}
 		<input
 			bind:this={inputEl}
@@ -79,7 +79,7 @@
 				<li>
 					<span class="name">{f.name}</span>
 					<span class="size">{(f.size / 1024).toFixed(1)} KB</span>
-					<button type="button" onclick={() => removeFile(i)} aria-label="削除">×</button>
+					<button type="button" onclick={() => removeFile(i)} aria-label="Remove">×</button>
 				</li>
 			{/each}
 		</ul>
